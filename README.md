@@ -1,2 +1,2 @@
-# SelfTrainingML
-Self Training Machine Learning module
+# AutoML
+Automated Machine Learning module

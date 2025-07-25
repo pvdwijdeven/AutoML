@@ -1,7 +1,7 @@
 [project]
-name = "selftrainingml"
+name = "automl"
 version = "0.1.0"
-description = "Add your description here"
+description = "automated machine learning framework"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
