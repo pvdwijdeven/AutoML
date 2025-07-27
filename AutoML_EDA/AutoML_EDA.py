@@ -13,6 +13,7 @@ class AutoML_EDA:
         self.logger = logger
 
     def read_data(self, file_path) -> pd.DataFrame | None:
+        self.logger.info(f"[BLUE]- Reading data from {file_path}")
         if not file_path:
             return None
         try:
@@ -27,7 +28,8 @@ class AutoML_EDA:
             print(f"Error reading {file_path}: {e}")
             return None
 
-    def perform_eda(self):
+    def perform_eda(self) -> str:
+        self.logger.info("[MAGENTA]Starting EDA (Exploratory Data Analysis)")
         self.df_train = self.read_data(self.file_train)
         if self.df_train is None:
             self.logger.error("Training data could not be loaded.")
@@ -38,8 +40,10 @@ class AutoML_EDA:
                 "Test data could not be loaded. Using only training data."
             )
 
-        print(self.df_train.info())
+        print(f"training data: {self.df_train.shape}")
 
         if self.df_test is not None:
-            print(self.df_test.info())
+            print(f"test data: {self.df_test.shape}")
+
+        self.logger.info("[MAGENTA]EDA (Exploratory Data Analysis) is done")
         return "EDA completed successfully with the provided datasets."
