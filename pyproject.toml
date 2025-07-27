@@ -10,5 +10,4 @@ dependencies = [
     "scikit-learn>=1.7.1",
     "setuptools>=80.9.0",
     "wxpython>=4.2.3",
-    "ydata-profiling>=4.16.1",
 ]
