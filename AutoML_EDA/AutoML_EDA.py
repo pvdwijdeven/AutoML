@@ -1,4 +1,28 @@
 import pandas as pd
+from pandas.api.types import (
+    is_integer_dtype,
+    is_float_dtype,
+    is_bool_dtype,
+    is_string_dtype,
+    is_object_dtype,
+)
+import json
+
+
+def infer_dtype(series: pd.Series) -> str:
+    if is_bool_dtype(series):
+        return "boolean"
+    if is_integer_dtype(series):
+        return "integer"
+    if is_float_dtype(series):
+        return "float"
+    if isinstance(series.dtype, pd.CategoricalDtype):
+        return "category"
+    if is_string_dtype(series):
+        return "string"
+    if is_object_dtype(series):
+        return "object"
+    return str(series.dtype)
 
 
 class AutoML_EDA:
@@ -28,6 +52,132 @@ class AutoML_EDA:
             print(f"Error reading {file_path}: {e}")
             return None
 
+    def column_type(
+        self,
+        df_train: pd.DataFrame,
+        df_test: pd.DataFrame | None,
+        column_name: str,
+    ) -> None:
+        def normalize_booleans(series: pd.Series) -> pd.Series:
+            if pd.api.types.is_object_dtype(
+                series
+            ) or pd.api.types.is_string_dtype(series):
+                return series.map(
+                    lambda x: str(x).strip().lower() if pd.notna(x) else x
+                ).replace({"true": True, "false": False})
+            return series
+
+        def convert_to_numeric(series: pd.Series) -> pd.Series:
+            return pd.to_numeric(
+                series.astype(str)
+                .str.strip()
+                .str.replace(r'^[\'"]+|[\'"]+$', "", regex=True),
+                errors="coerce",
+            )
+
+        col_series_train = df_train[column_name]
+
+        # Step 1: Normalize booleans
+        col_series_train = normalize_booleans(col_series_train)
+
+        # Step 2: Detect if boolean
+        unique_values = pd.Series(col_series_train.dropna().unique())
+        if unique_values.isin([True, False]).all():
+            df_train[column_name] = col_series_train.astype("boolean")
+            if df_test is not None and column_name in df_test.columns:
+                df_test[column_name] = normalize_booleans(
+                    df_test[column_name]
+                ).astype("boolean")
+            return
+
+        # Step 3: Categorical vs String
+        inferred_dtype = None
+        if pd.api.types.is_object_dtype(df_train[column_name]):
+            unique_ratio = df_train[column_name].nunique(dropna=True) / len(
+                df_train
+            )
+            inferred_dtype = "category" if unique_ratio < 0.1 else "string"
+            df_train[column_name] = df_train[column_name].astype(inferred_dtype)
+
+        # Step 4: Attempt numeric conversion
+        try_numeric = pd.api.types.is_object_dtype(
+            col_series_train
+        ) or pd.api.types.is_string_dtype(col_series_train)
+        if try_numeric:
+            try:
+                converted = convert_to_numeric(col_series_train)
+            except Exception as e:
+                self.logger.warning(
+                    f"Conversion to numeric failed for column '{column_name}': {e}"
+                )
+                converted = None
+        elif pd.api.types.is_numeric_dtype(col_series_train):
+            converted = col_series_train.copy()
+        else:
+            converted = None
+
+        if converted is not None:
+            non_na_count = col_series_train.notna().sum()
+            if converted.notna().sum() == non_na_count:
+                if (
+                    pd.api.types.is_float_dtype(converted)
+                    and (converted.dropna() % 1 == 0).all()
+                ):
+                    df_train[column_name] = converted.astype("Int64")
+                    inferred_dtype = "Int64"
+                else:
+                    df_train[column_name] = converted
+                    inferred_dtype = str(converted.dtype)
+
+        # Step 5: Apply same dtype to df_test
+        if df_test is not None and column_name in df_test.columns:
+            col_test = df_test[column_name]
+            if inferred_dtype == "boolean":
+                df_test[column_name] = normalize_booleans(col_test).astype(
+                    "boolean"
+                )
+            elif inferred_dtype == "category":
+                df_test[column_name] = col_test.astype("category")
+            elif inferred_dtype == "string":
+                df_test[column_name] = col_test.astype("string")
+            elif inferred_dtype == "Int64":
+                try:
+                    converted_test = convert_to_numeric(col_test)
+                    df_test[column_name] = converted_test.astype("Int64")
+                except Exception as e:
+                    self.logger.warning(
+                        f"Failed to apply Int64 conversion to test column '{column_name}': {e}"
+                    )
+            elif inferred_dtype is not None and inferred_dtype.startswith(
+                "float"
+            ):
+                try:
+                    converted_test = convert_to_numeric(col_test)
+                    # Use numpy dtype object for astype
+                    import numpy as np
+
+                    df_test[column_name] = converted_test.astype(np.float64)
+                except Exception as e:
+                    self.logger.warning(
+                        f"Failed to apply float conversion to test column '{column_name}': {e}"
+                    )
+
+    def analyse_columns(
+        self, df_train: pd.DataFrame, df_test: pd.DataFrame | None
+    ) -> None:
+        self.type_conversion = {}
+        for column in df_train.columns:
+            self.type_conversion[column] = {}
+            self.type_conversion[column]["original"] = infer_dtype(
+                df_train[column]
+            )
+            self.column_type(df_train, df_test, column)
+            self.type_conversion[column]["new"] = infer_dtype(df_train[column])
+        self.logger.info(
+            "[GREEN]- Column type analysis completed. Changes made:"
+        )
+        self.logger.info(f"[CYAN]{json.dumps(self.type_conversion, indent=4)}")
+
     def perform_eda(self) -> str:
         self.logger.info("[MAGENTA]Starting EDA (Exploratory Data Analysis)")
         self.df_train = self.read_data(self.file_train)
@@ -45,5 +195,6 @@ class AutoML_EDA:
         if self.df_test is not None:
             print(f"test data: {self.df_test.shape}")
 
+        self.analyse_columns(self.df_train, self.df_test)
         self.logger.info("[MAGENTA]EDA (Exploratory Data Analysis) is done")
         return "EDA completed successfully with the provided datasets."
