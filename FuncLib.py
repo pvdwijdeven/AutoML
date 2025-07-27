@@ -100,8 +100,7 @@ class Logger(logging.getLoggerClass()):
             if log_folder and not os.path.exists(log_folder):
                 os.makedirs(log_folder)
             log_formatter = logging.Formatter(
-                fmt="%(asctime)s | %(levelname)-8s | %(filename)-40s \
-                | line %(lineno)-4d | %(message)s ",
+                fmt="%(asctime)s | %(levelname)-8s | %(filename)-20s | line %(lineno)-4d | %(message)s ",
                 datefmt="%Y-%m-%d %H:%M:%S",
             )
             max_log_size = 5 * 1024 * 1024
