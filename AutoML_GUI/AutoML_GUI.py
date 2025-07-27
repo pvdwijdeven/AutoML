@@ -1,75 +1,10 @@
 import wx
 from AutoML_EDA import AutoML_EDA
 from pathlib import Path
-from FuncLib import Logger
+from FuncLib import Logger, TextCtrlHandler, WxTextRedirector
 import logging
 import sys
 import threading
-
-
-class WxTextRedirector:
-    def __init__(self, text_ctrl, color=wx.BLACK):
-        self.text_ctrl = text_ctrl
-        self.color = color  # store the default color
-
-    def write(self, string):
-        # if string.strip():
-
-        def append():
-            self.text_ctrl.SetDefaultStyle(wx.TextAttr(self.color))
-            self.text_ctrl.AppendText(string)
-            self.text_ctrl.SetDefaultStyle(
-                wx.TextAttr(wx.BLACK)
-            )  # reset if needed
-
-        wx.CallAfter(append)
-
-    def flush(self):
-        pass  # required for compatibility
-
-
-class TextCtrlHandler(logging.Handler):
-    INFO_COLORS = {
-        "GREEN": wx.Colour(0, 153, 0),
-        "BLUE": wx.Colour(0, 0, 153),
-        "YELLOW": wx.Colour(153, 153, 0),
-        "RED": wx.Colour(153, 0, 0),
-        "BLACK": wx.Colour(0, 0, 0),
-        "WHITE": wx.Colour(255, 255, 255),
-        "CYAN": wx.Colour(0, 153, 153),
-        "MAGENTA": wx.Colour(153, 0, 153),
-        "ORANGE": wx.Colour(255, 165, 0),
-        "GREY": wx.Colour(128, 128, 128),
-    }
-
-    LEVEL_COLORS = {
-        logging.DEBUG: INFO_COLORS["GREY"],
-        logging.INFO: INFO_COLORS["BLACK"],
-        logging.WARNING: INFO_COLORS["ORANGE"],
-        logging.ERROR: INFO_COLORS["RED"],
-        logging.CRITICAL: INFO_COLORS["RED"],
-    }
-
-    def __init__(self, text_ctrl):
-        super().__init__()
-        self.text_ctrl = text_ctrl
-
-    def emit(self, record):
-        msg = self.format(record)
-        msg_color = self.LEVEL_COLORS.get(record.levelno, wx.Colour(0, 0, 0))
-        if record.levelno == logging.INFO:
-            for color in self.INFO_COLORS:
-                if f"[{color}]" in msg:
-                    msg_color = self.INFO_COLORS.get(color, wx.Colour(0, 0, 0))
-                    msg = msg.replace(f"[{color}]", "")
-                    break
-
-        def append():
-            self.text_ctrl.SetDefaultStyle(wx.TextAttr(msg_color))
-            self.text_ctrl.AppendText(msg + "\n")
-            self.text_ctrl.SetDefaultStyle(wx.TextAttr(wx.BLACK))  # Reset
-
-        wx.CallAfter(append)
 
 
 class AutoMLFrame(wx.Frame):
