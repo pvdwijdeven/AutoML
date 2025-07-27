@@ -30,6 +30,10 @@ class AutoMLFrame(wx.Frame):
                 "text": "Open test data (.csv/.xlsx)",
                 "function": lambda event: self.on_open_file("test"),
             },
+            "ReportFile": {
+                "text": "Select report file (.html)",
+                "function": lambda event: self.on_select_output("ReportFile"),
+            },
             "StartEDA": {
                 "text": "Start EDA",
                 "function": lambda event: self.on_start_eda(),
@@ -48,7 +52,7 @@ class AutoMLFrame(wx.Frame):
             },
             "OutputFile": {
                 "text": "Select Output csv File",
-                "function": lambda event: self.on_select_output(),
+                "function": lambda event: self.on_select_output("OutputFile"),
             },
         }
 
@@ -114,8 +118,24 @@ class AutoMLFrame(wx.Frame):
                 test_path = args.project_root / args.test_data
             self.buttons_info["test"]["label"].SetLabel(f"{test_path}")
             self.logger.info("[GREEN]test data from command line")
+        if args.report_file:
+            if Path(args.report_file).is_absolute():
+                report_path = Path(args.report_file)
+            else:
+                report_path = args.project_root / args.report_file
+            self.buttons_info["ReportFile"]["label"].SetLabel(f"{report_path}")
+            self.logger.info("[GREEN]report file from command line")
+        if args.output_file:
+            if Path(args.output_file).is_absolute():
+                output_path = Path(args.output_file)
+            else:
+                output_path = args.project_root / args.output_file
+            self.buttons_info["OutputFile"]["label"].SetLabel(f"{output_path}")
+            self.logger.info("[GREEN]output file from command line")
 
         self.Show()
+        if args.EDA:
+            self.on_start_eda()
 
     def on_exit(self, event):
         self.Close()
@@ -132,19 +152,21 @@ class AutoMLFrame(wx.Frame):
             path = file_dialog.GetPath()
             self.buttons_info[kind]["label"].SetLabel(f"{path}")
 
-    def on_select_output(self):
+    def on_select_output(self, kind):
         with wx.FileDialog(
             self,
-            "Save CSV file",
-            wildcard="CSV files (*.csv)|*.csv",
+            f"Select {kind}",
+            wildcard=(
+                "CSV files (*.csv)|*.csv"
+                if kind == "OutputFile"
+                else "HTML files (*.html)|*.html"
+            ),
             style=wx.FD_SAVE | wx.FD_OVERWRITE_PROMPT,
         ) as file_dialog:
             if file_dialog.ShowModal() == wx.ID_CANCEL:
                 return
             path = file_dialog.GetPath()
-            if not path.endswith(".xlsx"):
-                path += ".xlsx"
-            self.buttons_info["OutputFile"]["label"].SetLabel(f"Output: {path}")
+            self.buttons_info[kind]["label"].SetLabel(f"{path}")
 
     def on_start_eda(self):
         thread = threading.Thread(target=self.actual_eda)
@@ -153,11 +175,12 @@ class AutoMLFrame(wx.Frame):
     def actual_eda(self):
         # Placeholder for EDA functionality
         self.buttons_info["StartEDA"]["label"].SetLabel("EDA started")
-        result = AutoML_EDA(
+        current_EDA = AutoML_EDA(
             logger=self.logger,
             file_train=self.buttons_info["training"]["label"].GetLabel(),
             file_test=self.buttons_info["test"]["label"].GetLabel(),
-        ).perform_eda()
+        )
+        result = current_EDA.perform_eda()
         self.buttons_info["StartEDA"]["label"].SetLabel(result)
 
     def make_placeholder_handler(self, index):
