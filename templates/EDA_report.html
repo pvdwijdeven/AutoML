@@ -3,7 +3,7 @@
 <html>
 <head>
   <meta charset="UTF-8">
-  <title>My Report</title>
+  <title>{{ title }}</title>
   <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
   <style>
     body { font-family: sans-serif; margin: 2em; }
@@ -14,7 +14,7 @@
 </head>
 <body>
 
-  <h1>Interactive Report</h1>
+  <h1>{{ title }}</h1>
 
   <div class="tabs">
     {% for tab in tabs %}
