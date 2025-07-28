@@ -7,6 +7,7 @@ from pandas.api.types import (
     is_object_dtype,
 )
 import json
+import pprint
 
 
 def infer_dtype(series: pd.Series) -> str:
@@ -168,15 +169,72 @@ class AutoML_EDA:
                     )
 
     def analyse_column(self, column_name: str):
+
+        assert (
+            self.df_train is not None
+        ), "Training DataFrame is not initialized"
+
         # type boolean:
         # - missing values, frequency True/False, graph
-        # type numeric:
-        # - missing values, #unique, min, max, average, graph
-        # type string:
-        # - missing values, #unique, most occuring
+        if self.type_conversion[column_name]["new"] == "boolean":
+            missing_count = self.df_train[column_name].isna().sum()
+            missing_pct = missing_count / len(self.df_train) * 100
+            return {
+                "type": "boolean",
+                "missing_values": missing_count,
+                "missing_percentage": missing_pct,
+                "frequency": self.df_train[column_name]
+                .value_counts()
+                .to_dict(),
+            }
+
         # type category:
         # - missing values, #unique, most occuring
-        pass
+        if self.type_conversion[column_name]["new"] == "category":
+            missing_count = self.df_train[column_name].isna().sum()
+            missing_pct = missing_count / len(self.df_train) * 100
+            unique_count = self.df_train[column_name].nunique(dropna=True)
+            unique_pct = unique_count / len(self.df_train) * 100
+            return {
+                "type": "category",
+                "missing_values": missing_count,
+                "missing_percentage": missing_pct,
+                "unique_count": unique_count,
+                "unique_percentage": unique_pct,
+                "frequency": self.df_train[column_name]
+                .value_counts()
+                .to_dict(),
+            }
+
+        # type string:
+        # - missing values, #unique, most occuring
+        if self.type_conversion[column_name]["new"] == "string":
+            missing_count = self.df_train[column_name].isna().sum()
+            missing_pct = missing_count / len(self.df_train) * 100
+            unique_count = self.df_train[column_name].nunique(dropna=True)
+            unique_pct = unique_count / len(self.df_train) * 100
+            return {
+                "type": "category",
+                "missing_values": missing_count,
+                "missing_percentage": missing_pct,
+                "unique_count": unique_count,
+                "unique_percentage": unique_pct,
+            }
+
+        # type numeric:
+        # - missing values, #unique, min, max, average, graph
+        if self.type_conversion[column_name]["new"] in ["integer", "float"]:
+            missing_count = self.df_train[column_name].isna().sum()
+            missing_pct = missing_count / len(self.df_train) * 100
+            return {
+                "type": self.type_conversion[column_name]["new"],
+                "missing_values": missing_count,
+                "missing_percentage": missing_pct,
+                "min": self.df_train[column_name].min(),
+                "max": self.df_train[column_name].max(),
+                "mean": self.df_train[column_name].mean(),
+                "std_dev": self.df_train[column_name].std(),
+            }
 
     def analyse_columns(self) -> None:
         assert (
@@ -199,6 +257,8 @@ class AutoML_EDA:
         self.column_info = {}
         for column in self.df_train.columns:
             self.column_info[column] = self.analyse_column(column)
+        self.logger.info("[GREEN]- Column analysis completed. Details:")
+        self.logger.info(f"[CYAN]{pprint.pformat(self.column_info)}")
 
     def perform_eda(self) -> str:
         self.logger.info("[MAGENTA]Starting EDA (Exploratory Data Analysis)")
