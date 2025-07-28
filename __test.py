@@ -58,7 +58,7 @@ template = env.get_template("EDA_report.html")
 output_html = template.render(tabs=tabs, title="Iris Dataset EDA Report")
 
 # Save to file
-with open("output\\output.html", "w", encoding="utf-8") as f:
+with open("export\\output.html", "w", encoding="utf-8") as f:
     f.write(output_html)
 
 print("✅ HTML report generated: output.html")
