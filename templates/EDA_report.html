@@ -1,0 +1,41 @@
+<!-- templates/report.html -->
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>My Report</title>
+  <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+  <style>
+    body { font-family: sans-serif; margin: 2em; }
+    .tab { display: none; }
+    .tab.active { display: block; }
+    .tabs button { margin-right: 5px; }
+  </style>
+</head>
+<body>
+
+  <h1>Interactive Report</h1>
+
+  <div class="tabs">
+    {% for tab in tabs %}
+      <button onclick="showTab('{{ loop.index0 }}')">{{ tab.title }}</button>
+    {% endfor %}
+  </div>
+
+  {% for tab in tabs %}
+    <div class="tab {% if loop.index0 == 0 %}active{% endif %}" id="tab-{{ loop.index0 }}">
+      <h2>{{ tab.title }}</h2>
+      {{ tab.content | safe }}
+    </div>
+  {% endfor %}
+
+  <script>
+    function showTab(index) {
+      document.querySelectorAll('.tab').forEach((el, i) => {
+        el.classList.toggle('active', i == index);
+      });
+    }
+  </script>
+
+</body>
+</html>
