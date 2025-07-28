@@ -1,0 +1,8 @@
+{
+        "workbench.colorCustomizations": {
+            "titleBar.activeBackground": "#420045", // Dark gray for active title bar
+            "titleBar.inactiveBackground": "#61007f", // Even darker gray for inactive title bar
+            "titleBar.activeForeground": "#ffffff", // White text for active title bar
+            "titleBar.inactiveForeground": "#cccccc" // Light gray text for inactive title bar
+        }
+    }
