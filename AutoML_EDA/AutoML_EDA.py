@@ -10,9 +10,11 @@ class AutoML_EDA:
     def __init__(
         self,
         logger,
+        report_file,
         file_train,
         file_test="",
     ) -> None:
+        self.report_file = report_file
         self.file_train = file_train
         self.file_test = file_test
         self.logger = logger
@@ -293,7 +295,7 @@ class AutoML_EDA:
         output_html = template.render(tabs=tabs, title="EDA Report")
 
         # Save to file
-        with open("export\\output.html", "w", encoding="utf-8") as f:
+        with open(self.report_file, "w", encoding="utf-8") as f:
             f.write(output_html)
         self.logger.info("[MAGENTA]EDA (Exploratory Data Analysis) is done")
         return "EDA completed successfully with the provided datasets."

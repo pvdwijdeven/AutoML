@@ -177,6 +177,7 @@ class AutoMLFrame(wx.Frame):
         self.buttons_info["StartEDA"]["label"].SetLabel("EDA started")
         current_EDA = AutoML_EDA(
             logger=self.logger,
+            report_file=self.buttons_info["ReportFile"]["label"].GetLabel(),
             file_train=self.buttons_info["training"]["label"].GetLabel(),
             file_test=self.buttons_info["test"]["label"].GetLabel(),
         )
