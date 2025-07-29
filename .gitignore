@@ -6,3 +6,4 @@ log/
 export/
 *.pyo
 test*.py
+testrun.ps1
