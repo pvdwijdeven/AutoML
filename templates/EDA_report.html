@@ -97,6 +97,7 @@ function openInnerTab(evt, tabId) {
 
 function showTab(index) {
   // Remove active class from all tabs and buttons
+  window.scrollTo({ top: 0, behavior: 'smooth' });
   document.querySelectorAll('.tab').forEach((el, i) => {
     el.classList.toggle('active', i == index);
   });

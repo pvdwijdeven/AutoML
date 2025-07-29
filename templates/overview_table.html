@@ -55,6 +55,7 @@
   <span style="margin-right: 50px; display: inline-block;">General overview</span>
   <a href="#feature-overview">Feature overview</a> |  
   <a href="#sample-overview">Sample overview</a> |
+  <a href="#target-overview">Target overview</a> |
   <a href="#general">General</a> |
   <a href="#sample-data">Sample Data</a>
 </div>
@@ -74,9 +75,16 @@
   <tr><td>Empty samples</td><td>{{ empty_rows }} ({{ (empty_rows / num_rows) | percentage }})</td></tr>
 </table>
 <br>
+<h3 id="target-overview" class="anchor-offset">Target overview</h3>
+<table>
+  <tr><td>Target</td><td><a href="#{{target | replace(' ', '-')}}" onclick="showTab(2)" class="feature-link">{{target}}</a></td></tr>
+  <tr><td>Target type</td><td>{{ target_type }} KB</td></tr>
+</table>
+<br>
 <h3 id="general" class="anchor-offset">General</h3>
 <table>
-  <tr><td>Target</td><td><a href="#{{target | replace(' ', '-')}}" onclick="showTab(2)" class="feature-link">{{target}}</a> (type: {{target_type}})</td></tr>
+  <tr><td>Table size</td><td>{{num_features + 1}} x {{num_rows}}</td></tr>
+  <tr><td>Number of cells</td><td>{{total_cells }}</td></tr>
   <tr><td>Memory usage</td><td>{{ memory_usage_kb }} KB</td></tr>
   <tr><td>Total missing values</td><td>{{ missing_values }} ({{ (missing_values / total_cells) | percentage }})</td></tr>
 </table>
