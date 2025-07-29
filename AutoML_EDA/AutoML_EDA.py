@@ -276,12 +276,19 @@ class AutoML_EDA:
         overview_html = create_overview_table(
             df=self.df_train, target=target, target_type=target_type
         )
-
+        features_html = ""
+        for feature in self.df_train.columns.difference([target]):
+            features_html += "<div></div><BR>" * 20
+            features_html += f'<div id="{feature.replace('', '')}" class="anchor-offset">{feature}</div>'
+            features_html += "<div></div><BR>" * 20
+        target_html = "<div></div><BR>" * 20
+        target_html += f'<div id="{target.replace('', '')}" class="anchor-offset">{target}</div>'
+        target_html += "<div></div><BR>" * 50
         # Prepare tab content
         tabs = [
             {"title": "General overview", "content": overview_html},
-            {"title": "Features", "content": "<div id='Age'>hierzo!</div>"},
-            {"title": "Target", "content": ""},
+            {"title": "Features", "content": features_html},
+            {"title": "Target", "content": target_html},
             {"title": "Relations", "content": ""},
             {"title": "Missing values", "content": ""},
         ]

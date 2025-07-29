@@ -30,7 +30,7 @@ def create_overview_table(
     # --- Collect the statistics ---
     n_rows = len(df)
     n_features = df.shape[1] - 1
-    feature_cols = df.columns.difference(["target"])
+    feature_cols = df.columns.difference([target])
     constant_cols = [
         col for col in feature_cols if df[col].nunique(dropna=False) == 1
     ]
