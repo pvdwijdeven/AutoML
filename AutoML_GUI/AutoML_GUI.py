@@ -132,7 +132,10 @@ class AutoMLFrame(wx.Frame):
                 output_path = args.project_root / args.output_file
             self.buttons_info["OutputFile"]["label"].SetLabel(f"{output_path}")
             self.logger.info("[GREEN]output file from command line")
-
+        if args.silent:
+            self.logger.info("[GREEN]silent mode, GUI will not be shown")
+            self.actual_eda()
+            exit()
         self.Show()
         if args.EDA:
             self.on_start_eda()

@@ -16,6 +16,12 @@ if __name__ == "__main__":
         default=False,
     )
     parser.add_argument(
+        "--silent",
+        help="execute without GUI, default is False",
+        action="store_true",
+        default=False,
+    )
+    parser.add_argument(
         "--report_file", help="filename for report file (.html)"
     )
     parser.add_argument("--output_file", help="filename for output file (.csv)")
