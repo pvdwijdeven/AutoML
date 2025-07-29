@@ -1,29 +1,9 @@
 import pandas as pd
-from pandas.api.types import (
-    is_integer_dtype,
-    is_float_dtype,
-    is_bool_dtype,
-    is_string_dtype,
-    is_object_dtype,
-)
 import json
 import pprint
-
-
-def infer_dtype(series: pd.Series) -> str:
-    if is_bool_dtype(series):
-        return "boolean"
-    if is_integer_dtype(series):
-        return "integer"
-    if is_float_dtype(series):
-        return "float"
-    if isinstance(series.dtype, pd.CategoricalDtype):
-        return "category"
-    if is_string_dtype(series):
-        return "string"
-    if is_object_dtype(series):
-        return "object"
-    return str(series.dtype)
+from jinja2 import Environment, FileSystemLoader
+from .AutoML_EDA_overview import create_overview_table
+from AutoML_Libs import infer_dtype
 
 
 class AutoML_EDA:
@@ -278,5 +258,24 @@ class AutoML_EDA:
             print(f"test data: {self.df_test.shape}")
 
         self.analyse_columns()
+        overview_html = create_overview_table(df=self.df_train)
+
+        # Prepare tab content
+        tabs = [
+            {"title": "General overview", "content": overview_html},
+            {"title": "Features", "content": ""},
+            {"title": "Target", "content": ""},
+            {"title": "Relations", "content": ""},
+            {"title": "Missing values", "content": ""},
+        ]
+
+        # Load and render the template
+        env = Environment(loader=FileSystemLoader("templates"))
+        template = env.get_template("EDA_report.html")
+        output_html = template.render(tabs=tabs, title="EDA Report")
+
+        # Save to file
+        with open("export\\output.html", "w", encoding="utf-8") as f:
+            f.write(output_html)
         self.logger.info("[MAGENTA]EDA (Exploratory Data Analysis) is done")
         return "EDA completed successfully with the provided datasets."

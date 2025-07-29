@@ -8,34 +8,105 @@
   <style>
     body { font-family: sans-serif; margin: 2em; }
     .tab { display: none; }
+    .tabs button.active {
+          background-color: #ccc;
+        }
     .tab.active { display: block; }
-    .tabs button { margin-right: 5px; }
+    .tabs button { 
+      margin-right: 5px; 
+      min-width: 120px;
+      min-height: 20px;
+      text-align: center;
+      cursor: pointer;
+    }
+    .fixed-header {
+      position: fixed;
+      top: 0;
+      width: 100%;
+      background: white;
+      z-index: 1000;
+      padding: 1em 2em;
+      border-bottom: 1px solid #ccc;
+    }
+    .fixed-links {
+      position: fixed;
+      top: 130px; /* Position below the main header */
+      width: 100%;
+      background: #f8f8f8;
+      z-index: 999;
+      padding: 10px 2em;
+      border-bottom: 1px solid #ddd;
+      font-size: 18px;
+      font-weight: bold;
+    }
+    .fixed-links a {
+      color: #0066cc;
+      text-decoration: none;
+      margin: 0 5px;
+    }
+
+    .fixed-links a:hover {
+      text-decoration: underline;
+    }
+    .anchor-offset {
+      padding-top: 180px;
+      margin-top: -180px;
+    }
+    body {
+      margin-top: 180px; /* adjust depending on header height */
+    }
   </style>
 </head>
 <body>
-
+<div class="fixed-header">
   <h1>{{ title }}</h1>
 
-  <div class="tabs">
-    {% for tab in tabs %}
-      <button onclick="showTab('{{ loop.index0 }}')">{{ tab.title }}</button>
-    {% endfor %}
-  </div>
-
+<div class="tabs">
+  {% for tab in tabs %}
+    <button onclick="showTab('{{ loop.index0 }}')" {% if loop.first %}class="active"{% endif %}>
+      {{ tab.title }}
+    </button>
+  {% endfor %}
+</div>
+</div>
   {% for tab in tabs %}
     <div class="tab {% if loop.index0 == 0 %}active{% endif %}" id="tab-{{ loop.index0 }}">
-      <h2>{{ tab.title }}</h2>
       {{ tab.content | safe }}
     </div>
   {% endfor %}
 
-  <script>
-    function showTab(index) {
-      document.querySelectorAll('.tab').forEach((el, i) => {
-        el.classList.toggle('active', i == index);
-      });
-    }
-  </script>
+<script>
+function openInnerTab(evt, tabId) {
+  const contents = document.querySelectorAll('.tabcontent-inner');
+  contents.forEach(c => c.style.display = 'none');
+
+  const buttons = document.querySelectorAll('.tablinks-inner');
+  buttons.forEach(b => b.classList.remove('active'));
+
+  document.getElementById(tabId).style.display = 'block';
+  evt.currentTarget.classList.add('active');
+}
+
+function showTab(index) {
+  // Remove active class from all tabs and buttons
+  document.querySelectorAll('.tab').forEach((el, i) => {
+    el.classList.toggle('active', i == index);
+  });
+  
+  // Remove active class from all buttons
+  document.querySelectorAll('.tabs button').forEach(btn => {
+    btn.classList.remove('active');
+  });
+  
+  // Add active class to clicked button
+  document.querySelectorAll('.tabs button')[index].classList.add('active');
+}
+
+// Initialize the first inner tab when page loads
+document.addEventListener('DOMContentLoaded', function() {
+  document.getElementById("defaultInnerOpen").click();
+});
+</script>
 
 </body>
 </html>
