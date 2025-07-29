@@ -76,6 +76,7 @@
 <br>
 <h3 id="general" class="anchor-offset">General</h3>
 <table>
+  <tr><td>Target</td><td><a href="#{{target | replace(' ', '-')}}" onclick="showTab(2)" class="feature-link">{{target}}</a> (type: {{target_type}})</td></tr>
   <tr><td>Memory usage</td><td>{{ memory_usage_kb }} KB</td></tr>
   <tr><td>Total missing values</td><td>{{ missing_values }} ({{ (missing_values / total_cells) | percentage }})</td></tr>
 </table>

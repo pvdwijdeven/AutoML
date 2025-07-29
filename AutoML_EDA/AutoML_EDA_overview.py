@@ -1,9 +1,26 @@
 from jinja2 import Environment, FileSystemLoader
 from AutoML_Libs import infer_dtype
-from collections import Counter
+from collections import defaultdict
+import pandas as pd
+import re
 
 
-def create_overview_table(df) -> str:
+def add_links_to_headers(html: str, target) -> str:
+    def replace_th(match):
+        col_name = match.group(1)
+        if col_name == target:
+            link = f'<a href="#{col_name.replace(" ", "-")}" onclick="showTab(2)" class="feature-link">{col_name}</a>'
+        else:
+            link = f'<a href="#{col_name.replace(" ", "-")}" onclick="showTab(1)" class="feature-link">{col_name}</a>'
+        return f"<th>{link}</th>"
+
+    # Replace every <th>...</th> with a linked version
+    return re.sub(r"<th>(.*?)</th>", replace_th, html)
+
+
+def create_overview_table(
+    df: pd.DataFrame, target: str, target_type: str
+) -> str:
     def percentage(value) -> str:
         return f"{value:.1%}"
 
@@ -12,13 +29,13 @@ def create_overview_table(df) -> str:
 
     # --- Collect the statistics ---
     n_rows = len(df)
-    n_features = df.shape[1]
-
+    n_features = df.shape[1] - 1
+    feature_cols = df.columns.difference(["target"])
     constant_cols = [
-        col for col in df.columns if df[col].nunique(dropna=False) == 1
+        col for col in feature_cols if df[col].nunique(dropna=False) == 1
     ]
-    empty_cols = [col for col in df.columns if df[col].count() == 0]
-    duplicate_cols = df.T.duplicated().sum()
+    empty_cols = [col for col in feature_cols if df[col].count() == 0]
+    duplicate_cols = df.drop(columns=[target]).T.duplicated().sum()
 
     duplicate_rows = df.duplicated().sum()
     empty_rows = (df.isnull().sum(axis=1) == df.shape[1]).sum()
@@ -26,29 +43,45 @@ def create_overview_table(df) -> str:
     memory_usage = df.memory_usage(deep=True).sum()
     missing_values = df.isnull().sum().sum()
 
+    type_to_features = defaultdict(list)
+    for col in feature_cols:
+        dtype = infer_dtype(df[col])
+        type_to_features[dtype].append(
+            f'<a href="#{col.replace(" ", "-")}" onclick="showTab(1)" class="feature-link">{col}</a>'
+        )
+
+    # Step 2: Build the HTML table
     feature_types = """
     <table border="1" style="border-collapse: collapse;">
     <thead>
         <tr>
         <th>Type</th>
         <th>Frequency</th>
+        <th>Features</th>
         </tr>
     </thead>
     <tbody>
     """
-    for dtype, count in Counter(
-        infer_dtype(df[col]) for col in df.columns
-    ).items():
-        feature_types += f"    <tr><td>{dtype}</td><td>{count}</td></tr>\n"
 
-    feature_types += "  </tbody>\n</table>"
+    for dtype, features in type_to_features.items():
+        feature_list = ", ".join(features)
+        feature_types += f"<tr><td>{dtype}</td><td>{len(features)}</td><td>{feature_list}</td></tr>\n"
+
+    feature_types += "</tbody>\n</table>"
 
     # Samples
-    samples_head = df.head(10).to_html(index=False)
-    samples_middle = df.iloc[n_rows // 2 - 5 : n_rows // 2 + 5].to_html(
-        index=False
+    samples_head = add_links_to_headers(
+        df.head(10).to_html(index=False), target
     )
-    samples_tail = df.tail(10).to_html(index=False)
+    samples_middle = add_links_to_headers(
+        df.iloc[n_rows // 2 - 5 : n_rows // 2 + 5].to_html(
+            index=False,
+        ),
+        target,
+    )
+    samples_tail = add_links_to_headers(
+        df.tail(10).to_html(index=False), target
+    )
 
     # --- Context dictionary for rendering ---
     context = {
@@ -66,6 +99,8 @@ def create_overview_table(df) -> str:
         "samples_head": samples_head,
         "samples_middle": samples_middle,
         "samples_tail": samples_tail,
+        "target": target,
+        "target_type": target_type,
     }
 
     template = env.get_template("overview_table.html")

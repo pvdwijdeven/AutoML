@@ -30,7 +30,7 @@ class AutoML_EDA:
             self.logger.error(f"File not found: {file_path}")
             return None
         except Exception as e:
-            print(f"Error reading {file_path}: {e}")
+            self.logger.error(f"Error reading {file_path}: {e}")
             return None
 
     def column_type(
@@ -230,15 +230,15 @@ class AutoML_EDA:
             self.type_conversion[column]["new"] = infer_dtype(
                 self.df_train[column]
             )
-        self.logger.info(
+        self.logger.debug(
             "[GREEN]- Column type analysis completed. Changes made:"
         )
-        self.logger.info(f"[CYAN]{json.dumps(self.type_conversion, indent=4)}")
+        self.logger.debug(f"[CYAN]{json.dumps(self.type_conversion, indent=4)}")
         self.column_info = {}
         for column in self.df_train.columns:
             self.column_info[column] = self.analyse_column(column)
-        self.logger.info("[GREEN]- Column analysis completed. Details:")
-        self.logger.info(f"[CYAN]{pprint.pformat(self.column_info)}")
+        self.logger.debug("[GREEN]- Column analysis completed. Details:")
+        self.logger.debug(f"[CYAN]{pprint.pformat(self.column_info)}")
 
     def perform_eda(self) -> str:
         self.logger.info("[MAGENTA]Starting EDA (Exploratory Data Analysis)")
@@ -246,29 +246,47 @@ class AutoML_EDA:
         if self.df_train is None:
             self.logger.error("Training data could not be loaded.")
             return "Failed to load training data. EDA cannot proceed."
+        target = self.df_train.columns[-1]
         self.df_test = self.read_data(self.file_test)
         if self.df_test is None:
             self.logger.error(
                 "Test data could not be loaded. Using only training data."
             )
+        else:
 
-        print(f"training data: {self.df_train.shape}")
+            training_columns = set(self.df_train.columns)
+            test_columns = set(self.df_test.columns)
+            self.logger.debug(training_columns - test_columns)
+            if len(training_columns - test_columns) != 1:
+                self.logger.warning(
+                    "Test data does not contain all training columns.\n"
+                    "EDA will proceed with the available columns."
+                )
+            else:
+                target = (training_columns - test_columns).pop()
+        self.logger.debug(f"training data: {self.df_train.shape}")
 
         if self.df_test is not None:
-            print(f"test data: {self.df_test.shape}")
+            self.logger.debug(f"test data: {self.df_test.shape}")
 
         self.analyse_columns()
-        overview_html = create_overview_table(df=self.df_train)
+        target_type = infer_dtype(self.df_train[target])
+        overview_html = create_overview_table(
+            df=self.df_train, target=target, target_type=target_type
+        )
 
         # Prepare tab content
         tabs = [
             {"title": "General overview", "content": overview_html},
-            {"title": "Features", "content": ""},
+            {"title": "Features", "content": "<div id='Age'>hierzo!</div>"},
             {"title": "Target", "content": ""},
             {"title": "Relations", "content": ""},
             {"title": "Missing values", "content": ""},
         ]
-
+        if self.df_test is not None:
+            tabs.append(
+                {"title": "Test data", "content": ""},
+            )
         # Load and render the template
         env = Environment(loader=FileSystemLoader("templates"))
         template = env.get_template("EDA_report.html")
