@@ -2,8 +2,8 @@ import pandas as pd
 import json
 import pprint
 from jinja2 import Environment, FileSystemLoader
-from .AutoML_EDA_overview import create_overview_table
-from AutoML_Libs import infer_dtype, get_html_from_template, get_frequency_table
+from .automl_eda_overview import create_overview_table
+from automl_libs import infer_dtype, get_html_from_template, get_frequency_table
 
 
 class AutoML_EDA:
@@ -290,7 +290,7 @@ class AutoML_EDA:
             )
         # Load and render the template
         env = Environment(loader=FileSystemLoader("templates"))
-        template = env.get_template("EDA_report.html")
+        template = env.get_template("eda_report.html")
         output_html = template.render(tabs=tabs, title="EDA Report")
 
         # Save to file

@@ -1,7 +1,7 @@
 import wx
-from AutoML_EDA import AutoML_EDA
+from automl_eda import AutoML_EDA
 from pathlib import Path
-from AutoML_Libs import Logger, TextCtrlHandler, WxTextRedirector
+from automl_libs import Logger, TextCtrlHandler, WxTextRedirector
 import logging
 import sys
 import threading
@@ -97,7 +97,7 @@ class AutoMLFrame(wx.Frame):
         self.logger = Logger(
             level_console=Logger.INFO,
             level_file=Logger.DEBUG,
-            filename="log/AutoML.log",
+            filename="log/automl.log",
             wx_handler=self.log_handler,
         )
         self.log_handler.setLevel(logging.INFO)

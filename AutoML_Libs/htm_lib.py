@@ -15,8 +15,6 @@ df = pd.DataFrame(
 
 def get_frequency_table(df, column_name) -> str:
     frequency_data = df[column_name].value_counts().to_dict()
-    if column_name == "Transported":
-        print(set(frequency_data.keys()))
     if set(frequency_data.keys()) != {np.False_, np.True_}:
         frequency_data = {
             f'"{str(key)}"': value for key, value in frequency_data.items()

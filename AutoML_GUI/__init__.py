@@ -1,5 +1,5 @@
 # STML_GUI/__init__.py
 
-from .AutoML_GUI import AutoMLFrame
+from .automl_gui import AutoMLFrame
 
 __all__ = ["AutoMLFrame"]
