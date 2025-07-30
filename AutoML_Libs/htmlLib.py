@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 import plotly.express as px
+from jinja2 import Environment, FileSystemLoader
 
 # Sample data
 np.random.seed(0)
@@ -10,6 +11,53 @@ df = pd.DataFrame(
         "weight": np.random.normal(65, 12, 100),
     }
 )
+
+
+def get_frequency_table(df, column_name) -> str:
+    frequency_data = df[column_name].value_counts().to_dict()
+    if column_name == "Transported":
+        print(set(frequency_data.keys()))
+    if set(frequency_data.keys()) != {np.False_, np.True_}:
+        frequency_data = {
+            f'"{str(key)}"': value for key, value in frequency_data.items()
+        }
+    frequency_data["Missing values"] = df[column_name].isna().sum()
+    total = len(df)
+
+    frequency_table = """
+    <table class="frequency-table" border="1">
+    <thead>
+        <tr>
+        <th>Value</th>
+        <th>Count</th>
+        <th>Percentage</th>
+        </tr>
+    </thead>
+    <tbody>
+    """
+    for key, value in frequency_data.items():
+        percentage = value / total * 100
+        frequency_table += f"""
+        <tr>
+        <td>{key}</td>
+        <td>{value}</td>
+        <td>{percentage:.1f}%</td>
+        </tr>
+        """
+
+    frequency_table += """
+    </tbody>
+    </table>
+    """
+
+    return frequency_table
+
+
+def get_html_from_template(template_file, context) -> str:
+    env = Environment(loader=FileSystemLoader("templates"))
+    template = env.get_template(template_file)
+    rendered_html = template.render(context=context)
+    return rendered_html
 
 
 def create_plots_html(df):

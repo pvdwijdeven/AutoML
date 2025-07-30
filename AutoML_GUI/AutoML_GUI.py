@@ -101,8 +101,9 @@ class AutoMLFrame(wx.Frame):
             wx_handler=self.log_handler,
         )
         self.log_handler.setLevel(logging.INFO)
-        sys.stdout = WxTextRedirector(self.log_ctrl, wx.Colour(255, 0, 0))
-        sys.stderr = WxTextRedirector(self.log_ctrl, wx.Colour(150, 0, 0))
+        if not args.silent:
+            sys.stdout = WxTextRedirector(self.log_ctrl, wx.Colour(255, 0, 0))
+            sys.stderr = WxTextRedirector(self.log_ctrl, wx.Colour(150, 0, 0))
 
         if args.training_data:
             if Path(args.training_data).is_absolute():

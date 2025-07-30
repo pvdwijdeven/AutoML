@@ -3,7 +3,7 @@ import json
 import pprint
 from jinja2 import Environment, FileSystemLoader
 from .AutoML_EDA_overview import create_overview_table
-from AutoML_Libs import infer_dtype
+from AutoML_Libs import infer_dtype, get_html_from_template, get_frequency_table
 
 
 class AutoML_EDA:
@@ -155,7 +155,7 @@ class AutoML_EDA:
         assert (
             self.df_train is not None
         ), "Training DataFrame is not initialized"
-
+        frequency = get_frequency_table(self.df_train, column_name)
         # type boolean:
         # - missing values, frequency True/False, graph
         if self.type_conversion[column_name]["new"] == "boolean":
@@ -163,11 +163,8 @@ class AutoML_EDA:
             missing_pct = missing_count / len(self.df_train) * 100
             return {
                 "type": "boolean",
-                "missing_values": missing_count,
-                "missing_percentage": missing_pct,
-                "frequency": self.df_train[column_name]
-                .value_counts()
-                .to_dict(),
+                "missing_values": f"{missing_count} ({missing_pct:.1f}%)",
+                "frequency": frequency.replace("np.", "").replace("_", ""),
             }
 
         # type category:
@@ -177,15 +174,12 @@ class AutoML_EDA:
             missing_pct = missing_count / len(self.df_train) * 100
             unique_count = self.df_train[column_name].nunique(dropna=True)
             unique_pct = unique_count / len(self.df_train) * 100
+            frequency = get_frequency_table(self.df_train, column_name)
             return {
                 "type": "category",
-                "missing_values": missing_count,
-                "missing_percentage": missing_pct,
-                "unique_count": unique_count,
-                "unique_percentage": unique_pct,
-                "frequency": self.df_train[column_name]
-                .value_counts()
-                .to_dict(),
+                "missing_values": f"{missing_count} ({missing_pct:.1f}%)",
+                "unique_count": f"{unique_count} ({unique_pct:.1f}%)",
+                "frequency": frequency,
             }
 
         # type string:
@@ -196,11 +190,9 @@ class AutoML_EDA:
             unique_count = self.df_train[column_name].nunique(dropna=True)
             unique_pct = unique_count / len(self.df_train) * 100
             return {
-                "type": "category",
-                "missing_values": missing_count,
-                "missing_percentage": missing_pct,
-                "unique_count": unique_count,
-                "unique_percentage": unique_pct,
+                "type": "string",
+                "missing_values": f"{missing_count} ({missing_pct:.1f}%)",
+                "unique_count": f"{unique_count} ({unique_pct:.1f}%)",
             }
 
         # type numeric:
@@ -210,8 +202,7 @@ class AutoML_EDA:
             missing_pct = missing_count / len(self.df_train) * 100
             return {
                 "type": self.type_conversion[column_name]["new"],
-                "missing_values": missing_count,
-                "missing_percentage": missing_pct,
+                "missing_values": f"{missing_count} ({missing_pct:.1f}%)",
                 "min": self.df_train[column_name].min(),
                 "max": self.df_train[column_name].max(),
                 "mean": self.df_train[column_name].mean(),
@@ -237,7 +228,11 @@ class AutoML_EDA:
         )
         self.logger.debug(f"[CYAN]{json.dumps(self.type_conversion, indent=4)}")
         self.column_info = {}
+        self.target_info = {}
         for column in self.df_train.columns:
+            if column == self.target:
+                self.target_info[self.target] = self.analyse_column(column)
+                continue
             self.column_info[column] = self.analyse_column(column)
         self.logger.debug("[GREEN]- Column analysis completed. Details:")
         self.logger.debug(f"[CYAN]{pprint.pformat(self.column_info)}")
@@ -248,7 +243,7 @@ class AutoML_EDA:
         if self.df_train is None:
             self.logger.error("Training data could not be loaded.")
             return "Failed to load training data. EDA cannot proceed."
-        target = self.df_train.columns[-1]
+        self.target = self.df_train.columns[-1]
         self.df_test = self.read_data(self.file_test)
         if self.df_test is None:
             self.logger.error(
@@ -265,25 +260,22 @@ class AutoML_EDA:
                     "EDA will proceed with the available columns."
                 )
             else:
-                target = (training_columns - test_columns).pop()
+                self.target = (training_columns - test_columns).pop()
         self.logger.debug(f"training data: {self.df_train.shape}")
 
         if self.df_test is not None:
             self.logger.debug(f"test data: {self.df_test.shape}")
 
         self.analyse_columns()
-        target_type = infer_dtype(self.df_train[target])
+        target_type = infer_dtype(self.df_train[self.target])
         overview_html = create_overview_table(
-            df=self.df_train, target=target, target_type=target_type
+            df=self.df_train, target=self.target, target_type=target_type
         )
-        features_html = ""
-        for feature in self.df_train.columns.difference([target]):
-            features_html += "<div></div><BR>" * 20
-            features_html += f'<div id="{feature.replace('', '')}" class="anchor-offset">{feature}</div>'
-            features_html += "<div></div><BR>" * 20
-        target_html = "<div></div><BR>" * 20
-        target_html += f'<div id="{target.replace('', '')}" class="anchor-offset">{target}</div>'
-        target_html += "<div></div><BR>" * 50
+        features_html = get_html_from_template(
+            "features.html", self.column_info
+        )
+        target_html = get_html_from_template("target.html", self.target_info)
+
         # Prepare tab content
         tabs = [
             {"title": "General overview", "content": overview_html},
