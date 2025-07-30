@@ -3,7 +3,7 @@ import json
 import pprint
 from jinja2 import Environment, FileSystemLoader
 from .automl_eda_overview import create_overview_table
-from _automl_libs import (
+from automl_libs import (
     infer_dtype,
     get_html_from_template,
     get_frequency_table,
