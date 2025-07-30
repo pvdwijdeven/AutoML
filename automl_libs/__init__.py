@@ -3,6 +3,13 @@
 from .general_lib import WxTextRedirector, TextCtrlHandler, Logger
 from .definitions import infer_dtype
 from .html_lib import get_html_from_template, get_frequency_table
+from .feature_lib import (
+    analyze_string_column,
+    analyze_categorical_column,
+    analyze_numeric_column,
+    analyze_boolean_column,
+    analyze_target,
+)
 
 __all__ = [
     "WxTextRedirector",
@@ -11,4 +18,9 @@ __all__ = [
     "infer_dtype",
     "get_html_from_template",
     "get_frequency_table",
+    "analyze_string_column",
+    "analyze_categorical_column",
+    "analyze_numeric_column",
+    "analyze_boolean_column",
+    "analyze_target",
 ]

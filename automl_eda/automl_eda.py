@@ -3,10 +3,16 @@ import json
 import pprint
 from jinja2 import Environment, FileSystemLoader
 from .automl_eda_overview import create_overview_table
+from scipy.stats import skew
 from automl_libs import (
     infer_dtype,
     get_html_from_template,
     get_frequency_table,
+    analyze_string_column,
+    analyze_categorical_column,
+    analyze_numeric_column,
+    analyze_boolean_column,
+    analyze_target,
 )
 
 
@@ -169,6 +175,10 @@ class AutoML_EDA:
                 "type": "boolean",
                 "missing_values": f"{missing_count} ({missing_pct:.1f}%)",
                 "frequency": frequency.replace("np.", "").replace("_", ""),
+                "suggestions": "- "
+                + "<br>- ".join(
+                    analyze_boolean_column(self.df_train, column_name)
+                ),
             }
 
         # type category:
@@ -184,6 +194,10 @@ class AutoML_EDA:
                 "missing_values": f"{missing_count} ({missing_pct:.1f}%)",
                 "unique_count": f"{unique_count} ({unique_pct:.1f}%)",
                 "frequency": frequency,
+                "suggestions": "- "
+                + "<br>- ".join(
+                    analyze_categorical_column(self.df_train, column_name)
+                ),
             }
 
         # type string:
@@ -197,6 +211,13 @@ class AutoML_EDA:
                 "type": "string",
                 "missing_values": f"{missing_count} ({missing_pct:.1f}%)",
                 "unique_count": f"{unique_count} ({unique_pct:.1f}%)",
+                "suggestions": "- "
+                + "<br>- ".join(
+                    analyze_string_column(
+                        self.df_train,
+                        column_name,
+                    )
+                ),
             }
 
         # type numeric:
@@ -204,13 +225,35 @@ class AutoML_EDA:
         if self.type_conversion[column_name]["new"] in ["integer", "float"]:
             missing_count = self.df_train[column_name].isna().sum()
             missing_pct = missing_count / len(self.df_train) * 100
+            col_data = self.df_train[column_name]
+            col_non_null = col_data.dropna()
+
             return {
                 "type": self.type_conversion[column_name]["new"],
                 "missing_values": f"{missing_count} ({missing_pct:.1f}%)",
-                "min": self.df_train[column_name].min(),
-                "max": self.df_train[column_name].max(),
-                "mean": self.df_train[column_name].mean(),
-                "std_dev": self.df_train[column_name].std(),
+                "min": col_non_null.min() if not col_non_null.empty else None,
+                "max": col_non_null.max() if not col_non_null.empty else None,
+                "skewness": (
+                    skew(col_non_null) if len(col_non_null) > 2 else None
+                ),
+                "mean": col_non_null.mean() if len(col_non_null) > 2 else None,
+                "std_dev": (
+                    col_non_null.std() if len(col_non_null) > 2 else None
+                ),
+                "suggestions": (
+                    "- "
+                    + "<br>- ".join(
+                        analyze_numeric_column(self.df_train, column_name)
+                        + analyze_target(self.df_train, column_name)
+                    )
+                    if column_name == self.target
+                    else (
+                        "- "
+                        + "<br>- ".join(
+                            analyze_numeric_column(self.df_train, column_name)
+                        )
+                    )
+                ),
             }
 
     def analyse_columns(self) -> None:

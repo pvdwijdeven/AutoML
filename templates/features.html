@@ -1,11 +1,24 @@
 <div class="fixed-links">
-  <span style="margin-right: 50px; display: inline-block;">Features</span>
-  <a href="#feature-overview">Feature overview</a> |  
-  <a href="#sample-overview">Sample overview</a> |
-  <a href="#target-overview">Target overview</a> |
-  <a href="#general">General</a> |
-  <a href="#sample-data">Sample Data</a>
+  <span class="label" style="margin-right: 20px;">Features </span>
+  <select class="feature-select" onchange="jumpToFeature(this)">
+    <option value="">Select a feature...</option>
+    {% for column_name in context.keys() %}
+      <option value="#{{ column_name }}">{{ column_name }}</option>
+    {% endfor %}
+  </select>
 </div>
+
+<script>
+  function jumpToFeature(select) {
+    if (select.value) {
+      location.hash = select.value;
+      // Reset to placeholder after short delay to ensure hash works
+      setTimeout(() => {
+        select.value = "";
+      }, 100);
+    }
+  }
+</script>
 
 {% for column_name, stats in context.items() %}
   <h3 id="{{ column_name }}" class="anchor-offset">{{ column_name }}</h3>
