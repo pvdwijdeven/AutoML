@@ -1,4 +1,4 @@
-# STML_GUI/__init__.py
+# automl_gui/__init__.py
 
 from .automl_gui import AutoMLFrame
 
