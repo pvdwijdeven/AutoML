@@ -1,5 +1,5 @@
 import wx
-from automl_gui import AutoMLFrame
+from _automl_gui import AutoMLFrame
 import argparse
 from pathlib import Path
 

@@ -1,7 +1,7 @@
 import wx
-from automl_eda import AutoML_EDA
+from _automl_eda import AutoML_EDA
 from pathlib import Path
-from automl_libs import Logger, TextCtrlHandler, WxTextRedirector
+from _automl_libs import Logger, TextCtrlHandler, WxTextRedirector
 import logging
 import sys
 import threading
