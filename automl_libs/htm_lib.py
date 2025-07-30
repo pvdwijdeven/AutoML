@@ -117,45 +117,46 @@ def create_plots_html(df):
     return "\n".join(column_blocks)
 
 
-# Generate content
-content_html = create_plots_html(df)
+def plot_test(df):
+    # Generate content
+    content_html = create_plots_html(df)
 
-HTML_HEAD = """<head>
-    <title>Plots per Column</title>
-    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
-    <style>
-        .row-flex {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 30px;
-            align-items: flex-start;
-        }
-        .block {
-            flex: 1 1 300px;
-            box-sizing: border-box;
-        }
-        .text-block {
-            max-width: 300px;
-        }
-        @media (max-width: 900px) {
+    HTML_HEAD = """<head>
+        <title>Plots per Column</title>
+        <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+        <style>
             .row-flex {
-                flex-direction: column;
+                display: flex;
+                flex-wrap: wrap;
+                gap: 30px;
+                align-items: flex-start;
             }
-        }
-    </style>
-</head>"""
+            .block {
+                flex: 1 1 300px;
+                box-sizing: border-box;
+            }
+            .text-block {
+                max-width: 300px;
+            }
+            @media (max-width: 900px) {
+                .row-flex {
+                    flex-direction: column;
+                }
+            }
+        </style>
+    </head>"""
 
-# Wrap into a full HTML document
-FULL_HTML = f"""
-<html>
-{HTML_HEAD}
-<body style="font-family: Arial, sans-serif; padding: 20px;">
-    <h1>Data Overview</h1>
-    {content_html}
-</body>
-</html>
-"""
+    # Wrap into a full HTML document
+    FULL_HTML = f"""
+    <html>
+    {HTML_HEAD}
+    <body style="font-family: Arial, sans-serif; padding: 20px;">
+        <h1>Data Overview</h1>
+        {content_html}
+    </body>
+    </html>
+    """
 
-# Save to file
-with open("plots_report.html", "w") as f:
-    f.write(FULL_HTML)
+    # Save to file
+    with open("plots_report.html", "w") as f:
+        f.write(FULL_HTML)
