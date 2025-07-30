@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <title>{{ title }}</title>
-  <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+  <script src="https://cdn.plot.ly/plotly-3.1.0-rc.0.min.js" charset="utf-8"></script>
   <style>
     body { font-family: sans-serif; margin: 2em; }
     .tab { display: none; }
@@ -63,7 +63,82 @@
     body {
       margin-top: 180px; /* adjust depending on header height */
     }
-  </style>
+  .table-wrapper {
+    overflow-x: auto;
+    max-height: 500px;
+  }
+  .table-wrapper table {
+    border-collapse: collapse;
+    width: 100%;
+  }
+  .table-wrapper th, .table-wrapper td {
+    padding: 8px;
+    border: 1px solid #000000;
+  }
+  .table-wrapper tr:nth-child(even) {
+    background-color: #f9f9f9;
+  }
+  .table-wrapper tr:nth-child(odd) {
+    background-color: #fff;
+  }
+
+  .tab-inner button.active { background-color: #ccc; }
+  .tabcontent-inner { display: none; padding: 10px 0; }
+    .tab-inner button { 
+      margin-right: 5px; 
+      min-width: 120px;
+      min-height: 20px;
+      text-align: center;
+      cursor: pointer;
+    }
+  table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 1em;
+  }
+  th, td {
+      border: 1px solid #ccc;
+      padding: 8px;
+      text-align: left;
+  }
+  th {
+      background-color: #f0f0f0;
+  }
+  h2 {
+      margin-top: 2em;
+  }
+  table td:first-child,
+  table th:first-child {
+    width: 200px; /* or any fixed pixel value */
+    white-space: nowrap; /* optional: prevents text from wrapping */
+  }
+  .frequency-table {
+    border-collapse: collapse;
+    margin-top: 10px;
+    width: 100%;
+  }
+  .frequency-table th, .frequency-table td {
+    padding: 6px 12px;
+    border: 1px solid #ccc;
+    text-align: left;
+  }
+  .frequency-table th {
+    background-color: #f4f4f4;
+  }
+  .frequency-table td:first-child,
+  .frequency-table th:first-child,
+  .frequency-table td:nth-child(2),
+  .frequency-table th:nth-child(2) {
+    white-space: nowrap;
+    width: 1%;
+  }
+  .frequency-table td:first-child {
+    text-align: left;
+  }
+  table td, table th {
+    vertical-align: top;
+  }
+</style>
 </head>
 <body>
 <div class="fixed-header">

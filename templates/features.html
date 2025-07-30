@@ -1,0 +1,22 @@
+<div class="fixed-links">
+  <span style="margin-right: 50px; display: inline-block;">Features</span>
+  <a href="#feature-overview">Feature overview</a> |  
+  <a href="#sample-overview">Sample overview</a> |
+  <a href="#target-overview">Target overview</a> |
+  <a href="#general">General</a> |
+  <a href="#sample-data">Sample Data</a>
+</div>
+
+{% for column_name, stats in context.items() %}
+  <h3 id="{{ column_name }}" class="anchor-offset">{{ column_name }}</h3>
+  <table class="feature-summary">
+    <tbody>
+      {% for key, value in stats.items() %}
+        <tr>
+          <th>{{ key.replace('_', ' ').capitalize() }}</th>
+          <td>{{ value }}</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+{% endfor %}
