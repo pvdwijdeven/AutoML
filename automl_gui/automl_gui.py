@@ -98,10 +98,14 @@ class AutoMLFrame(wx.Frame):
             level_console=Logger.INFO,
             level_file=Logger.DEBUG,
             filename="log/automl.log",
-            wx_handler=self.log_handler,
+            wx_handler=(
+                self.log_handler
+                if (not args.nogui) or (args.nogui and args.silent)
+                else None
+            ),
         )
         self.log_handler.setLevel(logging.INFO)
-        if not args.silent:
+        if not args.nogui:
             sys.stdout = WxTextRedirector(self.log_ctrl, wx.Colour(255, 0, 0))
             sys.stderr = WxTextRedirector(self.log_ctrl, wx.Colour(150, 0, 0))
 
@@ -133,7 +137,7 @@ class AutoMLFrame(wx.Frame):
                 output_path = args.project_root / args.output_file
             self.buttons_info["OutputFile"]["label"].SetLabel(f"{output_path}")
             self.logger.info("[GREEN]output file from command line")
-        if args.silent:
+        if args.nogui:
             self.logger.info("[GREEN]silent mode, GUI will not be shown")
             self.actual_eda()
             exit()

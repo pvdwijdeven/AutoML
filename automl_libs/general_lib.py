@@ -1,11 +1,26 @@
 import logging
 from logging.handlers import RotatingFileHandler
 import wx
-from typing import Dict
-from colorama import Fore, Back
 import os
 
-INFO_COLORS = {
+
+class ColoredFormatter(logging.Formatter):
+    COLORS = {
+        "DEBUG": "\033[94m",  # Blue
+        "INFO": "\033[92m",  # Green
+        "WARNING": "\033[93m",  # Yellow
+        "ERROR": "\033[91m",  # Red
+        "CRITICAL": "\033[95m",  # Magenta
+    }
+    RESET = "\033[0m"
+
+    def format(self, record):
+        color = self.COLORS.get(record.levelname, self.RESET)
+        message = super().format(record)
+        return f"{color}{message}{self.RESET}"
+
+
+WX_INFO_COLORS = {
     "GREEN": wx.Colour(0, 153, 0),
     "BLUE": wx.Colour(0, 0, 153),
     "YELLOW": wx.Colour(153, 153, 0),
@@ -18,12 +33,25 @@ INFO_COLORS = {
     "GREY": wx.Colour(128, 128, 128),
 }
 
+CONSOLE_INFO_COLORS = {
+    "BLACK": "\033[30m",
+    "RED": "\033[31m",
+    "GREEN": "\033[92m",  # Bright Green
+    "YELLOW": "\033[33m",
+    "BLUE": "\033[34m",
+    "MAGENTA": "\033[35m",
+    "CYAN": "\033[36m",
+    "WHITE": "\033[97m",  # Bright White
+    "GREY": "\033[90m",  # Bright Black (looks like grey)
+    "ORANGE": "\033[38;5;208m",  # Approximation using 256-color mode
+}
+
 LEVEL_COLORS = {
-    logging.DEBUG: INFO_COLORS["GREY"],
-    logging.INFO: INFO_COLORS["BLACK"],
-    logging.WARNING: INFO_COLORS["ORANGE"],
-    logging.ERROR: INFO_COLORS["RED"],
-    logging.CRITICAL: INFO_COLORS["RED"],
+    logging.DEBUG: WX_INFO_COLORS["GREY"],
+    logging.INFO: WX_INFO_COLORS["BLACK"],
+    logging.WARNING: WX_INFO_COLORS["ORANGE"],
+    logging.ERROR: WX_INFO_COLORS["RED"],
+    logging.CRITICAL: WX_INFO_COLORS["RED"],
 }
 
 
@@ -58,9 +86,9 @@ class TextCtrlHandler(logging.Handler):
         msg = self.format(record)
         msg_color = LEVEL_COLORS.get(record.levelno, wx.Colour(0, 0, 0))
         if record.levelno == logging.INFO:
-            for color in INFO_COLORS:
+            for color in WX_INFO_COLORS:
                 if f"[{color}]" in msg:
-                    msg_color = INFO_COLORS.get(color, wx.Colour(0, 0, 0))
+                    msg_color = WX_INFO_COLORS.get(color, wx.Colour(0, 0, 0))
                     msg = msg.replace(f"[{color}]", "")
                     break
 
@@ -73,42 +101,49 @@ class TextCtrlHandler(logging.Handler):
 
 
 class CustomFormatter(logging.Formatter):
-    """
-    Class required for Logger class
-    """
-
-    def __init__(
-        self,
-        fmt="%(asctime)s - %(levelname)s - %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S",
-    ) -> None:
-        super().__init__(fmt=fmt, datefmt=datefmt)
-
-    format_debug: str = (
-        "%(levelname)s on line %(lineno)d (%(filename)s): %(message)s"
-    )
-    format_info: str = "%(message)s"
-    format_warning: str = "%(levelname)s: %(message)s"
-    format_error: str = "%(levelname)s: %(message)s"
-    format_critical: str = (
-        "%(levelname)s on line %(lineno)d (%(filename)s): %(message)s"
-    )
-    FORMATS: Dict[int, str] = {
-        logging.DEBUG: Fore.GREEN + format_debug + Fore.RESET,
-        logging.INFO: Fore.BLUE + format_info + Fore.RESET,
-        logging.WARNING: Fore.YELLOW + format_warning + Fore.RESET,
-        logging.ERROR: Fore.RED + format_error + Fore.RESET,
-        logging.CRITICAL: Fore.BLACK
-        + Back.YELLOW
-        + format_critical
-        + Fore.RESET
-        + Back.RESET,
+    COLOR_TAGS = {
+        "BLACK": "\033[30m",
+        "RED": "\033[31m",
+        "GREEN": "\033[92m",
+        "YELLOW": "\033[33m",
+        "BLUE": "\033[34m",
+        "MAGENTA": "\033[35m",
+        "CYAN": "\033[36m",
+        "WHITE": "\033[97m",
+        "GREY": "\033[90m",
+        "ORANGE": "\033[38;5;208m",
     }
 
-    def format(self, record) -> str:
-        log_fmt: str | None = self.FORMATS.get(record.levelno)
-        formatter = logging.Formatter(fmt=log_fmt)
-        return formatter.format(record=record)
+    RESET = "\033[0m"
+
+    FORMATS = {
+        logging.DEBUG: "\033[92m"
+        + "%(levelname)s on line %(lineno)d (%(filename)s): %(message)s"
+        + RESET,
+        logging.INFO: "%(message)s",  # color will come from [TAG]
+        logging.WARNING: "\033[93m" + "%(levelname)s: %(message)s" + RESET,
+        logging.ERROR: "\033[91m" + "%(levelname)s: %(message)s" + RESET,
+        logging.CRITICAL: "\033[30m\033[103m"
+        + "%(levelname)s on line %(lineno)d (%(filename)s): %(message)s"
+        + RESET,
+    }
+
+    def format(self, record: logging.LogRecord) -> str:
+        # Replace [COLOR] tags in the actual message
+        if isinstance(record.msg, str):  # avoid issues if msg is not a string
+            for tag, color_code in self.COLOR_TAGS.items():
+                record.msg = record.msg.replace(f"[{tag}]", color_code)
+            # Add color reset at end
+            record.msg += self.RESET
+
+        log_fmt = self.FORMATS.get(record.levelno, self._fmt)
+        formatter = logging.Formatter(log_fmt, self.datefmt)
+        return formatter.format(record)
+
+    # def format(self, record) -> str:
+    #     log_fmt: str | None = self.FORMATS.get(record.levelno)
+    #     formatter = logging.Formatter(fmt=log_fmt)
+    #     return formatter.format(record=record)
 
 
 class Logger(logging.getLoggerClass()):

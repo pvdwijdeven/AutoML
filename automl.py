@@ -16,8 +16,14 @@ if __name__ == "__main__":
         default=False,
     )
     parser.add_argument(
-        "--silent",
+        "--nogui",
         help="execute without GUI, default is False",
+        action="store_true",
+        default=False,
+    )
+    parser.add_argument(
+        "--silent",
+        help="if executed without GUI, no console output, default is False",
         action="store_true",
         default=False,
     )
