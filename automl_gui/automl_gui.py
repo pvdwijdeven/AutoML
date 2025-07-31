@@ -21,6 +21,9 @@ class AutoMLFrame(wx.Frame):
         # === MAIN OUTER SIZER ===
         outer_sizer = wx.BoxSizer(wx.VERTICAL)
 
+        icon = wx.Icon("data/icons/automl_icon.png", wx.BITMAP_TYPE_PNG)
+        self.SetIcon(icon)
+
         self.buttons_info = {
             "training": {
                 "text": "Open training data (.csv/.xlsx)",

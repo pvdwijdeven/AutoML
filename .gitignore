@@ -1,5 +1,5 @@
 .venv/
-data/
+ml_data/
 __pycache__/
 *.pyc
 log/
