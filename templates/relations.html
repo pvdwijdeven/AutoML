@@ -1,5 +1,7 @@
 <div class="fixed-links">
   <span class="label" style="margin-right: 20px;">Relations </span>
+  <a href="#correlation-plot">Correlation</a> |  
+  <a href="#mi-plot">Mutual information</a>
   <select class="feature-select" onchange="jumpToFeature(this)">
     <option value="">Select a feature...</option>
     {% for column_name in context.keys() %}
@@ -20,13 +22,12 @@
   }
 </script>
 
-<h1>My Two Plots</h1>
     
-    <div style="width: 48%; float: left;">
+    <div id="correlation-plot" style="width: 48%; float: left;" class="anchor-offset">
         {{ plots[0] | safe }}
     </div>
-
-    <div style="width: 48%; float: right;">
+    <div style="clear: both;"></div>
+    <div id="mi-plot" style="width: 48%; float: left;" class="anchor-offset">
         {{ plots[1] | safe }}
     </div>
 

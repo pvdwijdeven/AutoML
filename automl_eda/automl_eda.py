@@ -279,9 +279,6 @@ class AutoML_EDA:
         self.column_info = {}
         self.target_info = {}
         for column in self.df_train.columns:
-            if column == self.target:
-                self.target_info[self.target] = self.analyse_column(column)
-                continue
             self.column_info[column] = self.analyse_column(column)
         self.logger.debug("[GREEN]- Column analysis completed. Details:")
         self.logger.debug(f"[CYAN]{pprint.pformat(self.column_info)}")
@@ -323,7 +320,6 @@ class AutoML_EDA:
         features_html = get_html_from_template(
             "features.html", self.column_info
         )
-        target_html = get_html_from_template("target.html", self.target_info)
         self.relation_info = generate_feature_relations(
             self.df_train, self.target
         )
@@ -337,7 +333,6 @@ class AutoML_EDA:
         tabs = [
             {"title": "General overview", "content": overview_html},
             {"title": "Features", "content": features_html},
-            {"title": "Target", "content": target_html},
             {"title": "Relations", "content": relations_html},
             {"title": "Missing values", "content": ""},
         ]
