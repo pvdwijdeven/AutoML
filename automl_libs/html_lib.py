@@ -2,6 +2,11 @@ import pandas as pd
 import numpy as np
 import plotly.express as px
 from jinja2 import Environment, FileSystemLoader
+from sklearn.feature_selection import (
+    mutual_info_classif,
+    mutual_info_regression,
+)
+from sklearn.preprocessing import LabelEncoder
 
 # Sample data
 np.random.seed(0)
@@ -51,112 +56,79 @@ def get_frequency_table(df, column_name) -> str:
     return frequency_table
 
 
-def get_html_from_template(template_file, context) -> str:
+def get_html_from_template(template_file, context, plots=[]) -> str:
     env = Environment(loader=FileSystemLoader("templates"))
     template = env.get_template(template_file)
-    rendered_html = template.render(context=context)
+    rendered_html = template.render(context=context, plots=plots)
     return rendered_html
 
 
-def create_plots_html(df):
-    column_blocks = []
+def generate_relation_visuals(df, target=None, max_features=20):
+    #    warnings.filterwarnings("ignore")
+    df = df.copy().dropna()
 
-    for col in df.columns:
-        # Horizontal box plot
-        fig_box = px.box(
-            df,
-            x=col,
-            title=f"{col} - Box Plot",
-            orientation="h",
-            height=300,
-            width=600,
+    # Identify types
+    num_cols = df.select_dtypes(include=np.number).columns.tolist()
+    cat_cols = df.select_dtypes(exclude=np.number).columns.tolist()
+
+    # Label encode categorical features temporarily
+    le_dict = {}
+    for col in cat_cols:
+        le = LabelEncoder()
+        df[col] = df[col].astype(str)
+        df[col] = le.fit_transform(df[col])
+        le_dict[col] = le
+
+    # Limit features for speed
+    all_features = num_cols + cat_cols
+    if len(all_features) > max_features:
+        all_features = all_features[:max_features]
+
+    # Compute correlation matrix
+    corr_matrix = df[all_features].corr()
+
+    # Plot Correlation Heatmap
+    fig_corr = px.imshow(
+        corr_matrix,
+        text_auto=True,
+        color_continuous_scale="RdBu",
+        title="Correlation Heatmap",
+        labels={"color": "Correlation"},
+        aspect="auto",
+    )
+    fig_corr.update_layout(width=900, height=900)
+    correlation_html = fig_corr.to_html(full_html=False, include_plotlyjs=False)
+
+    # Compute Mutual Information
+    mi_scores = {}
+    X_all_features = all_features.copy()
+    if target in X_all_features:
+        X_all_features.remove(target)
+    target_relation = ""
+    if target is not None and target in df.columns:
+        y = df[target]
+        X = df.drop(columns=[target])
+        if y.nunique() <= 10:
+            mi = mutual_info_classif(
+                X[X_all_features], y, discrete_features="auto"
+            )
+        else:
+            mi = mutual_info_regression(
+                X[X_all_features], y, discrete_features="auto"
+            )
+        mi_scores = dict(zip(X_all_features, mi))
+
+        # Plot MI bar chart
+        mi_series = pd.Series(mi_scores).sort_values(ascending=False)
+        fig_mi = px.bar(
+            mi_series,
+            x=mi_series.index,
+            y=mi_series.values,
+            title=f"Mutual Information with Target: {target}",
+            labels={"x": "Feature", "y": "Mutual Information"},
         )
-        box_html = fig_box.to_html(full_html=False, include_plotlyjs="cdn")
-
-        # Horizontal strip plot
-        fig_strip = px.strip(
-            df,
-            x=col,
-            title=f"{col} - Strip Plot",
-            orientation="h",
-            height=300,
-            width=600,
+        fig_mi.update_layout(xaxis_tickangle=-45)
+        target_relation = fig_mi.to_html(
+            full_html=False, include_plotlyjs=False
         )
-        strip_html = fig_strip.to_html(full_html=False, include_plotlyjs=False)
-
-        # Text + Layout
-        column_html = f"""
-        <div style="margin-bottom: 60px;">
-            <div class="row-flex">
-                <!-- Text block -->
-                <div class="block text-block">
-                    <h3>{col}</h3>
-                    <p>
-                        <strong>Mean:</strong> {df[col].mean():.2f}<br>
-                        <strong>Std:</strong> {df[col].std():.2f}<br>
-                        <strong>Min:</strong> {df[col].min():.2f}<br>
-                        <strong>Max:</strong> {df[col].max():.2f}
-                    </p>
-                </div>
-
-                <!-- Box plot block -->
-                <div class="block plot-block">
-                    {box_html}
-                </div>
-
-                <!-- Strip plot block -->
-                <div class="block plot-block">
-                    {strip_html}
-                </div>
-            </div>
-        </div>
-        """
-
-        column_blocks.append(column_html)
-
-    return "\n".join(column_blocks)
-
-
-def plot_test(df):
-    # Generate content
-    content_html = create_plots_html(df)
-
-    HTML_HEAD = """<head>
-        <title>Plots per Column</title>
-        <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
-        <style>
-            .row-flex {
-                display: flex;
-                flex-wrap: wrap;
-                gap: 30px;
-                align-items: flex-start;
-            }
-            .block {
-                flex: 1 1 300px;
-                box-sizing: border-box;
-            }
-            .text-block {
-                max-width: 300px;
-            }
-            @media (max-width: 900px) {
-                .row-flex {
-                    flex-direction: column;
-                }
-            }
-        </style>
-    </head>"""
-
-    # Wrap into a full HTML document
-    FULL_HTML = f"""
-    <html>
-    {HTML_HEAD}
-    <body style="font-family: Arial, sans-serif; padding: 20px;">
-        <h1>Data Overview</h1>
-        {content_html}
-    </body>
-    </html>
-    """
-
-    # Save to file
-    with open("plots_report.html", "w") as f:
-        f.write(FULL_HTML)
+    return correlation_html, target_relation

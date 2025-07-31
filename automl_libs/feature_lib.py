@@ -1,8 +1,101 @@
 import pandas as pd
 import re
-from collections import Counter, defaultdict
+from collections import Counter
 from scipy.stats import skew
 from automl_libs import infer_dtype
+import numpy as np
+from sklearn.feature_selection import (
+    mutual_info_classif,
+    mutual_info_regression,
+)
+from sklearn.preprocessing import LabelEncoder
+import warnings
+
+
+def generate_feature_relations(df, target=None, max_features=20):
+    warnings.filterwarnings("ignore")
+    df = df.copy().dropna()
+
+    # Identify types
+    num_cols = df.select_dtypes(include=np.number).columns.tolist()
+    cat_cols = df.select_dtypes(exclude=np.number).columns.tolist()
+    # Label encode categorical features temporarily
+    le_dict = {}
+    for col in cat_cols:
+        le = LabelEncoder()
+        df[col] = df[col].astype(str)
+        df[col] = le.fit_transform(df[col])
+        le_dict[col] = le
+
+    # Limit features for speed
+    all_features = num_cols + cat_cols
+    if len(all_features) > max_features:
+        all_features = all_features[:max_features]
+
+    # Compute correlation matrix
+    corr_matrix = df[all_features].corr()
+
+    # Mutual Information
+    mi_scores = {}
+    X_all_features = all_features.copy()
+    if target in all_features:
+        X_all_features.remove(target)
+    if target is not None and target in df.columns:
+        y = df[target]
+        X = df.drop(columns=[target])
+        if y.nunique() <= 10:
+            mi = mutual_info_classif(
+                X[X_all_features], y, discrete_features="auto"
+            )
+        else:
+            mi = mutual_info_regression(
+                X[X_all_features], y, discrete_features="auto"
+            )
+        mi_scores = dict(zip(X_all_features, mi))
+
+    # Output dictionary
+    insights = {}
+
+    for feature in all_features:
+        related = []
+        suggestions = []
+
+        # Related by correlation
+        if feature in corr_matrix:
+            high_corr = corr_matrix[feature][
+                (corr_matrix[feature].abs() > 0.7)
+                & (corr_matrix[feature].abs() < 1.0)
+            ]
+            related = high_corr.index.tolist()
+            if high_corr.any():
+                suggestions.append(
+                    "Highly correlated with "
+                    + ", ".join(related)
+                    + " — consider dropping or combining."
+                )
+
+        # Mutual information
+        mi_score = mi_scores.get(feature)
+        if mi_score is not None:
+            if mi_score > 0.2:
+                suggestions.append(
+                    f"High mutual information with target (MI={mi_score:.2f}) — useful feature."
+                )
+            elif mi_score < 0.01:
+                suggestions.append(
+                    f"Low mutual information with target (MI={mi_score:.2f}) — may not help predictive power."
+                )
+
+        insights[feature] = {
+            "feature": feature,
+            "related_features": "<br>".join(related) if related else "None",
+            "mutual_info with target": (
+                f"{mi_score:.3f}" if mi_score is not None else "N/A"
+            ),
+            "suggestions": "- " + "<br>- ".join(suggestions),
+        }
+
+    return insights
 
 
 def analyze_target(df, target_col):
@@ -218,6 +311,92 @@ def analyze_string_column(
     """
     Analyzes a string column and returns feature engineering suggestions.
     """
+
+    def analyze_parts(samples, depth=0):
+        delimiter_regex = re.compile(r"[-_/:|]")
+        if not samples:
+            return
+        indent = "&nbsp;&nbsp;" * (depth - 1)
+        # Step 1: Find common delimiters across all samples
+        delimiter_counts = {}
+        for s in samples:
+            for match in delimiter_regex.finditer(s):
+                delimiter_counts[match.group()] = (
+                    delimiter_counts.get(match.group(), 0) + 1
+                )
+
+        # Pick delimiter that is present in all samples
+        common_delim = None
+        for match in delimiter_regex.finditer(samples[0]):
+            delim = match.group()
+            if all(delim in s for s in samples):
+                common_delim = delim
+                break
+
+        if not common_delim:
+            if depth == 0:
+                return
+            # No consistent delimiter; check the remaining strings
+            lengths = [len(s) for s in samples]
+            all_numeric = all(s.isdigit() for s in samples)
+            if all_numeric:
+                if len(set(lengths)) == 1:
+                    suggestions.append(
+                        f"#{indent}- Right part is numeric of consistent length {lengths[0]}."
+                    )
+                else:
+                    suggestions.append(
+                        f"#{indent}- Right part is numeric (variable length allowed)."
+                    )
+            else:
+                if len(set(lengths)) == 1:
+                    suggestions.append(
+                        f"#{indent}- Right part is non-numeric string of consistent length {lengths[0]}."
+                    )
+                else:
+                    suggestions.append(
+                        f"#{indent}- Right part is non-numeric string with varying lengths: {set(lengths)}."
+                    )
+            return
+
+        # Split strings into 2 parts
+        left_parts = []
+        right_parts = []
+        for s in samples:
+            split_index = s.find(common_delim)
+            left_parts.append(s[:split_index])
+            right_parts.append(s[split_index + 1 :])
+        if depth == 0:
+            suggestions.append(f"Split on '{common_delim}'")
+        else:
+            suggestions.append(f"#{indent}- Split on '{common_delim}'")
+        indent = "&nbsp;&nbsp;" * (depth)
+        # Analyze left part
+        all_numeric = all(part.isdigit() for part in left_parts)
+        lengths = [len(p) for p in left_parts]
+        if all_numeric:
+            if len(set(lengths)) == 1:
+                suggestions.append(
+                    f"#{indent}- Left part is numeric of consistent length {lengths[0]}."
+                )
+            else:
+                suggestions.append(
+                    f"#{indent}- Left part is numeric (variable length allowed)."
+                )
+        else:
+
+            if len(set(lengths)) == 1:
+                suggestions.append(
+                    f"#{indent}- Left part is non-numeric string of consistent length {lengths[0]}."
+                )
+            else:
+                suggestions.append(
+                    f"#{indent}- Left part is non-numeric string with varying lengths: {set(lengths)}."
+                )
+
+        # Recurse on right part
+        analyze_parts(right_parts, depth=depth + 1)
+
     suggestions = []
     series = df[column_name]
     series = series.dropna().astype(str)
@@ -236,22 +415,7 @@ def analyze_string_column(
         suggestions.append("Use word count as a feature.")
 
     # --- 3. Delimiter Splitting ---
-    delimiter_regex = re.compile(r"[-_/:|]")
-    split_positions = defaultdict(list)
-
-    for s in series:
-        for match in delimiter_regex.finditer(s):
-            split_positions[match.group()].append(match.start())
-
-    for delim, positions in split_positions.items():
-        if not positions:
-            continue
-        most_common_pos = Counter(positions).most_common(1)[0]
-        freq = most_common_pos[1] / len(series)
-        if freq >= delimiter_consistency_threshold:
-            suggestions.append(
-                f"Split on '{delim}' at position {most_common_pos[0]} (consistent in {freq:.0%} of samples)."
-            )
+    analyze_parts([str(s) for s in series])
 
     # --- 4. Contains Digits / Alpha / Alnum ---
     if series.str.contains(r"\d").mean() > 0.5:

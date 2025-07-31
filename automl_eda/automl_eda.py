@@ -13,6 +13,8 @@ from automl_libs import (
     analyze_numeric_column,
     analyze_boolean_column,
     analyze_target,
+    generate_feature_relations,
+    generate_relation_visuals,
 )
 
 
@@ -189,15 +191,15 @@ class AutoML_EDA:
             unique_count = self.df_train[column_name].nunique(dropna=True)
             unique_pct = unique_count / len(self.df_train) * 100
             frequency = get_frequency_table(self.df_train, column_name)
+            suggestions = "- " + "<br>- ".join(
+                analyze_categorical_column(self.df_train, column_name)
+            )
             return {
                 "type": "category",
                 "missing_values": f"{missing_count} ({missing_pct:.1f}%)",
                 "unique_count": f"{unique_count} ({unique_pct:.1f}%)",
                 "frequency": frequency,
-                "suggestions": "- "
-                + "<br>- ".join(
-                    analyze_categorical_column(self.df_train, column_name)
-                ),
+                "suggestions": suggestions,
             }
 
         # type string:
@@ -217,7 +219,7 @@ class AutoML_EDA:
                         self.df_train,
                         column_name,
                     )
-                ),
+                ).replace("- #", "&nbsp;&nbsp;"),
             }
 
         # type numeric:
@@ -322,13 +324,21 @@ class AutoML_EDA:
             "features.html", self.column_info
         )
         target_html = get_html_from_template("target.html", self.target_info)
+        self.relation_info = generate_feature_relations(
+            self.df_train, self.target
+        )
 
+        # relations_html = str(self.relation_info) + "\n" + str(self.column_info)
+        plot1, plot2 = generate_relation_visuals(self.df_train, self.target)
+        relations_html = get_html_from_template(
+            "relations.html", self.relation_info, [plot1, plot2]
+        )
         # Prepare tab content
         tabs = [
             {"title": "General overview", "content": overview_html},
             {"title": "Features", "content": features_html},
             {"title": "Target", "content": target_html},
-            {"title": "Relations", "content": ""},
+            {"title": "Relations", "content": relations_html},
             {"title": "Missing values", "content": ""},
         ]
         if self.df_test is not None:

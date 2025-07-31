@@ -1,0 +1,48 @@
+<div class="fixed-links">
+  <span class="label" style="margin-right: 20px;">Relations </span>
+  <select class="feature-select" onchange="jumpToFeature(this)">
+    <option value="">Select a feature...</option>
+    {% for column_name in context.keys() %}
+      <option value="#{{ column_name }}_relations">{{ column_name }}</option>
+    {% endfor %}
+  </select>
+</div>
+
+<script>
+  function jumpToFeature(select) {
+    if (select.value) {
+      location.hash = select.value;
+      // Reset to placeholder after short delay to ensure hash works
+      setTimeout(() => {
+        select.value = "";
+      }, 100);
+    }
+  }
+</script>
+
+<h1>My Two Plots</h1>
+    
+    <div style="width: 48%; float: left;">
+        {{ plots[0] | safe }}
+    </div>
+
+    <div style="width: 48%; float: right;">
+        {{ plots[1] | safe }}
+    </div>
+
+    <div style="clear: both;"></div>
+
+{% for column_name, stats in context.items() %}
+  <h3 id="{{ column_name }}_relations" class="anchor-offset">{{ column_name }}</h3>
+  
+  <table class="feature-summary">
+    <tbody>
+      {% for key, value in stats.items() %}
+        <tr>
+          <th>{{ key.replace('_', ' ').capitalize() }}</th>
+          <td>{{ value }}</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+{% endfor %}

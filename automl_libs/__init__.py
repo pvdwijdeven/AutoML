@@ -2,13 +2,18 @@
 
 from .general_lib import WxTextRedirector, TextCtrlHandler, Logger
 from .definitions import infer_dtype
-from .html_lib import get_html_from_template, get_frequency_table
+from .html_lib import (
+    get_html_from_template,
+    get_frequency_table,
+    generate_relation_visuals,
+)
 from .feature_lib import (
     analyze_string_column,
     analyze_categorical_column,
     analyze_numeric_column,
     analyze_boolean_column,
     analyze_target,
+    generate_feature_relations,
 )
 
 __all__ = [
@@ -23,4 +28,6 @@ __all__ = [
     "analyze_numeric_column",
     "analyze_boolean_column",
     "analyze_target",
+    "generate_feature_relations",
+    "generate_relation_visuals",
 ]
