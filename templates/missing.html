@@ -1,0 +1,19 @@
+<div class="fixed-links">
+  <span class="label" style="margin-right: 20px;">Missing data </span>
+  <a href="#general-info-missing">General info</a> |  
+  <a href="#per-feature">Per feature</a>
+</div>
+
+    <h3 id="general-info-missing" class="anchor-offset">General info</h3>
+    <div style="width: 48%; float: left;" class="anchor-offset">
+        {{ context.table1 | safe }}
+    </div>
+    <div style="clear: both;"></div>
+
+    <h3 id="per-feature" class="anchor-offset">Per feature</h3>
+    <div style="width: 48%; float: left;" class="anchor-offset">
+        {{ context.table2 | safe }}
+    </div>
+
+    <div style="clear: both;"></div>
+

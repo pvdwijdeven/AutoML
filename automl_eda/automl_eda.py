@@ -3,6 +3,7 @@ import json
 import pprint
 from jinja2 import Environment, FileSystemLoader
 from .automl_eda_overview import create_overview_table
+from .automl_missing import missing_data_summary
 from scipy.stats import skew
 from automl_libs import (
     infer_dtype,
@@ -329,12 +330,24 @@ class AutoML_EDA:
         relations_html = get_html_from_template(
             "relations.html", self.relation_info, [plot1, plot2]
         )
+
+        column_info_html, general_info_html = missing_data_summary(
+            self.df_train
+        )
+        missing_context = {
+            "table2": column_info_html,
+            "table1": general_info_html,
+        }
+        missing_html = get_html_from_template("missing.html", missing_context)
         # Prepare tab content
         tabs = [
             {"title": "General overview", "content": overview_html},
             {"title": "Features", "content": features_html},
             {"title": "Relations", "content": relations_html},
-            {"title": "Missing values", "content": ""},
+            {
+                "title": "Missing values",
+                "content": missing_html,
+            },
         ]
         if self.df_test is not None:
             tabs.append(
