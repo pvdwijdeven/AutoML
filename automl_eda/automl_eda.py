@@ -3,7 +3,12 @@ import json
 import pprint
 from jinja2 import Environment, FileSystemLoader
 from .automl_eda_overview import create_overview_table
-from .automl_missing import missing_data_summary
+from .automl_missing import (
+    missing_data_summary,
+    plot_missingness_matrix,
+    plot_missing_correlation,
+    generate_missing_summary,
+)
 from scipy.stats import skew
 from automl_libs import (
     infer_dtype,
@@ -335,8 +340,13 @@ class AutoML_EDA:
             self.df_train
         )
         missing_context = {
-            "table2": column_info_html,
-            "table1": general_info_html,
+            "feature_info": column_info_html,
+            "general_info": general_info_html,
+            "plot_missing": plot_missingness_matrix(self.df_train, top_n=20),
+            "plot_missing_correlation": plot_missing_correlation(self.df_train),
+            "missing_summary": generate_missing_summary(
+                self.df_train,
+            ),
         }
         missing_html = get_html_from_template("missing.html", missing_context)
         # Prepare tab content

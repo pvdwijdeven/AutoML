@@ -2,7 +2,7 @@
   <span class="label" style="margin-right: 20px;">Relations </span>
   <a href="#correlation-plot">Correlation</a> |  
   <a href="#mi-plot">Mutual information</a>
-  <select class="feature-select" onchange="jumpToFeature(this)">
+  <select id="feature-select-relation" class="feature-select" onchange="jumpToFeature(this)">
     <option value="">Select a feature...</option>
     {% for column_name in context.keys() %}
       <option value="#{{ column_name }}_relations">{{ column_name }}</option>

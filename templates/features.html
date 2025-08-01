@@ -1,6 +1,6 @@
 <div class="fixed-links">
   <span class="label" style="margin-right: 20px;">Features </span>
-  <select class="feature-select" onchange="jumpToFeature(this)">
+  <select id="feature-select" class="feature-select" onchange="jumpToFeature(this)">
     <option value="">Select a feature...</option>
     {% for column_name in context.keys() %}
       <option value="#{{ column_name }}">{{ column_name }}</option>

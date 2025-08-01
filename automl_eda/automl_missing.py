@@ -1,4 +1,6 @@
 import pandas as pd
+import plotly.express as px
+from automl_libs import infer_dtype
 
 
 def missing_data_summary(df):
@@ -46,3 +48,174 @@ def missing_data_summary(df):
     general_info_html = general_info.to_html(header=False, index=False)
 
     return column_info_html, general_info_html
+
+
+def plot_missingness_matrix(df, top_n=20) -> str:
+    # Step 1: Select top N columns with the most missing values
+    missing_counts = df.isnull().sum()
+    top_missing_cols = (
+        missing_counts.sort_values(ascending=False).head(top_n).index.tolist()
+    )
+
+    # Step 2: Create a boolean mask: True = missing, False = present
+    mask = df[top_missing_cols].isnull()
+
+    # Step 3: Convert to long format for Plotly
+    data = (
+        mask.reset_index()
+        .melt(id_vars="index", var_name="Feature", value_name="IsMissing")
+        .rename(columns={"index": "Row"})
+    )
+    data["MissingValue"] = data["IsMissing"].map(
+        {True: "Missing", False: "Present"}
+    )
+
+    # Step 4: Plot using Plotly Express heatmap
+    fig = px.imshow(
+        mask[top_missing_cols].astype(int).T,
+        color_continuous_scale=[[0, "blue"], [1, "white"]],
+        aspect="auto",
+        labels={"x": "Row Index", "y": "Feature", "color": "Missing"},
+        title=f"Missing Value Matrix (Top {top_n} Features)",
+    )
+    fig.update_layout(
+        xaxis_title="Row Index",
+        yaxis_title="Feature",
+        coloraxis_showscale=False,
+        height=400 + top_n * 20,
+    )
+    return fig.to_html(
+        full_html=False,
+        include_plotlyjs=False,
+        default_width="100%",
+        div_id="my-plot",
+        config=dict(responsive=True),
+    )
+
+
+def plot_missing_correlation(df, top_n=20):
+    # Step 1: Numeric missingness matrix
+    missing_df = df.isnull().astype(int)
+
+    # Step 2: Focus on top N features with most missing values
+    top_cols = missing_df.sum().sort_values(ascending=False).head(top_n).index
+    missing_df = missing_df[top_cols]
+
+    # Step 3: Correlation matrix
+    corr = missing_df.corr()
+
+    # Step 4: Plot with Plotly
+    fig = px.imshow(
+        corr,
+        color_continuous_scale="RdBu",
+        zmin=-1,
+        zmax=1,
+        title=f"Correlation of Missingness (Top {top_n} Features)",
+    )
+    fig.update_layout(
+        xaxis_title="Feature", yaxis_title="Feature", height=600, width=600
+    )
+    return fig.to_html(
+        full_html=False,
+        include_plotlyjs=False,
+        default_width="100%",
+        div_id="my-plot2",
+        config=dict(responsive=True),
+    )
+
+
+def generate_missing_summary(df, drop_col_thresh=0.6, drop_row_thresh=0.05):
+    """
+    Suggest how to handle missing values for each feature in a DataFrame,
+    including imputation strategies even if imputation is not strictly recommended.
+
+    Parameters:
+    - df: pandas DataFrame
+    - drop_col_thresh: float, threshold for dropping a column (default 60%)
+    - drop_row_thresh: float, threshold for dropping rows (default 5%)
+
+    Returns:
+    - HTML table as a string
+    """
+
+    n_rows = len(df)
+    results = []
+
+    for col in df.columns:
+        n_missing = df[col].isnull().sum()
+        pct_missing = n_missing / n_rows
+
+        if n_missing == 0:
+            continue  # skip columns without missing values
+
+        col_type = infer_dtype(df[col])
+        n_unique = df[col].nunique(dropna=True)
+        skewness = (
+            df[col].skew() if pd.api.types.is_numeric_dtype(df[col]) else None
+        )
+
+        # Default values
+        suggestion = ""
+        strategy = ""
+
+        # 1. Drop column if mostly missing
+        if pct_missing > drop_col_thresh:
+            suggestion = "Drop column"
+            strategy = "Too many missing values; not worth imputing"
+
+        # 2. Drop rows if only few missing
+        elif pct_missing < drop_row_thresh:
+            suggestion = "Drop rows with missing"
+            # Still recommend a strategy in case user prefers imputation
+            strategy = "Alternatively: "
+        else:
+            suggestion = "Impute"
+
+        # 3. Recommend imputation strategy (always, per your request)
+        if col_type in ["integer", "floating", "mixed-integer-float"]:
+            if skewness is not None and abs(skewness) > 1:
+                strategy += "median imputation (skewed)"
+            else:
+                strategy += "mean imputation"
+            if pct_missing > 0.2:
+                strategy += " or KNN/iterative imputation"
+        elif col_type in ["object", "string", "categorical", "boolean"]:
+            impute_options = []
+
+            if n_unique <= 10:
+                impute_options.append("mode imputation")
+            if 10 < n_unique <= 50:
+                impute_options.append("'Unknown' label")
+            if n_unique > 10:
+                impute_options.append("frequency or target encoding")
+
+            strategy += " or ".join(impute_options)
+
+            if pct_missing > 0.2:
+                strategy += "; consider model-based imputation if valuable"
+        elif "datetime" in col_type:
+            strategy += "most frequent date or interpolation"
+        else:
+
+            strategy += "custom strategy required (complex type)"
+
+        # 4. Consider group-based imputation advice
+        if (
+            suggestion == "Impute"
+            and col_type in ["integer", "floating", "object", "category"]
+            and n_unique > 1
+        ):
+            strategy += "; optionally use group-based imputation if related feature available"
+
+        results.append(
+            {
+                "Column": col,
+                "Missing Count": n_missing,
+                "Missing %": f"{pct_missing:.1%}",
+                "Type": str(col_type),
+                "Suggestion": suggestion,
+                "Imputation Strategy": strategy,
+            }
+        )
+
+    return pd.DataFrame(results).to_html(classes=["frequency-table"])
