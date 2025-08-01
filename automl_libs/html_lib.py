@@ -105,18 +105,23 @@ def generate_relation_visuals(df, target=None, max_features=20):
     if target in X_all_features:
         X_all_features.remove(target)
     target_relation = ""
+
     if target is not None and target in df.columns:
-        y = df[target]
-        X = df.drop(columns=[target])
-        if y.nunique() <= 10:
-            mi = mutual_info_classif(
-                X[X_all_features], y, discrete_features="auto"
-            )
-        else:
-            mi = mutual_info_regression(
-                X[X_all_features], y, discrete_features="auto"
-            )
-        mi_scores = dict(zip(X_all_features, mi))
+        try:
+            y = df[target]
+            X = df.drop(columns=[target])
+            if y.nunique() <= 10:
+                mi = mutual_info_classif(
+                    X[X_all_features], y, discrete_features="auto"
+                )
+            else:
+                mi = mutual_info_regression(
+                    X[X_all_features], y, discrete_features="auto"
+                )
+            mi_scores = dict(zip(X_all_features, mi))
+        except Exception as e:
+            print(f"Error computing mutual information: {e}")
+            mi_scores = {feature: None for feature in all_features}
 
         # Plot MI bar chart
         mi_series = pd.Series(mi_scores).sort_values(ascending=False)

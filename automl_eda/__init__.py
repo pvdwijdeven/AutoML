@@ -8,6 +8,7 @@ from .automl_missing import (
     plot_missing_correlation,
     generate_missing_summary,
 )
+from .automl_testdata import analyze_test_data
 
 __all__ = [
     "AutoML_EDA",
@@ -16,4 +17,5 @@ __all__ = [
     "plot_missingness_matrix",
     "plot_missing_correlation",
     "generate_missing_summary",
+    "analyze_test_data",
 ]

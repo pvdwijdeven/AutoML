@@ -9,6 +9,7 @@ from .automl_missing import (
     plot_missing_correlation,
     generate_missing_summary,
 )
+from .automl_testdata import analyze_test_data
 from scipy.stats import skew
 from automl_libs import (
     infer_dtype,
@@ -360,8 +361,30 @@ class AutoML_EDA:
             },
         ]
         if self.df_test is not None:
+            # Samples
+            n_rows = len(self.df_test)
+            samples_head = self.df_test.head(10).to_html(index=False)
+            samples_middle = self.df_test.iloc[
+                n_rows // 2 - 5 : n_rows // 2 + 5
+            ].to_html(
+                index=False,
+            )
+            samples_tail = self.df_test.tail(10).to_html(index=False)
+
+            # --- Context dictionary for rendering ---
+
+            testdata_content = analyze_test_data(
+                self.df_train, self.df_test, self.target
+            )
+            context = {
+                "tables": testdata_content,
+                "samples_head": samples_head,
+                "samples_middle": samples_middle,
+                "samples_tail": samples_tail,
+            }
+            testdata_html = get_html_from_template("testdata.html", context)
             tabs.append(
-                {"title": "Test data", "content": ""},
+                {"title": "Test data", "content": testdata_html},
             )
         # Load and render the template
         env = Environment(loader=FileSystemLoader("templates"))
