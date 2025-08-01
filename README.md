@@ -3,28 +3,6 @@
 
 Automated Machine Learning module
 
-Use GUI or CLI
-
-## Command Line Interface (CLI) Options
-
-```bash
-automl [OPTIONS]
-````
-
-### Options
-
-| Option                 | Description                                                   |
-| ---------------------- | ------------------------------------------------------------- |
-| `-h`, `--help`         | Show this help message and exit                               |
-| `--training_data FILE` | Filename for training data                                    |
-| `--test_data FILE`     | Filename for test data                                        |
-| `--EDA`                | Start EDA (default: `False`)                                  |
-| `--nogui`              | Execute without GUI (default: `False`)                        |
-| `--silent`             | If executed without GUI, no console output (default: `False`) |
-| `--report_file FILE`   | Filename for report file (`.html`)                            |
-| `--output_file FILE`   | Filename for output file (`.csv`)                             |
-
----
 
 ## 📊 What AutoML Currently Produces
 
@@ -62,6 +40,30 @@ When EDA is started from the GUI or via CLI with the `--EDA` option, AutoML gene
 
 ---
 
+
+Use GUI or CLI
+
+## Command Line Interface (CLI) Options
+
+```bash
+automl [OPTIONS]
+````
+
+### Options
+
+| Option                 | Description                                                   |
+| ---------------------- | ------------------------------------------------------------- |
+| `-h`, `--help`         | Show this help message and exit                               |
+| `--training_data FILE` | Filename for training data                                    |
+| `--test_data FILE`     | Filename for test data                                        |
+| `--EDA`                | Start EDA (default: `False`)                                  |
+| `--nogui`              | Execute without GUI (default: `False`)                        |
+| `--silent`             | If executed without GUI, no console output (default: `False`) |
+| `--report_file FILE`   | Filename for report file (`.html`)                            |
+| `--output_file FILE`   | Filename for output file (`.csv`)                             |
+
+---
+
 ## 🚧 What’s in Progress
 
 The AutoML module is still under active development. The following components are being built:
@@ -71,6 +73,8 @@ The AutoML module is still under active development. The following components ar
 * ⚙️ Hyperparameter optimization
 * 📊 Evaluation metrics and comparison tools
 * 💾 Exportable pipeline (as code and artifacts)
+
+
 
 ---
 
