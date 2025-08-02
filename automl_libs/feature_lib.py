@@ -10,12 +10,70 @@ from sklearn.feature_selection import (
 )
 from sklearn.preprocessing import LabelEncoder
 import warnings
+from typing import List
 
 
-def generate_feature_relations(df, target=None, max_features=20):
+def select_features_by_missingness(
+    df: pd.DataFrame,
+    target: str = "",
+    candidate_features: List[str] = [],
+    max_features: int = 100,
+    min_row_fraction: float = 0.2,
+) -> List[str]:
+    """
+    Select features sorted by ascending missing values, adding features
+    until max_features is reached or dropping NA rows keeps at least min_row_fraction of data.
+
+    Parameters:
+    - df: DataFrame with your data
+    - candidate_features: list of feature column names to consider
+    - max_features: max number of features to select
+    - min_row_fraction: minimal fraction of rows to keep after dropping NA
+
+    Returns:
+    - selected_features: list of selected features satisfying conditions
+    """
+    if not candidate_features:
+        # If no specific features provided, use all columns
+        candidate_features = df.columns.tolist()
+    if target and target in candidate_features:
+        candidate_features = [f for f in candidate_features if f != target]
+    # Sort features by missing values ascending
+    missing_counts = df[candidate_features].isna().sum().sort_values()
+
+    selected_features = []
+    original_row_count = len(df)
+
+    for feature in missing_counts.index:
+        selected_features.append(feature)
+
+        # Calculate how many rows remain after dropping NA in current features
+        rows_remaining = df.dropna(subset=selected_features).shape[0]
+        fraction_remaining = rows_remaining / original_row_count
+
+        # Check stop conditions
+        if (
+            len(selected_features) >= max_features
+            or fraction_remaining <= min_row_fraction
+        ):
+            # If fraction dropped below threshold after adding last feature,
+            # remove that feature to keep fraction above min_row_fraction
+            if fraction_remaining < min_row_fraction:
+                selected_features.pop()
+            break
+
+    return selected_features
+
+
+def generate_feature_relations(df, target="", max_features=100):
     warnings.filterwarnings("ignore")
-    df = df.copy().dropna()
-
+    features = select_features_by_missingness(df, "")
+    if target != "" and target not in features:
+        features.append(target)
+    num_features = len(features)
+    df = df[features].copy().dropna()
+    if target == "":
+        target = None
     # Identify types
     num_cols = df.select_dtypes(include=np.number).columns.tolist()
     cat_cols = df.select_dtypes(exclude=np.number).columns.tolist()
@@ -39,22 +97,20 @@ def generate_feature_relations(df, target=None, max_features=20):
     mi_scores = {}
     try:
         X_all_features = all_features.copy()
-        if target in all_features:
+        if isinstance(target, str) and target in X_all_features:
             X_all_features.remove(target)
         if target is not None and target in df.columns:
             y = df[target]
-            X = df.drop(columns=[target])
+            X = df[X_all_features]
             if y.nunique() <= 10:
-                mi = mutual_info_classif(
-                    X[X_all_features], y, discrete_features="auto"
-                )
+                mi = mutual_info_classif(X, y, discrete_features="auto")
             else:
-                mi = mutual_info_regression(
-                    X[X_all_features], y, discrete_features="auto"
-                )
+                mi = mutual_info_regression(X, y, discrete_features="auto")
             mi_scores = dict(zip(X_all_features, mi))
     except Exception as e:
-        print(f"Error computing mutual information: {e}")
+        print(
+            f"Error computing mutual information: {e}",
+        )
         mi_scores = {feature: None for feature in all_features}
 
     # Output dictionary
@@ -99,7 +155,7 @@ def generate_feature_relations(df, target=None, max_features=20):
             "suggestions": "- " + "<br>- ".join(suggestions),
         }
 
-    return insights
+    return insights, num_features
 
 
 def analyze_target(df, target_col):

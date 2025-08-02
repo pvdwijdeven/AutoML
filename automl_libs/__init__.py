@@ -14,6 +14,7 @@ from .feature_lib import (
     analyze_boolean_column,
     analyze_target,
     generate_feature_relations,
+    select_features_by_missingness,
 )
 
 __all__ = [
@@ -30,4 +31,5 @@ __all__ = [
     "analyze_target",
     "generate_feature_relations",
     "generate_relation_visuals",
+    "select_features_by_missingness",
 ]

@@ -1,6 +1,7 @@
 import pandas as pd
-import json
-import pprint
+
+# import json
+# import pprint
 from jinja2 import Environment, FileSystemLoader
 from .automl_eda_overview import create_overview_table
 from .automl_missing import (
@@ -23,6 +24,7 @@ from automl_libs import (
     generate_feature_relations,
     generate_relation_visuals,
 )
+import numpy as np
 
 
 class AutoML_EDA:
@@ -122,17 +124,18 @@ class AutoML_EDA:
             converted = None
 
         if converted is not None:
+            is_int_like = np.isclose(converted.dropna() % 1, 0).all()
             non_na_count = col_series_train.notna().sum()
             if converted.notna().sum() == non_na_count:
-                if (
-                    pd.api.types.is_float_dtype(converted)
-                    and (converted.dropna() % 1 == 0).all()
-                ):
+                if pd.api.types.is_float_dtype(converted) and is_int_like:
+                    self.df_train[column_name] = converted.astype("Int64")
+                    inferred_dtype = "Int64"
+                elif is_int_like:
                     self.df_train[column_name] = converted.astype("Int64")
                     inferred_dtype = "Int64"
                 else:
                     self.df_train[column_name] = converted
-                    inferred_dtype = str(converted.dtype)
+                    inferred_dtype = str(converted.dtype).capitalize()
 
         # Step 5: Apply same dtype to df_test
         if self.df_test is not None and column_name in self.df_test.columns:
@@ -154,12 +157,11 @@ class AutoML_EDA:
                         f"Failed to apply Int64 conversion to test column '{column_name}': {e}"
                     )
             elif inferred_dtype is not None and inferred_dtype.startswith(
-                "float"
+                "Float"
             ):
                 try:
                     converted_test = convert_to_numeric(col_test)
                     # Use numpy dtype object for astype
-                    import numpy as np
 
                     self.df_test[column_name] = converted_test.astype(
                         np.float64
@@ -168,6 +170,10 @@ class AutoML_EDA:
                     self.logger.warning(
                         f"Failed to apply float conversion to test column '{column_name}': {e}"
                     )
+        if self.df_test is not None and column_name != self.target:
+            self.logger.debug(
+                f"{column_name}: {inferred_dtype}, {self.df_train[column_name].dtype}, {self.df_test[column_name].dtype}"
+            )
 
     def analyse_column(self, column_name: str):
 
@@ -282,13 +288,13 @@ class AutoML_EDA:
         self.logger.debug(
             "[GREEN]- Column type analysis completed. Changes made:"
         )
-        self.logger.debug(f"[CYAN]{json.dumps(self.type_conversion, indent=4)}")
+        # self.logger.debug(f"[CYAN]{json.dumps(self.type_conversion, indent=4)}")
         self.column_info = {}
         self.target_info = {}
         for column in self.df_train.columns:
             self.column_info[column] = self.analyse_column(column)
         self.logger.debug("[GREEN]- Column analysis completed. Details:")
-        self.logger.debug(f"[CYAN]{pprint.pformat(self.column_info)}")
+        # self.logger.debug(f"[CYAN]{pprint.pformat(self.column_info)}")
 
     def perform_eda(self) -> str:
         self.logger.info("[MAGENTA]Starting EDA (Exploratory Data Analysis)")
@@ -327,14 +333,20 @@ class AutoML_EDA:
         features_html = get_html_from_template(
             "features.html", self.column_info
         )
-        self.relation_info = generate_feature_relations(
+        self.relation_info, self.num_feats = generate_feature_relations(
             self.df_train, self.target
         )
+        relation_context = {}
+        relation_context["relation_info"] = self.relation_info
+        relation_context["num_feats"] = self.num_feats
 
         # relations_html = str(self.relation_info) + "\n" + str(self.column_info)
         plot1, plot2 = generate_relation_visuals(self.df_train, self.target)
+        relation_context["plot1"] = plot1
+        relation_context["plot2"] = plot2
+
         relations_html = get_html_from_template(
-            "relations.html", self.relation_info, [plot1, plot2]
+            "relations.html", relation_context
         )
 
         column_info_html, general_info_html = missing_data_summary(
@@ -394,5 +406,6 @@ class AutoML_EDA:
         # Save to file
         with open(self.report_file, "w", encoding="utf-8") as f:
             f.write(output_html)
+        self.logger.info("[YELLOW]EDA report saved to %s", self.report_file)
         self.logger.info("[MAGENTA]EDA (Exploratory Data Analysis) is done")
         return "EDA completed successfully with the provided datasets."

@@ -8,35 +8,35 @@ Automated Machine Learning module
 
 When EDA is started from the GUI or via CLI with the `--EDA` option, AutoML generates an interactive **Exploratory Data Analysis (EDA) report** as an HTML file.
 
-### ✅ Features of the Report
+## 🧠 Exploratory Data Analysis (EDA) Report
 
-* **Dataset Overview**
+AutoML can automatically generate an interactive **EDA report** (HTML format) from any structured dataset via GUI or CLI. This report provides a comprehensive overview of your data before modeling, supporting informed decisions in feature engineering and preprocessing.
 
-  * Number of samples and features
-  * Types of features (numeric, categorical, string, boolean)
-  * Missing values summary
-  * Data memory usage and preview tables (head/middle/tail)
+### 🧩 Key Capabilities
 
-* **Per-Feature Details**
+- **Dataset Summary**
+  - Number of features and samples
+  - Feature types (numeric, categorical, string, boolean)
+  - Memory usage and missing value analysis
+  - Table previews (head, middle, tail)
 
-  * Summary statistics (mean, std, min, max, skewness)
-  * Frequency counts for categorical features
-  * Intelligent suggestions for:
+- **Per-Feature Diagnostics**
+  - Summary statistics and distributions
+  - Category frequencies
+  - Imputation and encoding suggestions
+  - Flagging of zero-inflated, highly skewed, or constant features
 
-    * Encoding (e.g. One-Hot, Ordinal, Binary)
-    * Outlier and skewness handling (e.g. log transforms, binning)
-    * String feature parsing (e.g. split suggestions)
-    * Zero-inflated feature treatment
+- **Relation Insights**
+  - Correlation matrix
+  - Mutual information with the target
+  - Feature-target interactions
 
-* **Relation Analysis**
+- **Optional Test Data Check**
+  - Structural and statistical comparison with training data
+  - Detection of mismatches and unseen categories
 
-  * Correlation matrix
-  * Mutual information plot
-  * Feature interaction insights
+The report is fully HTML-based, styled for usability, and supports quick navigation through tabs and feature anchors.
 
-* **Test Data Compatibility**
-
-  * Optional analysis for test data consistency
 
 ---
 

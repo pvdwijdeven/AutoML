@@ -9,15 +9,19 @@ def missing_data_summary(df):
 
     # Percentage of missing values per column
     missing_percentage = (missing_count / len(df)) * 100
-
+    mask = missing_percentage > 0
+    missing_count = missing_count[mask]
+    missing_percentage = missing_percentage[mask]
     # Combine into a DataFrame and sort descending
     column_info = pd.DataFrame(
         {
             "Missing Count": missing_count.astype(str) + " of " + str(len(df)),
-            "Missing Percentage": missing_percentage.map("{:.2f}%".format),
+            "Missing Percentage": missing_percentage,
         }
-    ).sort_values(by="Missing Count", ascending=False)
-
+    ).sort_values(by="Missing Percentage", ascending=False)
+    column_info["Missing Percentage"] = column_info["Missing Percentage"].map(
+        "{:.2f}%".format
+    )
     # General missing data statistics
     total_missing = missing_count.sum()
     total_missing_text = f"{total_missing} of {len(df) * len(df.columns)} ({total_missing / (len(df) * len(df.columns)):.2%})"
@@ -25,6 +29,10 @@ def missing_data_summary(df):
     rows_with_missing_text = (
         f"{rows_with_missing} of {len(df)} ({rows_with_missing / len(df):.2%})"
     )
+    columns_something_missing = (missing_count > 0).sum()
+    columns_none_missing = (missing_count == 0).sum()
+    columns_something_missing_text = f"{columns_something_missing} of {len(df.columns)} ({columns_something_missing / len(df.columns):.2%})"
+    columns_none_missing_text = f"{columns_none_missing} of {len(df.columns)} ({columns_none_missing / len(df.columns):.2%})"
     columns_all_missing = (missing_count == len(df)).sum()
     columns_all_missing_text = f"{columns_all_missing} of {len(df.columns)} ({columns_all_missing / len(df.columns):.2%})"
 
@@ -34,11 +42,15 @@ def missing_data_summary(df):
                 "Total Missing Values",
                 "Rows with Missing Values",
                 "Columns with 100% Missing",
+                "Columns with something Missing",
+                "Columns with nothing Missing",
             ],
             "Value": [
                 total_missing_text,
                 rows_with_missing_text,
                 columns_all_missing_text,
+                columns_something_missing_text,
+                columns_none_missing_text,
             ],
         }
     )
@@ -50,9 +62,10 @@ def missing_data_summary(df):
     return column_info_html, general_info_html
 
 
-def plot_missingness_matrix(df, top_n=20) -> str:
+def plot_missingness_matrix(df, top_n=100) -> str:
     # Step 1: Select top N columns with the most missing values
     missing_counts = df.isnull().sum()
+    missing_counts = missing_counts[missing_counts > 0]
     top_missing_cols = (
         missing_counts.sort_values(ascending=False).head(top_n).index.tolist()
     )
@@ -76,7 +89,7 @@ def plot_missingness_matrix(df, top_n=20) -> str:
         color_continuous_scale=[[0, "blue"], [1, "white"]],
         aspect="auto",
         labels={"x": "Row Index", "y": "Feature", "color": "Missing"},
-        title=f"Missing Value Matrix (Top {top_n} Features)",
+        title="Missing Value Matrix",
     )
     fig.update_layout(
         xaxis_title="Row Index",
@@ -93,15 +106,19 @@ def plot_missingness_matrix(df, top_n=20) -> str:
     )
 
 
-def plot_missing_correlation(df, top_n=20):
-    # Step 1: Numeric missingness matrix
+def plot_missing_correlation(df, top_n=100):
+
+    # Step 1: Create missing value indicator
     missing_df = df.isnull().astype(int)
 
-    # Step 2: Focus on top N features with most missing values
+    # Step 2: Remove columns with 0 missing values
+    missing_df = missing_df.loc[:, missing_df.sum() > 0]
+
+    # Step 3: Focus on top N features with most missing values
     top_cols = missing_df.sum().sort_values(ascending=False).head(top_n).index
     missing_df = missing_df[top_cols]
 
-    # Step 3: Correlation matrix
+    # Step 4: Correlation matrix of missing patterns
     corr = missing_df.corr()
 
     # Step 4: Plot with Plotly
@@ -110,7 +127,7 @@ def plot_missing_correlation(df, top_n=20):
         color_continuous_scale="RdBu",
         zmin=-1,
         zmax=1,
-        title=f"Correlation of Missingness (Top {top_n} Features)",
+        title="Correlation of Missingness)",
     )
     fig.update_layout(
         xaxis_title="Feature", yaxis_title="Feature", height=600, width=600
@@ -217,5 +234,11 @@ def generate_missing_summary(df, drop_col_thresh=0.6, drop_row_thresh=0.05):
                 "Imputation Strategy": strategy,
             }
         )
-
-    return pd.DataFrame(results).to_html(classes=["frequency-table"])
+    df_results = pd.DataFrame(results)
+    df_results = df_results.sort_values(
+        by="Missing Count",
+        ascending=False,
+    )
+    return df_results.to_html(
+        classes=["frequency-table"], index=False, justify="left"
+    )

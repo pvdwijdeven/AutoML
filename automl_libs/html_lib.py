@@ -7,6 +7,7 @@ from sklearn.feature_selection import (
     mutual_info_regression,
 )
 from sklearn.preprocessing import LabelEncoder
+from .feature_lib import select_features_by_missingness
 
 # Sample data
 np.random.seed(0)
@@ -63,9 +64,17 @@ def get_html_from_template(template_file, context, plots=[]) -> str:
     return rendered_html
 
 
-def generate_relation_visuals(df, target=None, max_features=20):
+def generate_relation_visuals(df, target="", max_features=100):
     #    warnings.filterwarnings("ignore")
-    df = df.copy().dropna()
+    features = select_features_by_missingness(df, "")
+    if target != "" and target not in features:
+        features = [target] + features
+    elif target != "" and target in features:
+        features.remove(target)
+        features = [target] + features
+    df = df[features].copy().dropna()
+    if target == "":
+        target = None
 
     # Identify types
     num_cols = df.select_dtypes(include=np.number).columns.tolist()
@@ -96,44 +105,48 @@ def generate_relation_visuals(df, target=None, max_features=20):
         labels={"color": "Correlation"},
         aspect="auto",
     )
-    fig_corr.update_layout(width=900, height=900)
+    fig_corr.update_layout(
+        autosize=False,
+        width=1000,
+        height=1000,
+    )
     correlation_html = fig_corr.to_html(full_html=False, include_plotlyjs=False)
 
     # Compute Mutual Information
     mi_scores = {}
-    X_all_features = all_features.copy()
-    if target in X_all_features:
-        X_all_features.remove(target)
-    target_relation = ""
-
-    if target is not None and target in df.columns:
-        try:
+    try:
+        X_all_features = all_features.copy()
+        if isinstance(target, str) and target in X_all_features:
+            X_all_features.remove(target)
+        if target is not None and target in df.columns:
             y = df[target]
-            X = df.drop(columns=[target])
+            X = df[X_all_features]
             if y.nunique() <= 10:
-                mi = mutual_info_classif(
-                    X[X_all_features], y, discrete_features="auto"
-                )
+                mi = mutual_info_classif(X, y, discrete_features="auto")
             else:
-                mi = mutual_info_regression(
-                    X[X_all_features], y, discrete_features="auto"
-                )
+                mi = mutual_info_regression(X, y, discrete_features="auto")
             mi_scores = dict(zip(X_all_features, mi))
-        except Exception as e:
-            print(f"Error computing mutual information: {e}")
-            mi_scores = {feature: None for feature in all_features}
+    except Exception as e:
+        print(
+            f"Error computing mutual information: {e}",
+        )
+        mi_scores = {feature: None for feature in all_features}
 
-        # Plot MI bar chart
-        mi_series = pd.Series(mi_scores).sort_values(ascending=False)
-        fig_mi = px.bar(
-            mi_series,
-            x=mi_series.index,
-            y=mi_series.values,
-            title=f"Mutual Information with Target: {target}",
-            labels={"x": "Feature", "y": "Mutual Information"},
-        )
-        fig_mi.update_layout(xaxis_tickangle=-45)
-        target_relation = fig_mi.to_html(
-            full_html=False, include_plotlyjs=False
-        )
+    # Plot MI bar chart
+    mi_series = pd.Series(mi_scores).sort_values(ascending=False)
+    fig_mi = px.bar(
+        mi_series,
+        x=mi_series.index,
+        y=mi_series.values,
+        title=f"Mutual Information with Target: {target}",
+        labels={"x": "Feature", "y": "Mutual Information"},
+    )
+    fig_mi.update_layout(
+        xaxis_tickangle=-45,
+        autosize=False,
+        width=1000,
+        height=500,
+    )
+    target_relation = fig_mi.to_html(full_html=False, include_plotlyjs=False)
+
     return correlation_html, target_relation
