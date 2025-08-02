@@ -7,6 +7,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Automated Machine Learning GUI"
     )
+    parser.add_argument("--title", help="title of the project", default="")
     parser.add_argument("--training_data", help="filename for training data")
     parser.add_argument("--test_data", help="filename for test data")
     parser.add_argument(

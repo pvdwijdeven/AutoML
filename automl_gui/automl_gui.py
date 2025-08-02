@@ -41,9 +41,9 @@ class AutoMLFrame(wx.Frame):
                 "text": "Start EDA",
                 "function": lambda event: self.on_start_eda(),
             },
-            "Button4": {
-                "text": "Button 4",
-                "function": lambda event: self.make_placeholder_handler(4),
+            "title": {
+                "text": "Title for EDA Report",
+                "function": lambda event: self.on_get_title(),
             },
             "Button5": {
                 "text": "Button 5",
@@ -140,6 +140,11 @@ class AutoMLFrame(wx.Frame):
                 output_path = args.project_root / args.output_file
             self.buttons_info["OutputFile"]["label"].SetLabel(f"{output_path}")
             self.logger.info("[GREEN]output file from command line")
+        if args.title:
+            title = args.title
+
+            self.buttons_info["title"]["label"].SetLabel(f"{title}")
+            self.logger.info("[GREEN]title from command line")
         if args.nogui:
             self.logger.info("[GREEN]silent mode, GUI will not be shown")
             self.actual_eda()
@@ -150,6 +155,15 @@ class AutoMLFrame(wx.Frame):
 
     def on_exit(self, event):
         self.Close()
+
+    def on_get_title(self):
+        dlg = wx.TextEntryDialog(
+            self, "Enter title for EDA Report:", "EDA Report Title"
+        )
+        if dlg.ShowModal() == wx.ID_OK:
+            title = dlg.GetValue()
+            self.buttons_info["title"]["label"].SetLabel(title)
+        dlg.Destroy()
 
     def on_open_file(self, kind):
         with wx.FileDialog(
@@ -191,6 +205,7 @@ class AutoMLFrame(wx.Frame):
             report_file=self.buttons_info["ReportFile"]["label"].GetLabel(),
             file_train=self.buttons_info["training"]["label"].GetLabel(),
             file_test=self.buttons_info["test"]["label"].GetLabel(),
+            title=self.buttons_info["title"]["label"].GetLabel(),
         )
         result = current_EDA.perform_eda()
         self.buttons_info["StartEDA"]["label"].SetLabel(result)

@@ -69,18 +69,17 @@ def create_overview_table(
 
     feature_types += "</tbody>\n</table>"
 
-    # Samples
     samples_head = add_links_to_headers(
-        df.head(10).to_html(index=False), target
+        df.head(10).to_html(index=False, na_rep="<N/A>"), target
     )
     samples_middle = add_links_to_headers(
         df.iloc[n_rows // 2 - 5 : n_rows // 2 + 5].to_html(
-            index=False,
+            index=False, na_rep="<N/A>"
         ),
         target,
     )
     samples_tail = add_links_to_headers(
-        df.tail(10).to_html(index=False), target
+        df.tail(10).to_html(index=False, na_rep="<N/A>"), target
     )
 
     # --- Context dictionary for rendering ---

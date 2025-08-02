@@ -25,20 +25,18 @@ from automl_libs import (
     generate_relation_visuals,
 )
 import numpy as np
+from scipy.stats import entropy as scipy_entropy
 
 
 class AutoML_EDA:
     def __init__(
-        self,
-        logger,
-        report_file,
-        file_train,
-        file_test="",
+        self, logger, report_file, file_train, file_test="", title=""
     ) -> None:
         self.report_file = report_file
         self.file_train = file_train
         self.file_test = file_test
         self.logger = logger
+        self.title = title
 
     def read_data(self, file_path) -> pd.DataFrame | None:
         self.logger.info(f"[BLUE]- Reading data from {file_path}")
@@ -93,7 +91,6 @@ class AutoML_EDA:
                 self.df_test[column_name] = normalize_booleans(
                     self.df_test[column_name]
                 ).astype("boolean")
-            return
 
         # Step 3: Categorical vs String
         inferred_dtype = None
@@ -170,10 +167,13 @@ class AutoML_EDA:
                     self.logger.warning(
                         f"Failed to apply float conversion to test column '{column_name}': {e}"
                     )
-        if self.df_test is not None and column_name != self.target:
-            self.logger.debug(
-                f"{column_name}: {inferred_dtype}, {self.df_train[column_name].dtype}, {self.df_test[column_name].dtype}"
-            )
+        # if self.df_test is not None and column_name != self.target:
+        #     self.logger.debug(
+        #         f"{column_name}: {inferred_dtype}, {self.df_train[column_name].dtype}, {self.df_test[column_name].dtype}"
+        #     )
+        self.type_conversion[column_name]["actual"] = self.df_train[
+            column_name
+        ].dtype
 
     def analyse_column(self, column_name: str):
 
@@ -187,7 +187,7 @@ class AutoML_EDA:
             missing_count = self.df_train[column_name].isna().sum()
             missing_pct = missing_count / len(self.df_train) * 100
             return {
-                "type": "boolean",
+                "type": f"boolean ({self.type_conversion[column_name]['actual']}) - was {self.type_conversion[column_name]['original']}",
                 "missing_values": f"{missing_count} ({missing_pct:.1f}%)",
                 "frequency": frequency.replace("np.", "").replace("_", ""),
                 "suggestions": "- "
@@ -199,19 +199,48 @@ class AutoML_EDA:
         # type category:
         # - missing values, #unique, most occuring
         if self.type_conversion[column_name]["new"] == "category":
+            # Column-level stats
             missing_count = self.df_train[column_name].isna().sum()
             missing_pct = missing_count / len(self.df_train) * 100
+
             unique_count = self.df_train[column_name].nunique(dropna=True)
             unique_pct = unique_count / len(self.df_train) * 100
+
+            # Frequency table
             frequency = get_frequency_table(self.df_train, column_name)
+
+            # Mode count
+            mode_value = self.df_train[column_name].mode(dropna=True)
+            mode_count = (
+                self.df_train[column_name].value_counts(dropna=True).iloc[0]
+                if not frequency == ""
+                else 0
+            )
+
+            # Entropy
+            value_counts = self.df_train[column_name].value_counts(
+                normalize=True, dropna=True
+            )
+            entropy_value = scipy_entropy(value_counts, base=2)  # base-2: bits
+
+            # Cardinality label
+            if unique_count <= 5:
+                cardinality_label = "Low"
+            elif unique_count <= 20:
+                cardinality_label = "Medium"
+            else:
+                cardinality_label = "High"
             suggestions = "- " + "<br>- ".join(
                 analyze_categorical_column(self.df_train, column_name)
             )
             return {
-                "type": "category",
+                "type": f"category  ({self.type_conversion[column_name]['actual']}) - was {self.type_conversion[column_name]['original']}",
                 "missing_values": f"{missing_count} ({missing_pct:.1f}%)",
                 "unique_count": f"{unique_count} ({unique_pct:.1f}%)",
                 "frequency": frequency,
+                "mode": f"{mode_value.iloc[0]} ({mode_count})",
+                "entropy": f"{entropy_value:.4f}",
+                "cardinality": cardinality_label,
                 "suggestions": suggestions,
             }
 
@@ -223,7 +252,7 @@ class AutoML_EDA:
             unique_count = self.df_train[column_name].nunique(dropna=True)
             unique_pct = unique_count / len(self.df_train) * 100
             return {
-                "type": "string",
+                "type": f"string  ({self.type_conversion[column_name]['actual']}) - was {self.type_conversion[column_name]['original']}",
                 "missing_values": f"{missing_count} ({missing_pct:.1f}%)",
                 "unique_count": f"{unique_count} ({unique_pct:.1f}%)",
                 "suggestions": "- "
@@ -244,7 +273,7 @@ class AutoML_EDA:
             col_non_null = col_data.dropna()
 
             return {
-                "type": self.type_conversion[column_name]["new"],
+                "type": f"{self.type_conversion[column_name]["new"]}  ({self.type_conversion[column_name]['actual']}) - was {self.type_conversion[column_name]['original']}",
                 "missing_values": f"{missing_count} ({missing_pct:.1f}%)",
                 "min": col_non_null.min() if not col_non_null.empty else None,
                 "max": col_non_null.max() if not col_non_null.empty else None,
@@ -375,13 +404,15 @@ class AutoML_EDA:
         if self.df_test is not None:
             # Samples
             n_rows = len(self.df_test)
-            samples_head = self.df_test.head(10).to_html(index=False)
+            samples_head = self.df_test.head(10).to_html(
+                index=False, na_rep="<N/A>"
+            )
             samples_middle = self.df_test.iloc[
                 n_rows // 2 - 5 : n_rows // 2 + 5
-            ].to_html(
-                index=False,
+            ].to_html(index=False, na_rep="<N/A>")
+            samples_tail = self.df_test.tail(10).to_html(
+                index=False, na_rep="<N/A>"
             )
-            samples_tail = self.df_test.tail(10).to_html(index=False)
 
             # --- Context dictionary for rendering ---
 
@@ -401,7 +432,9 @@ class AutoML_EDA:
         # Load and render the template
         env = Environment(loader=FileSystemLoader("templates"))
         template = env.get_template("eda_report.html")
-        output_html = template.render(tabs=tabs, title="EDA Report")
+        output_html = template.render(
+            tabs=tabs, title=f"EDA Report {self.title}"
+        )
 
         # Save to file
         with open(self.report_file, "w", encoding="utf-8") as f:

@@ -6,4 +6,5 @@ log/
 export/
 *.pyo
 test*.py
-*.ps1
+run_all.ps1
+scripts/

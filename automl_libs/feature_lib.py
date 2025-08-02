@@ -11,6 +11,7 @@ from sklearn.feature_selection import (
 from sklearn.preprocessing import LabelEncoder
 import warnings
 from typing import List
+from scipy.stats import entropy as scipy_entropy
 
 
 def select_features_by_missingness(
@@ -520,35 +521,91 @@ def analyze_string_column(
     return suggestions
 
 
+def suggest_categorical_handling(entropy, cardinality):
+    """
+    Suggests preprocessing strategy based on entropy and cardinality.
+
+    Parameters:
+    - entropy (float): Entropy of the feature (0 = very predictable, high = unpredictable)
+    - cardinality (int): Number of unique non-null values in the feature
+
+    Returns:
+    - str: A human-readable suggestion
+    """
+
+    # Classify cardinality
+    if cardinality <= 5:
+        cardinality_class = "low"
+    elif cardinality <= 20:
+        cardinality_class = "medium"
+    else:
+        cardinality_class = "high"
+
+    # Classify entropy
+    if entropy < 0.5:
+        entropy_class = "low"
+    elif entropy < 2.0:
+        entropy_class = "medium"
+    else:
+        entropy_class = "high"
+
+    # Suggestions matrix
+    suggestions = {
+        (
+            "low",
+            "low",
+        ): "Very predictable and limited values. Consider binary encoding, or drop if dominated by a single value.",
+        (
+            "low",
+            "medium",
+        ): "A few common values with some variation. One-hot encoding or ordinal encoding may work well.",
+        (
+            "low",
+            "high",
+        ): "Rare case. Check for label issues or merge categories. One-hot may still be possible.",
+        (
+            "medium",
+            "low",
+        ): "Moderate number of values but low variation. Consider frequency encoding or grouping infrequent values.",
+        ("medium", "medium"): "Good candidate for one-hot or ordinal encoding.",
+        (
+            "medium",
+            "high",
+        ): "High diversity and moderate value count. Frequency encoding or target encoding is advised.",
+        (
+            "high",
+            "low",
+        ): "Many categories but one dominant. Consider reducing to 'Other' + top categories or dropping.",
+        (
+            "high",
+            "medium",
+        ): "High cardinality and some variation. Use frequency encoding or reduce dimensionality first.",
+        (
+            "high",
+            "high",
+        ): "Very diverse feature. Avoid one-hot encoding. Use target, frequency, or hashing encoding.",
+    }
+
+    return suggestions.get(
+        (cardinality_class, entropy_class), "No suggestion available."
+    )
+
+
 def analyze_categorical_column(df: pd.DataFrame, column_name: str) -> list[str]:
     suggestions = []
 
     s = df[column_name]
     n_unique = s.nunique(dropna=True)
     freq = s.value_counts(normalize=True, dropna=True)
+    value_counts = df[column_name].value_counts(normalize=True, dropna=True)
     top_freq = freq.iloc[0] if not freq.empty else 0
-
+    entropy_value = scipy_entropy(value_counts, base=2)  # base-2: bits
     suggestions = []
-
+    suggestions.append(suggest_categorical_handling(entropy_value, n_unique))
     # Cardinality-based suggestions
     if n_unique == 1:
         suggestions.append(
             f"Column '{column_name}' is constant. Consider dropping it."
-        )
-    elif n_unique <= 5:
-        suggestions.append(
-            f"Column '{column_name}' has low cardinality ({n_unique}). Consider One-Hot Encoding."
-        )
-        suggestions.append(
-            "Check if categories can be ordinal; if yes, try Ordinal Encoding."
-        )
-    elif n_unique <= 20:
-        suggestions.append(
-            f"Column '{column_name}' has medium cardinality ({n_unique}). Consider Target Encoding or Frequency Encoding."
-        )
-    else:
-        suggestions.append(
-            f"Column '{column_name}' has high cardinality ({n_unique}). Consider embedding or hashing techniques."
         )
 
     # Frequency distribution
