@@ -1,10 +1,8 @@
 .venv/
-ml_data/
+personal/
 __pycache__/
 *.pyc
 log/
-export/
 *.pyo
 test*.py
 run_all.ps1
-scripts/
