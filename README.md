@@ -54,6 +54,7 @@ automl [OPTIONS]
 | Option                 | Description                                                   |
 | ---------------------- | ------------------------------------------------------------- |
 | `-h`, `--help`         | Show this help message and exit                               |
+| `--title`              | Title for the project                                         |
 | `--training_data FILE` | Filename for training data                                    |
 | `--test_data FILE`     | Filename for test data                                        |
 | `--EDA`                | Start EDA (default: `False`)                                  |
