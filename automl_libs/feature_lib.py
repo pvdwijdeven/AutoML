@@ -288,6 +288,15 @@ def analyze_boolean_column(
     return suggestions
 
 
+def safe_skew(values):
+    values = pd.Series(values).dropna()
+    if len(values) < 3:
+        return np.nan
+    if np.isclose(np.std(values), 0):
+        return 0.0
+    return skew(values)
+
+
 def analyze_numeric_column(
     df: pd.DataFrame, column_name: str, sample_size=10000
 ) -> list[str]:
@@ -345,7 +354,7 @@ def analyze_numeric_column(
 
     # Check for zero-inflated + skewed + outliers
     if zero_ratio > 0.5 and len(non_zero_values) > 10:
-        skewness_non_zero = skew(non_zero_values)
+        skewness_non_zero = safe_skew(non_zero_values)
         n_outliers, _, _ = detect_outliers_iqr(non_zero_values)
 
         if abs(skewness_non_zero) > 1 and n_outliers > 0:
