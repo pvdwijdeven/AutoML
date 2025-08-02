@@ -12,6 +12,7 @@ from sklearn.preprocessing import LabelEncoder
 import warnings
 from typing import List
 from scipy.stats import entropy as scipy_entropy
+import plotly.express as px
 
 
 def select_features_by_missingness(
@@ -360,6 +361,80 @@ def analyze_numeric_column(
             )
 
     return suggestions
+
+
+def generate_eda_plots(df, column_name, inferred_type, target=""):
+    col = df[column_name]
+    col = col.dropna()
+    target_col = df.loc[col.index, target] if target else None
+
+    plot1 = plot2 = None
+
+    # Distribution / Frequency plot
+    if inferred_type in ["category", "boolean", "string"]:
+        plot1 = px.bar(
+            col.value_counts()
+            .reset_index(name="count")
+            .rename(columns={"index": column_name}),
+            x=column_name,
+            y="count",
+            title=f"Frequency of {column_name}",
+        )
+    elif inferred_type in ["integer", "float"]:
+        plot1 = px.histogram(
+            df, x=column_name, nbins=30, title=f"Distribution of {column_name}"
+        )
+
+    # Relation to target plot
+    if inferred_type in ["category", "boolean", "string"]:
+        grouped = (
+            df.groupby(column_name, dropna=False, observed=False)[target]
+            .describe()
+            .reset_index()
+        )
+        plot2 = px.box(
+            df, x=column_name, y=target, title=f"{target} per {column_name}"
+        )
+    elif inferred_type in ["integer", "float"]:
+        # Bin numeric into quantiles for clearer mean plots
+        binned = pd.qcut(col, q=10, duplicates="drop")
+        binned_str = binned.astype(str)
+
+        # Correctly align the target column with non-NaN feature values
+        target_col = df.loc[col.index, target]
+
+        # Create a temp DataFrame
+        temp_df = pd.DataFrame(
+            {
+                column_name: binned_str,
+                "target_value": target_col.values,  # Use neutral name to avoid clash
+            }
+        )
+
+        # Group and compute mean target
+        grouped = (
+            temp_df.groupby(column_name, observed=False)["target_value"]
+            .mean()
+            .reset_index()
+        )
+
+        # Create the line plot
+        plot2 = px.line(
+            grouped,
+            x=column_name,
+            y="target_value",
+            title=f"Mean {target} by binned {column_name}",
+        )
+
+    # Convert to HTML strings
+    plot1_html = (
+        plot1.to_html(full_html=False, include_plotlyjs="cdn") if plot1 else ""
+    )
+    plot2_html = (
+        plot2.to_html(full_html=False, include_plotlyjs=False) if plot2 else ""
+    )
+
+    return {"plot1": plot1_html, "plot2": plot2_html}
 
 
 def analyze_string_column(

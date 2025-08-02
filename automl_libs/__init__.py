@@ -15,6 +15,7 @@ from .feature_lib import (
     analyze_target,
     generate_feature_relations,
     select_features_by_missingness,
+    generate_eda_plots,
 )
 
 __all__ = [
@@ -32,4 +33,5 @@ __all__ = [
     "generate_feature_relations",
     "generate_relation_visuals",
     "select_features_by_missingness",
+    "generate_eda_plots",
 ]

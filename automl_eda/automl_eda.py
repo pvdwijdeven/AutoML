@@ -23,6 +23,7 @@ from automl_libs import (
     analyze_target,
     generate_feature_relations,
     generate_relation_visuals,
+    generate_eda_plots,
 )
 import numpy as np
 from scipy.stats import entropy as scipy_entropy
@@ -321,7 +322,14 @@ class AutoML_EDA:
         self.column_info = {}
         self.target_info = {}
         for column in self.df_train.columns:
-            self.column_info[column] = self.analyse_column(column)
+            self.column_info[column] = {}
+            self.column_info[column]["table"] = self.analyse_column(column)
+            self.column_info[column]["plots"] = generate_eda_plots(
+                self.df_train,
+                column,
+                infer_dtype(self.df_train[column]),
+                self.target,
+            )
         self.logger.debug("[GREEN]- Column analysis completed. Details:")
         # self.logger.debug(f"[CYAN]{pprint.pformat(self.column_info)}")
 
@@ -359,6 +367,7 @@ class AutoML_EDA:
         overview_html = create_overview_table(
             df=self.df_train, target=self.target, target_type=target_type
         )
+
         features_html = get_html_from_template(
             "features.html", self.column_info
         )
