@@ -163,12 +163,31 @@
   table td, table th {
     vertical-align: top;
   }
+.header-title-group {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  width: 100%;
+}
+
+
+
+.report-date {
+  margin: 0;
+  font-size: 0.9em;
+  color: #555;
+  margin-left: auto;
+  padding-right: 80px;
+}
 </style>
 </head>
 <body>
-<div class="fixed-header">
-  <h1>{{ title }}</h1>
 
+<div class="fixed-header">
+  <div class="header-title-group">
+    <h1>{{ title }}</h1>
+    <p class="report-date">Report generated on: {{ current_time.strftime("%Y-%m-%d %H:%M:%S") }}</p>
+  </div>
 <div class="tabs">
   {% for tab in tabs %}
     <button onclick="showTab('{{ loop.index0 }}')" {% if loop.first %}class="active"{% endif %}>

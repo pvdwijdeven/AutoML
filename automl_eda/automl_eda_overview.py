@@ -103,6 +103,7 @@ def create_overview_table(
     }
 
     template = env.get_template("overview_table.html")
+
     html_body = template.render(context)
 
     return html_body

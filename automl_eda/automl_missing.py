@@ -235,10 +235,11 @@ def generate_missing_summary(df, drop_col_thresh=0.6, drop_row_thresh=0.05):
             }
         )
     df_results = pd.DataFrame(results)
-    df_results = df_results.sort_values(
-        by="Missing Count",
-        ascending=False,
-    )
+    if not df_results.empty:
+        df_results = df_results.sort_values(
+            by="Missing Count",
+            ascending=False,
+        )
     return df_results.to_html(
         classes=["frequency-table"], index=False, justify="left"
     )

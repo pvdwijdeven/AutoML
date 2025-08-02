@@ -27,6 +27,7 @@ from automl_libs import (
 )
 import numpy as np
 from scipy.stats import entropy as scipy_entropy
+from datetime import datetime
 
 
 class AutoML_EDA:
@@ -442,7 +443,9 @@ class AutoML_EDA:
         env = Environment(loader=FileSystemLoader("templates"))
         template = env.get_template("eda_report.html")
         output_html = template.render(
-            tabs=tabs, title=f"EDA Report {self.title}"
+            tabs=tabs,
+            title=f"EDA Report {self.title}",
+            current_time=datetime.now(),
         )
 
         # Save to file
