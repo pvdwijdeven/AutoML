@@ -1,7 +1,4 @@
 import pandas as pd
-
-# import json
-# import pprint
 from jinja2 import Environment, FileSystemLoader
 from .automl_eda_overview import create_overview_table
 from .automl_missing import (
@@ -70,12 +67,33 @@ class AutoML_EDA:
         column_name: str,
     ) -> None:
         def normalize_booleans(series: pd.Series) -> pd.Series:
-            if pd.api.types.is_object_dtype(
-                series
-            ) or pd.api.types.is_string_dtype(series):
+
+            if (
+                pd.api.types.is_object_dtype(series)
+                or pd.api.types.is_string_dtype(series)
+                or pd.api.types.is_bool_dtype(series)
+            ):
+
+                normalized = series.dropna().map(
+                    lambda x: str(x).strip().lower()
+                )
+                valid_values = {"true", "false"}
+
+                unexpected = normalized[~normalized.isin(valid_values)]
+                if not unexpected.empty:
+                    return series
+
                 return series.map(
-                    lambda x: str(x).strip().lower() if pd.notna(x) else x
-                ).replace({"true": True, "false": False})
+                    lambda x: (
+                        True
+                        if str(x).strip().lower() == "true"
+                        else (
+                            False
+                            if str(x).strip().lower() == "false"
+                            else pd.NA
+                        )
+                    )
+                ).astype("boolean")
             return series
 
         def convert_to_numeric(series: pd.Series) -> pd.Series:
@@ -93,16 +111,15 @@ class AutoML_EDA:
 
         # Step 1: Normalize booleans
         col_series_train = normalize_booleans(col_series_train)
-
         # Step 2: Detect if boolean
         unique_values = pd.Series(col_series_train.dropna().unique())
         if unique_values.isin([True, False]).all():
             self.df_train[column_name] = col_series_train.astype("boolean")
+
             if self.df_test is not None and column_name in self.df_test.columns:
                 self.df_test[column_name] = normalize_booleans(
                     self.df_test[column_name]
                 ).astype("boolean")
-
         # Step 3: Categorical vs String
         inferred_dtype = None
         if pd.api.types.is_object_dtype(self.df_train[column_name]):
@@ -118,6 +135,7 @@ class AutoML_EDA:
         try_numeric = pd.api.types.is_object_dtype(
             col_series_train
         ) or pd.api.types.is_string_dtype(col_series_train)
+
         if try_numeric:
             try:
                 converted = convert_to_numeric(col_series_train)
@@ -126,7 +144,9 @@ class AutoML_EDA:
                     f"Conversion to numeric failed for column '{column_name}': {e}"
                 )
                 converted = None
-        elif pd.api.types.is_numeric_dtype(col_series_train):
+        elif pd.api.types.is_numeric_dtype(
+            col_series_train
+        ) and not pd.api.types.is_bool_dtype(col_series_train):
             converted = col_series_train.copy()
         else:
             converted = None
@@ -178,10 +198,6 @@ class AutoML_EDA:
                     self.logger.warning(
                         f"Failed to apply float conversion to test column '{column_name}': {e}"
                     )
-        # if self.df_test is not None and column_name != self.target:
-        #     self.logger.debug(
-        #         f"{column_name}: {inferred_dtype}, {self.df_train[column_name].dtype}, {self.df_test[column_name].dtype}"
-        #     )
         self.type_conversion[column_name]["actual"] = self.df_train[
             column_name
         ].dtype
@@ -279,15 +295,10 @@ class AutoML_EDA:
         # type numeric:
         # - missing values, #unique, min, max, average, graph
         if self.type_conversion[column_name]["new"] in ["integer", "float"]:
-            self.logger.debug("analyzing")
             missing_count = self.df_train[column_name].isna().sum()
-            self.logger.debug("analyzing")
             missing_pct = missing_count / len(self.df_train) * 100
-            self.logger.debug("analyzing")
             col_data = self.df_train[column_name]
-            self.logger.debug("analyzing")
             col_non_null = col_data.dropna()
-            self.logger.debug("analyzing")
             return {
                 "type": f"{self.type_conversion[column_name]["new"]}  ({self.type_conversion[column_name]['actual']}) - was {self.type_conversion[column_name]['original']}",
                 "missing_values": f"{missing_count} ({missing_pct:.1f}%)",
@@ -339,7 +350,6 @@ class AutoML_EDA:
             )
         sameline = "[FLUSH]" if self.nogui else "[SAMELINE]"
         self.logger.info(f"{sameline}[GREEN]- Column analysis completed.")
-        # self.logger.debug(f"[CYAN]{json.dumps(self.type_conversion, indent=4)}")
         self.column_info = {}
         self.target_info = {}
 
@@ -357,7 +367,6 @@ class AutoML_EDA:
             )
         sameline = "[FLUSH]" if self.nogui else "[SAMELINE]"
         self.logger.info(f"{sameline}[GREEN]- EDA data completed.")
-        # self.logger.debug(f"[CYAN]{pprint.pformat(self.column_info)}")
 
     def perform_eda(self) -> str:
         project = self.title if self.title else "dataset"
@@ -380,7 +389,6 @@ class AutoML_EDA:
 
             training_columns = set(self.df_train.columns)
             test_columns = set(self.df_test.columns)
-            self.logger.debug(training_columns - test_columns)
             if len(training_columns - test_columns) != 1:
                 self.logger.warning(
                     "Test data does not contain all training columns.\n"
@@ -394,11 +402,6 @@ class AutoML_EDA:
                         f"Using '{new_target}' as target for EDA."
                     )
                 self.target = new_target
-
-        self.logger.debug(f"training data: {self.df_train.shape}")
-
-        if self.df_test is not None:
-            self.logger.debug(f"test data: {self.df_test.shape}")
 
         self.analyse_columns()
         target_type = infer_dtype(self.df_train[self.target])
@@ -432,9 +435,6 @@ class AutoML_EDA:
                 summary_suggestions += self.column_info[column]["table"][
                     "suggestions"
                 ].split("<br>")
-            # self.logger.debug(
-            #     f"[GREEN]- Suggestions for {column}: {summary_suggestions}"
-            # )
             if summary_suggestions:
                 suggestion_overview[column]["recommendations"] = "<br>".join(
                     summary_suggestions
@@ -448,7 +448,6 @@ class AutoML_EDA:
         relation_context = {}
         relation_context["relation_info"] = self.relation_info
         relation_context["num_feats"] = self.num_feats
-        self.logger.debug(suggestion_overview)
         # relations_html = str(self.relation_info) + "\n" + str(self.column_info)
         plot1, plot2 = generate_relation_visuals(self.df_train, self.target)
         relation_context["plot1"] = plot1
