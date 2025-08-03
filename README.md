@@ -31,7 +31,13 @@ AutoML can automatically generate an interactive **EDA report** (HTML format) fr
   - Mutual information with the target
   - Feature-target interactions
 
-- **Optional Test Data Check**
+- **Missing data overview**
+  - Lists columns sorted by missing count and percentage
+  - Visualizes missingness (bar plots, optional heatmap)
+  - Estimates data retention if rows/columns are dropped
+  - Suggests basic imputation strategies per column
+
+- **(Optional) Test Data Check**
   - Structural and statistical comparison with training data
   - Detection of mismatches and unseen categories
 
