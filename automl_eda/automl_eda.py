@@ -321,10 +321,10 @@ class AutoML_EDA:
 
         for i, column in enumerate(self.df_train.columns, start=1):
             sameline = "[SAMELINE]" if i != 1 or self.nogui else ""
-            self.logger.info(
-                f"{sameline}[GREEN]    ({i}/{total})Analysing column '{column}'"
-            )
-            time.sleep(0.01)
+            if i % 2 == 0:
+                self.logger.info(
+                    f"{sameline}[GREEN]Analyzing columns ({i}/{total})"
+                )
             self.type_conversion[column] = {}
             self.type_conversion[column]["original"] = infer_dtype(
                 self.df_train[column]
@@ -340,10 +340,10 @@ class AutoML_EDA:
         self.target_info = {}
 
         for i, column in enumerate(self.df_train.columns, start=1):
+
             self.logger.info(
-                f"{'[SAMELINE]' if i != 1 or self.nogui else ''}[GREEN]    ({i}/{total}) Generating EDA for column '{column}'"
+                f"{'[SAMELINE]' if i != 1 or self.nogui else ''}[GREEN](Generating EDA {i}/{total})"
             )
-            time.sleep(0.01)
             self.column_info[column] = {}
             self.column_info[column]["table"] = self.analyse_column(column)
             self.column_info[column]["plots"] = generate_eda_plots(
