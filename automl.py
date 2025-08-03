@@ -4,7 +4,7 @@ import argparse
 from pathlib import Path
 
 
-if __name__ == "__main__":
+def automl(*args):
     parser = argparse.ArgumentParser(
         description="Automated Machine Learning GUI"
     )
@@ -44,5 +44,9 @@ if __name__ == "__main__":
     args = parser.parse_args()
     args.project_root = Path(__file__).resolve().parent
     app = wx.App(False)
-    frame = AutoMLFrame(args)
+    _frame = AutoMLFrame(args)
     app.MainLoop()
+
+
+if __name__ == "__main__":
+    automl()

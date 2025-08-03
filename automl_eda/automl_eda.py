@@ -192,10 +192,11 @@ class AutoML_EDA:
         assert (
             self.df_train is not None
         ), "Training DataFrame is not initialized"
-        frequency = get_frequency_table(self.df_train, column_name)
+
         # type boolean:
         # - missing values, frequency True/False, graph
         if self.type_conversion[column_name]["new"] == "boolean":
+            frequency = get_frequency_table(self.df_train, column_name)
             missing_count = self.df_train[column_name].isna().sum()
             missing_pct = missing_count / len(self.df_train) * 100
             return {
@@ -279,11 +280,15 @@ class AutoML_EDA:
         # type numeric:
         # - missing values, #unique, min, max, average, graph
         if self.type_conversion[column_name]["new"] in ["integer", "float"]:
+            self.logger.debug("analyzing")
             missing_count = self.df_train[column_name].isna().sum()
+            self.logger.debug("analyzing")
             missing_pct = missing_count / len(self.df_train) * 100
+            self.logger.debug("analyzing")
             col_data = self.df_train[column_name]
+            self.logger.debug("analyzing")
             col_non_null = col_data.dropna()
-
+            self.logger.debug("analyzing")
             return {
                 "type": f"{self.type_conversion[column_name]["new"]}  ({self.type_conversion[column_name]['actual']}) - was {self.type_conversion[column_name]['original']}",
                 "missing_values": f"{missing_count} ({missing_pct:.1f}%)",
@@ -340,7 +345,6 @@ class AutoML_EDA:
         self.target_info = {}
 
         for i, column in enumerate(self.df_train.columns, start=1):
-
             self.logger.info(
                 f"{'[SAMELINE]' if i != 1 or self.nogui else ''}[GREEN]Generating EDA ({i}/{total})"
             )
@@ -399,18 +403,20 @@ class AutoML_EDA:
 
         self.analyse_columns()
         target_type = infer_dtype(self.df_train[self.target])
+        self.logger.info("[GREEN]- Creating overview table")
         overview_html = create_overview_table(
-            df=self.df_train, target=self.target, target_type=target_type
+            df=self.df_train,
+            target=self.target,
+            target_type=target_type,
+            logger=self.logger,
         )
-
         features_html = get_html_from_template(
             "features.html", self.column_info
         )
-
+        self.logger.info("[GREEN]- Getting feature relations")
         self.relation_info, self.num_feats = generate_feature_relations(
-            self.df_train, self.target
+            self.df_train, self.target, logger=self.logger
         )
-        self.logger.info("[GREEN]- Relation info retrieved.")
         relation_context = {}
         relation_context["relation_info"] = self.relation_info
         relation_context["num_feats"] = self.num_feats
@@ -423,11 +429,11 @@ class AutoML_EDA:
         relations_html = get_html_from_template(
             "relations.html", relation_context
         )
-
+        self.logger.info("[GREEN]- Getting missing data info.")
         column_info_html, general_info_html = missing_data_summary(
             self.df_train
         )
-        self.logger.info("[GREEN]- Missing data info retrieved.")
+
         missing_context = {
             "feature_info": column_info_html,
             "general_info": general_info_html,

@@ -30,8 +30,8 @@ class AutoMLFrame(wx.Frame):
                 "function": lambda event: self.on_open_file("training"),
             },
             "target": {
-                "text": "target column, if no test data available and not last column in training data",
-                "function": lambda event: self.on_get_target,
+                "text": "target column",
+                "function": lambda event: self.on_get_target(),
             },
             "test": {
                 "text": "Open test data (.csv/.xlsx)",

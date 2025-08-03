@@ -19,7 +19,7 @@ def add_links_to_headers(html: str, target) -> str:
 
 
 def create_overview_table(
-    df: pd.DataFrame, target: str, target_type: str
+    df: pd.DataFrame, target: str, target_type: str, logger=None
 ) -> str:
     def percentage(value) -> str:
         return f"{value:.1%}"
@@ -35,14 +35,20 @@ def create_overview_table(
         col for col in feature_cols if df[col].nunique(dropna=False) == 1
     ]
     empty_cols = [col for col in feature_cols if df[col].count() == 0]
-    duplicate_cols = df.drop(columns=[target]).T.duplicated().sum()
+    duplicate_cols = (
+        pd.util.hash_pandas_object(df.drop(columns=target), index=True)
+        .duplicated()
+        .sum()
+    )
 
-    duplicate_rows = df.duplicated().sum()
+    duplicate_rows = (
+        pd.util.hash_pandas_object(df.round(5), index=False).duplicated().sum()
+    )
+
     empty_rows = (df.isnull().sum(axis=1) == df.shape[1]).sum()
 
     memory_usage = df.memory_usage(deep=True).sum()
     missing_values = df.isnull().sum().sum()
-
     type_to_features = defaultdict(list)
     for col in feature_cols:
         dtype = infer_dtype(df[col])
@@ -68,7 +74,6 @@ def create_overview_table(
         feature_types += f"<tr><td>{dtype}</td><td>{len(features)}</td><td>{feature_list}</td></tr>\n"
 
     feature_types += "</tbody>\n</table>"
-
     samples_head = add_links_to_headers(
         df.head(10).to_html(index=False, na_rep="<N/A>"), target
     )
@@ -81,7 +86,6 @@ def create_overview_table(
     samples_tail = add_links_to_headers(
         df.tail(10).to_html(index=False, na_rep="<N/A>"), target
     )
-
     # --- Context dictionary for rendering ---
     context = {
         "num_features": n_features,

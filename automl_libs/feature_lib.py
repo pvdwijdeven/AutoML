@@ -67,7 +67,7 @@ def select_features_by_missingness(
     return selected_features
 
 
-def generate_feature_relations(df, target="", max_features=100):
+def generate_feature_relations(df, target="", max_features=100, logger=None):
     warnings.filterwarnings("ignore")
     features = select_features_by_missingness(df, "")
     if target != "" and target not in features:
@@ -77,6 +77,7 @@ def generate_feature_relations(df, target="", max_features=100):
     if target == "":
         target = None
     # Identify types
+
     num_cols = df.select_dtypes(include=np.number).columns.tolist()
     cat_cols = df.select_dtypes(exclude=np.number).columns.tolist()
     # Label encode categorical features temporarily
@@ -93,8 +94,11 @@ def generate_feature_relations(df, target="", max_features=100):
         all_features = all_features[:max_features]
 
     # Compute correlation matrix
+    if logger:
+        logger.info("[GREEN]  - correlation information.")
     corr_matrix = df[all_features].corr()
-
+    if logger:
+        logger.info("[GREEN]  - mutual information.")
     # Mutual Information
     mi_scores = {}
     try:
@@ -117,7 +121,8 @@ def generate_feature_relations(df, target="", max_features=100):
 
     # Output dictionary
     insights = {}
-
+    if logger:
+        logger.info("[GREEN]- Creating relation info per feature.")
     for feature in all_features:
         related = []
         suggestions = []
