@@ -100,7 +100,7 @@ class AutoMLFrame(wx.Frame):
         self.logger = Logger(
             level_console=Logger.INFO,
             level_file=Logger.DEBUG,
-            filename="log/automl.log",
+            filename=args.logger_file,
             wx_handler=(
                 self.log_handler
                 if (not args.nogui) or (args.nogui and args.silent)

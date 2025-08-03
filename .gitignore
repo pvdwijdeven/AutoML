@@ -2,7 +2,6 @@
 personal/
 __pycache__/
 *.pyc
-log/
 *.pyo
 test*.py
 run_all.ps1

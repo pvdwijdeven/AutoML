@@ -64,6 +64,7 @@ automl [OPTIONS]
 | `--silent`             | If executed without GUI, no console output (default: `False`) |
 | `--report_file FILE`   | Filename for report file (`.html`)                            |
 | `--output_file FILE`   | Filename for output file (`.csv`)                             |
+| `--logger_file FILE`   | Filename for logger file (`.log`)                             |
 
 ---
 
