@@ -342,7 +342,7 @@ class AutoML_EDA:
         for i, column in enumerate(self.df_train.columns, start=1):
 
             self.logger.info(
-                f"{'[SAMELINE]' if i != 1 or self.nogui else ''}[GREEN](Generating EDA {i}/{total})"
+                f"{'[SAMELINE]' if i != 1 or self.nogui else ''}[GREEN]Generating EDA ({i}/{total})"
             )
             self.column_info[column] = {}
             self.column_info[column]["table"] = self.analyse_column(column)
@@ -406,9 +406,11 @@ class AutoML_EDA:
         features_html = get_html_from_template(
             "features.html", self.column_info
         )
+
         self.relation_info, self.num_feats = generate_feature_relations(
             self.df_train, self.target
         )
+        self.logger.info("[GREEN]- Relation info retrieved.")
         relation_context = {}
         relation_context["relation_info"] = self.relation_info
         relation_context["num_feats"] = self.num_feats
@@ -425,6 +427,7 @@ class AutoML_EDA:
         column_info_html, general_info_html = missing_data_summary(
             self.df_train
         )
+        self.logger.info("[GREEN]- Missing data info retrieved.")
         missing_context = {
             "feature_info": column_info_html,
             "general_info": general_info_html,
@@ -463,6 +466,7 @@ class AutoML_EDA:
             testdata_content = analyze_test_data(
                 self.df_train, self.df_test, self.target
             )
+            self.logger.info("[GREEN]- Test data info retrieved.")
             context = {
                 "tables": testdata_content,
                 "samples_head": samples_head,
