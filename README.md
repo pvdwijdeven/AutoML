@@ -56,8 +56,7 @@ automl [OPTIONS]
 | `-h`, `--help`         | Show this help message and exit                               |
 | `--title`              | Title for the project                                         |
 | `--training_data FILE` | Filename for training data                                    |
-| `--taget               | target column, if no test data available and not last column  |
-|                        | of training data                                              |
+| `--taget`              | target column, if no test data available and not last column of training data  |
 | `--test_data FILE`     | Filename for test data                                        |
 | `--EDA`                | Start EDA (default: `False`)                                  |
 | `--nogui`              | Execute without GUI (default: `False`)                        |
