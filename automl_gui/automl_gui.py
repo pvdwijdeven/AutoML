@@ -29,6 +29,10 @@ class AutoMLFrame(wx.Frame):
                 "text": "Open training data (.csv/.xlsx)",
                 "function": lambda event: self.on_open_file("training"),
             },
+            "target": {
+                "text": "target column, if no test data available and not last column in training data",
+                "function": lambda event: self.on_get_target,
+            },
             "test": {
                 "text": "Open test data (.csv/.xlsx)",
                 "function": lambda event: self.on_open_file("test"),
@@ -44,10 +48,6 @@ class AutoMLFrame(wx.Frame):
             "title": {
                 "text": "Title for EDA Report",
                 "function": lambda event: self.on_get_title(),
-            },
-            "Button5": {
-                "text": "Button 5",
-                "function": lambda event: self.make_placeholder_handler(5),
             },
             "Button6": {
                 "text": "Button 6",
@@ -118,35 +118,38 @@ class AutoMLFrame(wx.Frame):
             else:
                 train_path = args.project_root / args.training_data
             self.buttons_info["training"]["label"].SetLabel(f"{train_path}")
-            self.logger.info("[GREEN]training data from command line")
+            self.logger.debug("[GREEN]training data from command line")
         if args.test_data:
             if Path(args.test_data).is_absolute():
                 test_path = Path(args.test_data)
             else:
                 test_path = args.project_root / args.test_data
             self.buttons_info["test"]["label"].SetLabel(f"{test_path}")
-            self.logger.info("[GREEN]test data from command line")
+            self.logger.debug("[GREEN]test data from command line")
         if args.report_file:
             if Path(args.report_file).is_absolute():
                 report_path = Path(args.report_file)
             else:
                 report_path = args.project_root / args.report_file
             self.buttons_info["ReportFile"]["label"].SetLabel(f"{report_path}")
-            self.logger.info("[GREEN]report file from command line")
+            self.logger.debug("[GREEN]report file from command line")
         if args.output_file:
             if Path(args.output_file).is_absolute():
                 output_path = Path(args.output_file)
             else:
                 output_path = args.project_root / args.output_file
             self.buttons_info["OutputFile"]["label"].SetLabel(f"{output_path}")
-            self.logger.info("[GREEN]output file from command line")
+            self.logger.debug("[GREEN]output file from command line")
         if args.title:
             title = args.title
-
             self.buttons_info["title"]["label"].SetLabel(f"{title}")
-            self.logger.info("[GREEN]title from command line")
+            self.logger.debug("[GREEN]title from command line")
+        if args.target:
+            target = args.target
+            self.buttons_info["target"]["label"].SetLabel(f"{target}")
+            self.logger.debug("[GREEN]target from command line")
         if args.nogui:
-            self.logger.info("[GREEN]silent mode, GUI will not be shown")
+            self.logger.info("[GREEN]CLI mode, GUI will not be shown")
             self.actual_eda()
             exit()
         self.Show()
@@ -163,6 +166,15 @@ class AutoMLFrame(wx.Frame):
         if dlg.ShowModal() == wx.ID_OK:
             title = dlg.GetValue()
             self.buttons_info["title"]["label"].SetLabel(title)
+        dlg.Destroy()
+
+    def on_get_target(self):
+        dlg = wx.TextEntryDialog(
+            self, "Enter target column for training data:", "Target column"
+        )
+        if dlg.ShowModal() == wx.ID_OK:
+            title = dlg.GetValue()
+            self.buttons_info["target"]["label"].SetLabel(title)
         dlg.Destroy()
 
     def on_open_file(self, kind):
@@ -206,6 +218,7 @@ class AutoMLFrame(wx.Frame):
             file_train=self.buttons_info["training"]["label"].GetLabel(),
             file_test=self.buttons_info["test"]["label"].GetLabel(),
             title=self.buttons_info["title"]["label"].GetLabel(),
+            target=self.buttons_info["target"]["label"].GetLabel(),
         )
         result = current_EDA.perform_eda()
         self.buttons_info["StartEDA"]["label"].SetLabel(result)

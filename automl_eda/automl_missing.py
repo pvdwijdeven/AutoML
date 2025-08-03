@@ -72,6 +72,8 @@ def plot_missingness_matrix(df, top_n=100) -> str:
 
     # Step 2: Create a boolean mask: True = missing, False = present
     mask = df[top_missing_cols].isnull()
+    if mask.empty:
+        return "No columns with missing values to analyze."
 
     # Step 3: Convert to long format for Plotly
     data = (
@@ -113,7 +115,8 @@ def plot_missing_correlation(df, top_n=100):
 
     # Step 2: Remove columns with 0 missing values
     missing_df = missing_df.loc[:, missing_df.sum() > 0]
-
+    if missing_df.empty:
+        return "No columns with missing values to analyze."
     # Step 3: Focus on top N features with most missing values
     top_cols = missing_df.sum().sort_values(ascending=False).head(top_n).index
     missing_df = missing_df[top_cols]
@@ -127,7 +130,7 @@ def plot_missing_correlation(df, top_n=100):
         color_continuous_scale="RdBu",
         zmin=-1,
         zmax=1,
-        title="Correlation of Missingness)",
+        title="Correlation of Missingness",
     )
     fig.update_layout(
         xaxis_title="Feature", yaxis_title="Feature", height=600, width=600

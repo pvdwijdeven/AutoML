@@ -32,13 +32,14 @@ from datetime import datetime
 
 class AutoML_EDA:
     def __init__(
-        self, logger, report_file, file_train, file_test="", title=""
+        self, logger, report_file, file_train, file_test="", title="", target=""
     ) -> None:
         self.report_file = report_file
         self.file_train = file_train
         self.file_test = file_test
         self.logger = logger
         self.title = title
+        self.target = target
 
     def read_data(self, file_path) -> pd.DataFrame | None:
         self.logger.info(f"[BLUE]- Reading data from {file_path}")
@@ -335,15 +336,20 @@ class AutoML_EDA:
         # self.logger.debug(f"[CYAN]{pprint.pformat(self.column_info)}")
 
     def perform_eda(self) -> str:
-        self.logger.info("[MAGENTA]Starting EDA (Exploratory Data Analysis)")
+        project = self.title if self.title else "dataset"
+        self.logger.info("[MAGENTA]\nStarting EDA (Exploratory Data Analysis)")
+        self.logger.info(f"[MAGENTA]for {project}")
         self.df_train = self.read_data(self.file_train)
         if self.df_train is None:
             self.logger.error("Training data could not be loaded.")
             return "Failed to load training data. EDA cannot proceed."
-        self.target = self.df_train.columns[-1]
+        last_column = False
+        if self.target == "":
+            self.target = self.df_train.columns[-1]
+            last_column = True
         self.df_test = self.read_data(self.file_test)
         if self.df_test is None:
-            self.logger.error(
+            self.logger.warning(
                 "Test data could not be loaded. Using only training data."
             )
         else:
@@ -357,7 +363,14 @@ class AutoML_EDA:
                     "EDA will proceed with the available columns."
                 )
             else:
-                self.target = (training_columns - test_columns).pop()
+                new_target = (training_columns - test_columns).pop()
+                if new_target != self.target and not last_column:
+                    self.logger.warning(
+                        f"Target column '{self.target}' is in test data. "
+                        f"Using '{new_target}' as target for EDA."
+                    )
+                self.target = new_target
+
         self.logger.debug(f"training data: {self.df_train.shape}")
 
         if self.df_test is not None:
@@ -451,6 +464,6 @@ class AutoML_EDA:
         # Save to file
         with open(self.report_file, "w", encoding="utf-8") as f:
             f.write(output_html)
-        self.logger.info("[YELLOW]EDA report saved to %s", self.report_file)
+        self.logger.info("[BLUE]EDA report saved to %s", self.report_file)
         self.logger.info("[MAGENTA]EDA (Exploratory Data Analysis) is done")
         return "EDA completed successfully with the provided datasets."
