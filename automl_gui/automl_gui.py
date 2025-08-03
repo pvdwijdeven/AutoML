@@ -149,9 +149,12 @@ class AutoMLFrame(wx.Frame):
             self.buttons_info["target"]["label"].SetLabel(f"{target}")
             self.logger.debug("[GREEN]target from command line")
         if args.nogui:
+            self.nogui = True
             self.logger.info("[GREEN]CLI mode, GUI will not be shown")
             self.actual_eda()
             exit()
+        else:
+            self.nogui = False
         self.Show()
         if args.EDA:
             self.on_start_eda()
@@ -219,6 +222,7 @@ class AutoMLFrame(wx.Frame):
             file_test=self.buttons_info["test"]["label"].GetLabel(),
             title=self.buttons_info["title"]["label"].GetLabel(),
             target=self.buttons_info["target"]["label"].GetLabel(),
+            nogui=self.nogui,
         )
         result = current_EDA.perform_eda()
         self.buttons_info["StartEDA"]["label"].SetLabel(result)

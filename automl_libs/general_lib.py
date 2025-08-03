@@ -2,6 +2,7 @@ import logging
 from logging.handlers import RotatingFileHandler
 import wx
 import os
+import sys
 
 
 class ColoredFormatter(logging.Formatter):
@@ -76,14 +77,53 @@ class WxTextRedirector:
         pass  # required for compatibility
 
 
-class TextCtrlHandler(logging.Handler):
+class SameLineStreamHandler(logging.StreamHandler):
+    def emit(self, record):
+        try:
+            msg = self.format(record)
 
+            if msg.startswith("\033[2K\r"):  # [FLUSH]
+                self.stream.write(msg + "\n")
+                self.flush()
+
+            elif msg.startswith("\r"):  # [SAMELINE]
+                self.stream.write(msg)
+                self.flush()
+
+            else:
+                # Ensure previous sameline/flush does not bleed into this
+                self.stream.write(msg + self.terminator)
+                self.flush()
+
+        except Exception:
+            self.handleError(record)
+
+
+def overwrite_last_line(text_ctrl, new_text):
+    content = text_ctrl.GetValue()
+    lines = content.splitlines()
+
+    if lines:
+        lines[-1] = new_text  # Replace last line
+    else:
+        lines.append(new_text)
+
+    text_ctrl.SetValue("\n".join(lines))
+    text_ctrl.ShowPosition(text_ctrl.GetLastPosition())
+
+
+class TextCtrlHandler(logging.Handler):
     def __init__(self, text_ctrl):
         super().__init__()
         self.text_ctrl = text_ctrl
+        self.last_line_start = 0  # Track position of last line start
 
     def emit(self, record):
         msg = self.format(record)
+        sameline = "[SAMELINE]" in msg
+        msg = msg.replace("[SAMELINE]", "")
+
+        # Determine message color
         msg_color = LEVEL_COLORS.get(record.levelno, wx.Colour(0, 0, 0))
         if record.levelno == logging.INFO:
             for color in WX_INFO_COLORS:
@@ -92,12 +132,23 @@ class TextCtrlHandler(logging.Handler):
                     msg = msg.replace(f"[{color}]", "")
                     break
 
-        def append():
+        def update():
             self.text_ctrl.SetDefaultStyle(wx.TextAttr(msg_color))
-            self.text_ctrl.AppendText(msg + "\n")
-            self.text_ctrl.SetDefaultStyle(wx.TextAttr(wx.BLACK))  # Reset
 
-        wx.CallAfter(append)
+            if sameline:
+                # Overwrite the previous line
+                end_pos = self.text_ctrl.GetLastPosition()
+                self.text_ctrl.Replace(
+                    self.last_line_start, end_pos, msg + "\n"
+                )
+            else:
+                # Remember where this new line starts
+                self.last_line_start = self.text_ctrl.GetLastPosition()
+                self.text_ctrl.AppendText(msg + "\n")
+
+            self.text_ctrl.ShowPosition(self.text_ctrl.GetLastPosition())
+
+        wx.CallAfter(update)
 
 
 class CustomFormatter(logging.Formatter):
@@ -129,16 +180,32 @@ class CustomFormatter(logging.Formatter):
     }
 
     def format(self, record: logging.LogRecord) -> str:
-        # Replace [COLOR] tags in the actual message
-        if isinstance(record.msg, str):  # avoid issues if msg is not a string
+        sameline = False
+        flush = False
+
+        if isinstance(record.msg, str):
+            if "[SAMELINE]" in record.msg:
+                sameline = True
+                record.msg = record.msg.replace("[SAMELINE]", "")
+            if "[FLUSH]" in record.msg:
+                flush = True
+                record.msg = record.msg.replace("[FLUSH]", "")
+
             for tag, color_code in self.COLOR_TAGS.items():
                 record.msg = record.msg.replace(f"[{tag}]", color_code)
-            # Add color reset at end
+
             record.msg += self.RESET
 
         log_fmt = self.FORMATS.get(record.levelno, self._fmt)
         formatter = logging.Formatter(log_fmt, self.datefmt)
-        return formatter.format(record)
+        result = formatter.format(record)
+
+        if flush:
+            result = "\033[2K\r" + result
+        elif sameline:
+            result = "\r" + result
+
+        return result
 
     # def format(self, record) -> str:
     #     log_fmt: str | None = self.FORMATS.get(record.levelno)
@@ -215,9 +282,10 @@ class Logger(logging.getLoggerClass()):
             self.addHandler(hdlr=file_handler)
 
         # Define a Handler for console output
-        console = logging.StreamHandler(stream=None)
+        console = SameLineStreamHandler(stream=sys.stdout)
         console.setFormatter(fmt=CustomFormatter())
         self.addHandler(hdlr=console)
+
         if wx_handler is None:
             console.setLevel(level=level_console)
         else:

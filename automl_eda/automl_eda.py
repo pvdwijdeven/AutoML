@@ -28,11 +28,19 @@ from automl_libs import (
 import numpy as np
 from scipy.stats import entropy as scipy_entropy
 from datetime import datetime
+import time
 
 
 class AutoML_EDA:
     def __init__(
-        self, logger, report_file, file_train, file_test="", title="", target=""
+        self,
+        logger,
+        report_file,
+        file_train,
+        file_test="",
+        title="",
+        target="",
+        nogui=True,
     ) -> None:
         self.report_file = report_file
         self.file_train = file_train
@@ -40,6 +48,7 @@ class AutoML_EDA:
         self.logger = logger
         self.title = title
         self.target = target
+        self.nogui = nogui
 
     def read_data(self, file_path) -> pd.DataFrame | None:
         self.logger.info(f"[BLUE]- Reading data from {file_path}")
@@ -308,7 +317,14 @@ class AutoML_EDA:
             self.df_train is not None
         ), "Training DataFrame is not initialized"
         self.type_conversion = {}
-        for column in self.df_train.columns:
+        total = len(self.df_train.columns)
+
+        for i, column in enumerate(self.df_train.columns, start=1):
+            sameline = "[SAMELINE]" if i != 1 or self.nogui else ""
+            self.logger.info(
+                f"{sameline}[GREEN]    ({i}/{total})Analysing column '{column}'"
+            )
+            time.sleep(0.01)
             self.type_conversion[column] = {}
             self.type_conversion[column]["original"] = infer_dtype(
                 self.df_train[column]
@@ -317,13 +333,17 @@ class AutoML_EDA:
             self.type_conversion[column]["new"] = infer_dtype(
                 self.df_train[column]
             )
-        self.logger.debug(
-            "[GREEN]- Column type analysis completed. Changes made:"
-        )
+        sameline = "[FLUSH]" if self.nogui else "[SAMELINE]"
+        self.logger.info(f"{sameline}[GREEN]- Column analysis completed.")
         # self.logger.debug(f"[CYAN]{json.dumps(self.type_conversion, indent=4)}")
         self.column_info = {}
         self.target_info = {}
-        for column in self.df_train.columns:
+
+        for i, column in enumerate(self.df_train.columns, start=1):
+            self.logger.info(
+                f"{'[SAMELINE]' if i != 1 or self.nogui else ''}[GREEN]    ({i}/{total}) Generating EDA for column '{column}'"
+            )
+            time.sleep(0.01)
             self.column_info[column] = {}
             self.column_info[column]["table"] = self.analyse_column(column)
             self.column_info[column]["plots"] = generate_eda_plots(
@@ -332,7 +352,8 @@ class AutoML_EDA:
                 infer_dtype(self.df_train[column]),
                 self.target,
             )
-        self.logger.debug("[GREEN]- Column analysis completed. Details:")
+        sameline = "[FLUSH]" if self.nogui else "[SAMELINE]"
+        self.logger.info(f"{sameline}[GREEN]- EDA data completed.")
         # self.logger.debug(f"[CYAN]{pprint.pformat(self.column_info)}")
 
     def perform_eda(self) -> str:

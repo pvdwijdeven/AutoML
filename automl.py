@@ -3,6 +3,7 @@ from automl_gui import AutoMLFrame
 import argparse
 from pathlib import Path
 
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Automated Machine Learning GUI"
