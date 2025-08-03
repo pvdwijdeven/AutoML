@@ -181,7 +181,7 @@ def generate_missing_summary(df, drop_col_thresh=0.6, drop_row_thresh=0.05):
         # 1. Drop column if mostly missing
         if pct_missing > drop_col_thresh:
             suggestion = "Drop column"
-            strategy = "Too many missing values; not worth imputing"
+            strategy = "Alternatively: "
 
         # 2. Drop rows if only few missing
         elif pct_missing < drop_row_thresh:
