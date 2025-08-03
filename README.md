@@ -35,6 +35,9 @@ AutoML can automatically generate an interactive **EDA report** (HTML format) fr
   - Structural and statistical comparison with training data
   - Detection of mismatches and unseen categories
 
+- **Recommendations to do before pre-processing**
+  While this tool provides a robust automated EDA, it does not incorporate domain-specific knowledge or an understanding of feature semantics. Prior to applying preprocessing steps, it is strongly advised to review the dataset with human expertise in mind. The report outlines key areas where such insights can be integrated.
+
 The report is fully HTML-based, styled for usability, and supports quick navigation through tabs and feature anchors.
 
 

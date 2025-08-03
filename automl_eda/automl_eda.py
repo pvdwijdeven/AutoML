@@ -28,7 +28,6 @@ from automl_libs import (
 import numpy as np
 from scipy.stats import entropy as scipy_entropy
 from datetime import datetime
-import time
 
 
 class AutoML_EDA:
@@ -417,10 +416,39 @@ class AutoML_EDA:
         self.relation_info, self.num_feats = generate_feature_relations(
             self.df_train, self.target, logger=self.logger
         )
+
+        suggestion_overview = {}
+        for column in self.df_train.columns:
+            summary_suggestions = []
+            suggestion_overview[column] = {}
+            for cur_suggestion in (
+                self.relation_info.get(column, {})
+                .get("suggestions", "")
+                .split("<br>")
+            ):
+                if "correlated" in cur_suggestion:
+                    summary_suggestions = [cur_suggestion]
+            if self.type_conversion[column]["new"] == "string":
+                summary_suggestions += self.column_info[column]["table"][
+                    "suggestions"
+                ].split("<br>")
+            # self.logger.debug(
+            #     f"[GREEN]- Suggestions for {column}: {summary_suggestions}"
+            # )
+            if summary_suggestions:
+                suggestion_overview[column]["recommendations"] = "<br>".join(
+                    summary_suggestions
+                )
+            else:
+                del suggestion_overview[column]
+        # df_summary = pd.DataFrame.from_dict(
+        #     suggestion_overview,
+        # )
+        # summary_html = df_summary.to_html(classes=["frequency-table"])
         relation_context = {}
         relation_context["relation_info"] = self.relation_info
         relation_context["num_feats"] = self.num_feats
-
+        self.logger.debug(suggestion_overview)
         # relations_html = str(self.relation_info) + "\n" + str(self.column_info)
         plot1, plot2 = generate_relation_visuals(self.df_train, self.target)
         relation_context["plot1"] = plot1
@@ -483,6 +511,17 @@ class AutoML_EDA:
             tabs.append(
                 {"title": "Test data", "content": testdata_html},
             )
+
+        recomm_context = {
+            "summary": suggestion_overview,
+        }
+        recomm_html = get_html_from_template(
+            "recommendations.html", recomm_context
+        )
+        tabs.append(
+            {"title": "Recommendations", "content": recomm_html},
+        )
+
         # Load and render the template
         env = Environment(loader=FileSystemLoader("templates"))
         template = env.get_template("eda_report.html")
