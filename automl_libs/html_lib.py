@@ -64,39 +64,51 @@ def get_html_from_template(template_file, context, plots=[]) -> str:
     return rendered_html
 
 
-def generate_relation_visuals(df, target="", max_features=100):
-    #    warnings.filterwarnings("ignore")
+def generate_relation_visuals(
+    df, target="", max_features=100, max_samples=10000
+):
+
+    # Step 1: Select features
     features = select_features_by_missingness(df, "")
+
     if target != "" and target not in features:
         features = [target] + features
     elif target != "" and target in features:
         features.remove(target)
         features = [target] + features
-    df = df[features].copy().dropna()
+
+    df = df[features]
+
+    # Step 2: Sample early
+    if len(df) > max_samples:
+        df = df.sample(n=max_samples, random_state=42)
+
+    # Step 3: Drop rows with NA after sampling
+    df = df.dropna()
+
     if target == "":
         target = None
 
-    # Identify types
+    # Step 4: Detect types
     num_cols = df.select_dtypes(include=np.number).columns.tolist()
     cat_cols = df.select_dtypes(exclude=np.number).columns.tolist()
 
-    # Label encode categorical features temporarily
-    le_dict = {}
+    # Step 5: Label encode categoricals
     for col in cat_cols:
         le = LabelEncoder()
         df[col] = df[col].astype(str)
         df[col] = le.fit_transform(df[col])
-        le_dict[col] = le
 
-    # Limit features for speed
+    # Step 6: Restrict number of features
     all_features = num_cols + cat_cols
     if len(all_features) > max_features:
         all_features = all_features[:max_features]
-
-    # Compute correlation matrix
+    if all_features != len(df.columns):
+        num_feats = all_features
+    else:
+        num_feats = 0
+    # Step 7: Correlation matrix
     corr_matrix = df[all_features].corr()
-
-    # Plot Correlation Heatmap
     fig_corr = px.imshow(
         corr_matrix,
         text_auto=True,
@@ -112,28 +124,28 @@ def generate_relation_visuals(df, target="", max_features=100):
     )
     correlation_html = fig_corr.to_html(full_html=False, include_plotlyjs=False)
 
-    # Compute Mutual Information
+    # Step 8: Mutual Information
     mi_scores = {}
     try:
-        X_all_features = all_features.copy()
-        if isinstance(target, str) and target in X_all_features:
-            X_all_features.remove(target)
+        X_features = [f for f in all_features if f != target]
         if target is not None and target in df.columns:
             y = df[target]
-            X = df[X_all_features]
+            X = df[X_features]
             if y.nunique() <= 10:
-                mi = mutual_info_classif(X, y, discrete_features="auto")
+                mi = mutual_info_classif(
+                    X, y, discrete_features="auto", random_state=42
+                )
             else:
-                mi = mutual_info_regression(X, y, discrete_features="auto")
-            mi_scores = dict(zip(X_all_features, mi))
+                mi = mutual_info_regression(
+                    X, y, discrete_features="auto", random_state=42
+                )
+            mi_scores = dict(zip(X_features, mi))
     except Exception as e:
-        print(
-            f"Error computing mutual information: {e}",
-        )
+        print(f"Error computing mutual information: {e}")
         mi_scores = {feature: None for feature in all_features}
 
-    # Plot MI bar chart
-    mi_series = pd.Series(mi_scores).sort_values(ascending=False)
+    # Step 9: Plot MI
+    mi_series = pd.Series(mi_scores).dropna().sort_values(ascending=False)
     fig_mi = px.bar(
         mi_series,
         x=mi_series.index,
@@ -149,4 +161,4 @@ def generate_relation_visuals(df, target="", max_features=100):
     )
     target_relation = fig_mi.to_html(full_html=False, include_plotlyjs=False)
 
-    return correlation_html, target_relation
+    return correlation_html, target_relation, num_feats

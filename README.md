@@ -66,6 +66,7 @@ automl [OPTIONS]
 | `-h`, `--help`         | Show this help message and exit                               |
 | `--title`              | Title for the project                                         |
 | `--training_data FILE` | Filename for training data                                    |
+| `--description FILE`   | Filename for column description - see readme for further description    |
 | `--taget`              | target column, if no test data available and not last column of training data  |
 | `--test_data FILE`     | Filename for test data                                        |
 | `--EDA`                | Start EDA (default: `False`)                                  |
@@ -76,6 +77,23 @@ automl [OPTIONS]
 | `--logger_file FILE`   | Filename for logger file (`.log`)                             |
 
 ---
+
+## Column description file
+If available, a description file can be added, so that the column description will be part of the report. The descriptions shall be of the following format:
+
+````text
+column_name
+description, can be multiple lines.
+so this line also. Next line, before next column name is always empty
+
+column_name2
+also here text....
+
+column_name3
+
+column_name4
+Some column_names have no description
+````
 
 ## 🚧 What’s in Progress
 

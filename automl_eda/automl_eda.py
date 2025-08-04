@@ -510,11 +510,13 @@ class AutoML_EDA:
 
         relation_context = {}
         relation_context["relation_info"] = self.relation_info
-        relation_context["num_feats"] = self.num_feats
 
-        plot1, plot2 = generate_relation_visuals(self.df_train, self.target)
+        plot1, plot2, shown_feats = generate_relation_visuals(
+            self.df_train, self.target
+        )
         relation_context["plot1"] = plot1
         relation_context["plot2"] = plot2
+        relation_context["num_feats"] = shown_feats
 
         relations_html = get_html_from_template(
             "relations.j2", relation_context

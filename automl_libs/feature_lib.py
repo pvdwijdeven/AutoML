@@ -70,20 +70,33 @@ def select_features_by_missingness(
     return selected_features
 
 
-def generate_feature_relations(df, target="", max_features=100, logger=None):
+def generate_feature_relations(
+    df, target="", max_features=100, max_samples=10000, logger=None
+):
+
     warnings.filterwarnings("ignore")
+
+    # Step 1: Select features and target
     features = select_features_by_missingness(df, "")
-    if target != "" and target not in features:
+    if target and target not in features:
         features.append(target)
     num_features = len(features)
-    df = df[features].copy().dropna()
+
+    # Step 2: Drop missing values only for selected features
+    df = df[features].dropna()
+
+    # Step 3: Sample for performance
+    if len(df) > max_samples:
+        df = df.sample(n=max_samples, random_state=42)
+
     if target == "":
         target = None
-    # Identify types
 
+    # Step 4: Identify numeric and categorical columns
     num_cols = df.select_dtypes(include=np.number).columns.tolist()
     cat_cols = df.select_dtypes(exclude=np.number).columns.tolist()
-    # Label encode categorical features temporarily
+
+    # Step 5: Label encode categorical features
     le_dict = {}
     for col in cat_cols:
         le = LabelEncoder()
@@ -91,41 +104,42 @@ def generate_feature_relations(df, target="", max_features=100, logger=None):
         df[col] = le.fit_transform(df[col])
         le_dict[col] = le
 
-    # Limit features for speed
+    # Step 6: Restrict to max_features
     all_features = num_cols + cat_cols
     if len(all_features) > max_features:
         all_features = all_features[:max_features]
 
-    # Compute correlation matrix
+    # Step 7: Correlation
     if logger:
         logger.info("[GREEN]  - correlation information.")
     corr_matrix = df[all_features].corr()
+
+    # Step 8: Mutual Information
     if logger:
         logger.info("[GREEN]  - mutual information.")
-    # Mutual Information
     mi_scores = {}
     try:
-        X_all_features = all_features.copy()
-        if isinstance(target, str) and target in X_all_features:
-            X_all_features.remove(target)
-        if target is not None and target in df.columns:
+        X_features = [f for f in all_features if f != target]
+        if target and target in df.columns:
             y = df[target]
-            X = df[X_all_features]
+            X = df[X_features]
             if y.nunique() <= 10:
-                mi = mutual_info_classif(X, y, discrete_features="auto")
+                mi = mutual_info_classif(
+                    X, y, discrete_features="auto", random_state=42
+                )
             else:
-                mi = mutual_info_regression(X, y, discrete_features="auto")
-            mi_scores = dict(zip(X_all_features, mi))
+                mi = mutual_info_regression(
+                    X, y, discrete_features="auto", random_state=42
+                )
+            mi_scores = dict(zip(X_features, mi))
     except Exception as e:
-        print(
-            f"Error computing mutual information: {e}",
-        )
+        print(f"Error computing mutual information: {e}")
         mi_scores = {feature: None for feature in all_features}
 
-    # Output dictionary
-    insights = {}
+    # Step 9: Aggregate results
     if logger:
         logger.info("[GREEN]- Creating relation info per feature.")
+    insights = {}
     for feature in all_features:
         related = []
         suggestions = []
@@ -137,7 +151,7 @@ def generate_feature_relations(df, target="", max_features=100, logger=None):
                 & (corr_matrix[feature].abs() < 1.0)
             ]
             related = high_corr.index.tolist()
-            if high_corr.any():
+            if not high_corr.empty:
                 suggestions.append(
                     "Highly correlated with "
                     + ", ".join(related)
@@ -162,7 +176,9 @@ def generate_feature_relations(df, target="", max_features=100, logger=None):
             "mutual_info with target": (
                 f"{mi_score:.3f}" if mi_score is not None else "N/A"
             ),
-            "suggestions": "- " + "<br>- ".join(suggestions),
+            "suggestions": (
+                "- " + "<br>- ".join(suggestions) if suggestions else "None"
+            ),
         }
 
     return insights, num_features
@@ -393,18 +409,33 @@ def fig_to_base64(fig):
     return f'<img src="data:image/png;base64,{img_base64}" class="responsive-img"/>'
 
 
-# Now define the function to generate matplotlib/seaborn plots
+def generate_eda_plots(
+    df, column_name, inferred_type, target="", verbose=False
+):
+    MAX_ROWS = 5000
+    TOP_CATEGORIES = 20
 
+    # Sample for performance
+    sample_frac = 1.0 if len(df) <= MAX_ROWS else MAX_ROWS / len(df)
+    df_sampled = (
+        df.sample(frac=sample_frac, random_state=42)
+        if sample_frac < 1.0
+        else df.copy()
+    )
 
-def generate_eda_plots(df, column_name, inferred_type, target=""):
-    col = df[column_name].dropna()
-    target_col = df.loc[col.index, target] if target else None
+    if sample_frac < 1.0 and verbose:
+        print(
+            f"[INFO] Sampled {int(sample_frac * 100)}% of data for plotting..."
+        )
+
+    col = df_sampled[column_name].dropna()
+    target_col = df_sampled.loc[col.index, target] if target else None
 
     plot1_html = plot2_html = ""
 
     # Determine target type
     if target:
-        target_type = pd.api.types.infer_dtype(df[target], skipna=True)
+        target_type = pd.api.types.infer_dtype(df_sampled[target], skipna=True)
         is_target_numeric = target_type in [
             "integer",
             "floating",
@@ -412,6 +443,12 @@ def generate_eda_plots(df, column_name, inferred_type, target=""):
         ]
     else:
         is_target_numeric = False
+
+    # Truncate high-cardinality categories
+    if inferred_type in ["category", "boolean", "string"]:
+        top_categories = col.value_counts().nlargest(TOP_CATEGORIES).index
+        col = col[col.isin(top_categories)]
+        df_sampled = df_sampled[df_sampled[column_name].isin(top_categories)]
 
     # Plot 1: Distribution / Frequency
     if inferred_type in ["category", "boolean", "string"]:
@@ -425,7 +462,9 @@ def generate_eda_plots(df, column_name, inferred_type, target=""):
 
     elif inferred_type in ["integer", "float"]:
         fig, ax = plt.subplots(figsize=(8, 4))
-        sns.histplot(df[column_name].dropna(), bins=60, kde=False, ax=ax)
+        sns.histplot(
+            df_sampled[column_name].dropna(), bins=60, kde=False, ax=ax
+        )
         ax.set_title(f"Distribution of {column_name}")
         ax.set_xlabel(column_name)
         ax.set_ylabel("Frequency")
@@ -437,14 +476,14 @@ def generate_eda_plots(df, column_name, inferred_type, target=""):
         if inferred_type in ["category", "boolean", "string"]:
             if is_target_numeric:
                 fig, ax = plt.subplots(figsize=(8, 4))
-                sns.boxplot(x=column_name, y=target, data=df, ax=ax)
+                sns.boxplot(x=column_name, y=target, data=df_sampled, ax=ax)
                 ax.set_title(f"{target} per {column_name}")
+                ax.tick_params(axis="x", rotation=45)
                 fig.tight_layout()
                 plot2_html = fig_to_base64(fig)
             else:
-                # Both categorical: stacked bar
                 crosstab = (
-                    df.groupby([column_name, target], observed=False)
+                    df_sampled.groupby([column_name, target], observed=False)
                     .size()
                     .reset_index(name="count")
                 )
@@ -454,17 +493,13 @@ def generate_eda_plots(df, column_name, inferred_type, target=""):
                 ).fillna(0)
                 crosstab_pivot.plot(kind="bar", stacked=True, ax=ax)
                 ax.set_title(f"{target} distribution per {column_name}")
+                ax.tick_params(axis="x", rotation=45)
                 fig.tight_layout()
                 plot2_html = fig_to_base64(fig)
 
         elif inferred_type in ["integer", "float"]:
-            target_col = df.loc[col.index, target]
-            valid_idx = col.dropna().index
-            target_col = df.loc[valid_idx, target]
-            feature_col = col.loc[valid_idx]
-            sample_frac = 0.1 if len(feature_col) > 5000 else 1.0
-            feature_col = feature_col.sample(frac=sample_frac, random_state=42)
-            target_col = target_col.loc[feature_col.index]
+            feature_col = df_sampled[column_name].dropna()
+            target_col = df_sampled.loc[feature_col.index, target]
 
             if is_target_numeric:
                 scatter_df = pd.DataFrame(
@@ -472,30 +507,41 @@ def generate_eda_plots(df, column_name, inferred_type, target=""):
                 )
                 fig, ax = plt.subplots(figsize=(8, 4))
                 sns.scatterplot(
-                    data=scatter_df, x=column_name, y=target, alpha=0.6, ax=ax
+                    data=scatter_df,
+                    x=column_name,
+                    y=target,
+                    alpha=0.3,
+                    s=10,
+                    ax=ax,
                 )
                 ax.set_title(f"{target} vs {column_name}")
                 fig.tight_layout()
                 plot2_html = fig_to_base64(fig)
             else:
-                temp_df = pd.DataFrame(
-                    {column_name: feature_col, "target_value": target_col}
-                )
-                grouped = (
-                    temp_df.groupby(column_name, observed=False)["target_value"]
-                    .mean()
-                    .reset_index()
-                )
-                fig, ax = plt.subplots(figsize=(8, 4))
-                sns.barplot(
-                    data=grouped, x=column_name, y="target_value", ax=ax
-                )
-                ax.set_title(f"Mean {target} by {column_name}")
-                fig.tight_layout()
-                plot2_html = fig_to_base64(fig)
+                try:
+                    df_sampled["binned_feature"] = pd.qcut(
+                        df_sampled[column_name], q=10, duplicates="drop"
+                    )
+                    grouped = (
+                        df_sampled.groupby("binned_feature", observed=False)[
+                            target
+                        ]
+                        .mean()
+                        .reset_index()
+                    )
+                    fig, ax = plt.subplots(figsize=(8, 4))
+                    sns.barplot(
+                        data=grouped, x="binned_feature", y=target, ax=ax
+                    )
+                    ax.set_title(f"Mean {target} by binned {column_name}")
+                    ax.tick_params(axis="x", rotation=45)
+                    fig.tight_layout()
+                    plot2_html = fig_to_base64(fig)
+                except Exception as e:
+                    plot2_html = f"<p>Could not generate binned plot: {e}</p>"
 
     elif target == column_name:
-        plot2_html = f"<p>No plot as feature is to target ({target}).</p>"
+        plot2_html = f"<p>No plot as feature is target ({target}).</p>"
 
     return {"plot1": plot1_html, "plot2": plot2_html}
 
