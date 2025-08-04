@@ -37,13 +37,18 @@
   </table>
   </td>
   </tr>
-  <tr>
-  <td width="50%">
-  {{ stats.plots.plot1 | safe }}
-  </td><td width="50%">
-  {{ stats.plots.plot2 | safe }}
+<tr>
+  <td colspan="2">
+    <div class="plot-wrapper">
+      <div class="plot-cell">
+        {{ stats.plots.plot1 | safe }}
+      </div>
+      <div class="plot-cell">
+        {{ stats.plots.plot2 | safe }}
+      </div>
+    </div>
   </td>
-  </tr>
+</tr>
   </tbody>
   </table>
 {% endfor %}

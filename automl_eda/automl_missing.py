@@ -1,6 +1,13 @@
 import pandas as pd
 import plotly.express as px
 from automl_libs import infer_dtype
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import io
+import base64
+
+import matplotlib.colors as mcolors
 
 
 def missing_data_summary(df):
@@ -63,49 +70,48 @@ def missing_data_summary(df):
 
 
 def plot_missingness_matrix(df, top_n=100) -> str:
-    # Step 1: Select top N columns with the most missing values
     missing_counts = df.isnull().sum()
     missing_counts = missing_counts[missing_counts > 0]
+    if missing_counts.empty:
+        return "<p>No columns with missing values to analyze.</p>"
+
     top_missing_cols = (
-        missing_counts.sort_values(ascending=False).head(top_n).index.tolist()
+        missing_counts.sort_values(ascending=False).head(top_n).index
     )
+    mask = (
+        df[top_missing_cols].isnull().astype(int).T
+    )  # transpose for features on Y
 
-    # Step 2: Create a boolean mask: True = missing, False = present
-    mask = df[top_missing_cols].isnull()
-    if mask.empty:
-        return "No columns with missing values to analyze."
+    if mask.values.max() == mask.values.min():
+        return "<p>Only one value (all missing or all present) — can't render heatmap.</p>"
 
-    # Step 3: Convert to long format for Plotly
-    data = (
-        mask.reset_index()
-        .melt(id_vars="index", var_name="Feature", value_name="IsMissing")
-        .rename(columns={"index": "Row"})
-    )
-    data["MissingValue"] = data["IsMissing"].map(
-        {True: "Missing", False: "Present"}
-    )
+    # Colormap: 0 = blue, 1 = white
+    cmap = mcolors.ListedColormap(["#1f77b4", "#ffffff"])
+    bounds = [0, 0.5, 1]  # boundaries between 0 and 1
+    norm = mcolors.BoundaryNorm(bounds, cmap.N)
 
-    # Step 4: Plot using Plotly Express heatmap
-    fig = px.imshow(
-        mask[top_missing_cols].astype(int).T,
-        color_continuous_scale=[[0, "blue"], [1, "white"]],
-        aspect="auto",
-        labels={"x": "Row Index", "y": "Feature", "color": "Missing"},
-        title="Missing Value Matrix",
+    fig, ax = plt.subplots(
+        figsize=(min(20, mask.shape[1] * 0.15), 1 + mask.shape[0] * 0.4)
     )
-    fig.update_layout(
-        xaxis_title="Row Index",
-        yaxis_title="Feature",
-        coloraxis_showscale=False,
-        height=400 + top_n * 20,
-    )
-    return fig.to_html(
-        full_html=False,
-        include_plotlyjs=False,
-        default_width="100%",
-        div_id="my-plot",
-        config=dict(responsive=True),
-    )
+    cax = ax.imshow(mask, aspect="auto", cmap=cmap, norm=norm)
+
+    ax.set_title("Missing Value Matrix")
+    ax.set_xlabel("Row Index")
+    ax.set_ylabel("Feature")
+
+    ax.set_yticks(np.arange(mask.shape[0]))
+    ax.set_yticklabels(mask.index.tolist())
+    ax.set_xticks([])  # skip xticks for simplicity
+
+    plt.tight_layout()
+
+    # Export as base64 image
+    buf = io.BytesIO()
+    fig.savefig(buf, format="png", dpi=150, bbox_inches="tight")
+    plt.close(fig)
+    buf.seek(0)
+    img_base64 = base64.b64encode(buf.read()).decode("utf-8")
+    return f'<img src="data:image/png;base64,{img_base64}" style="max-width: 100%; height: auto;" />'
 
 
 def plot_missing_correlation(df, top_n=100):

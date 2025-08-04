@@ -12,7 +12,10 @@ from sklearn.preprocessing import LabelEncoder
 import warnings
 from typing import List
 from scipy.stats import entropy as scipy_entropy
-import plotly.express as px
+import seaborn as sns
+import matplotlib.pyplot as plt
+import io
+import base64
 
 
 def select_features_by_missingness(
@@ -380,11 +383,24 @@ def analyze_numeric_column(
     return suggestions
 
 
+def fig_to_base64(fig):
+    """Convert a matplotlib figure to a base64-encoded HTML image."""
+    buf = io.BytesIO()
+    fig.savefig(buf, format="png", bbox_inches="tight")
+    buf.seek(0)
+    img_base64 = base64.b64encode(buf.read()).decode("utf-8")
+    plt.close(fig)
+    return f'<img src="data:image/png;base64,{img_base64}" class="responsive-img"/>'
+
+
+# Now define the function to generate matplotlib/seaborn plots
+
+
 def generate_eda_plots(df, column_name, inferred_type, target=""):
     col = df[column_name].dropna()
     target_col = df.loc[col.index, target] if target else None
 
-    plot1 = plot2 = None
+    plot1_html = plot2_html = ""
 
     # Determine target type
     if target:
@@ -399,95 +415,87 @@ def generate_eda_plots(df, column_name, inferred_type, target=""):
 
     # Plot 1: Distribution / Frequency
     if inferred_type in ["category", "boolean", "string"]:
-        plot1 = px.bar(
-            col.value_counts()
-            .reset_index(name="count")
-            .rename(columns={"index": column_name}),
-            x=column_name,
-            y="count",
-            title=f"Frequency of {column_name}",
-        )
+        fig, ax = plt.subplots(figsize=(8, 4))
+        sns.countplot(x=col, order=col.value_counts().index, ax=ax)
+        ax.set_title(f"Frequency of {column_name}")
+        ax.set_xlabel(column_name)
+        ax.set_ylabel("Count")
+        fig.tight_layout()
+        plot1_html = fig_to_base64(fig)
+
     elif inferred_type in ["integer", "float"]:
-        plot1 = px.histogram(
-            df, x=column_name, nbins=30, title=f"Distribution of {column_name}"
-        )
+        fig, ax = plt.subplots(figsize=(8, 4))
+        sns.histplot(df[column_name].dropna(), bins=60, kde=False, ax=ax)
+        ax.set_title(f"Distribution of {column_name}")
+        ax.set_xlabel(column_name)
+        ax.set_ylabel("Frequency")
+        fig.tight_layout()
+        plot1_html = fig_to_base64(fig)
 
     # Plot 2: Relation to target
     if target and column_name != target:
         if inferred_type in ["category", "boolean", "string"]:
             if is_target_numeric:
-                plot2 = px.box(
-                    df,
-                    x=column_name,
-                    y=target,
-                    title=f"{target} per {column_name}",
-                )
+                fig, ax = plt.subplots(figsize=(8, 4))
+                sns.boxplot(x=column_name, y=target, data=df, ax=ax)
+                ax.set_title(f"{target} per {column_name}")
+                fig.tight_layout()
+                plot2_html = fig_to_base64(fig)
             else:
-                # Both feature and target are categorical: use a stacked bar
+                # Both categorical: stacked bar
                 crosstab = (
                     df.groupby([column_name, target], observed=False)
                     .size()
                     .reset_index(name="count")
                 )
-                plot2 = px.bar(
-                    crosstab,
-                    x=column_name,
-                    y="count",
-                    color=target,
-                    title=f"{target} distribution per {column_name}",
-                )
-        elif inferred_type in ["integer", "float"]:
-            binned = pd.qcut(col, q=10, duplicates="drop")
-            binned_str = binned.astype(str)
-            target_col = df.loc[col.index, target]
+                fig, ax = plt.subplots(figsize=(8, 4))
+                crosstab_pivot = crosstab.pivot(
+                    index=column_name, columns=target, values="count"
+                ).fillna(0)
+                crosstab_pivot.plot(kind="bar", stacked=True, ax=ax)
+                ax.set_title(f"{target} distribution per {column_name}")
+                fig.tight_layout()
+                plot2_html = fig_to_base64(fig)
 
-            temp_df = pd.DataFrame(
-                {
-                    column_name: binned_str,
-                    "target_value": target_col.values,
-                }
-            )
+        elif inferred_type in ["integer", "float"]:
+            target_col = df.loc[col.index, target]
+            valid_idx = col.dropna().index
+            target_col = df.loc[valid_idx, target]
+            feature_col = col.loc[valid_idx]
+            sample_frac = 0.1 if len(feature_col) > 5000 else 1.0
+            feature_col = feature_col.sample(frac=sample_frac, random_state=42)
+            target_col = target_col.loc[feature_col.index]
 
             if is_target_numeric:
+                scatter_df = pd.DataFrame(
+                    {column_name: feature_col, target: target_col}
+                )
+                fig, ax = plt.subplots(figsize=(8, 4))
+                sns.scatterplot(
+                    data=scatter_df, x=column_name, y=target, alpha=0.6, ax=ax
+                )
+                ax.set_title(f"{target} vs {column_name}")
+                fig.tight_layout()
+                plot2_html = fig_to_base64(fig)
+            else:
+                temp_df = pd.DataFrame(
+                    {column_name: feature_col, "target_value": target_col}
+                )
                 grouped = (
                     temp_df.groupby(column_name, observed=False)["target_value"]
                     .mean()
                     .reset_index()
                 )
-                plot2 = px.line(
-                    grouped,
-                    x=column_name,
-                    y="target_value",
-                    title=f"Mean {target} by binned {column_name}",
+                fig, ax = plt.subplots(figsize=(8, 4))
+                sns.barplot(
+                    data=grouped, x=column_name, y="target_value", ax=ax
                 )
-            else:
-                # Categorical target — use a stacked bar by bin
-                temp_df[target] = target_col.values
-                grouped = (
-                    temp_df.groupby([column_name, target], observed=False)
-                    .size()
-                    .reset_index(name="count")
-                )
-                plot2 = px.bar(
-                    grouped,
-                    x=column_name,
-                    y="count",
-                    color=target,
-                    title=f"{target} distribution by binned {column_name}",
-                )
+                ax.set_title(f"Mean {target} by {column_name}")
+                fig.tight_layout()
+                plot2_html = fig_to_base64(fig)
 
-    # Convert to HTML strings
-    plot1_html = (
-        plot1.to_html(full_html=False, include_plotlyjs="cdn") if plot1 else ""
-    )
-    if target != column_name:
-        plot2_html = (
-            plot2.to_html(full_html=False, include_plotlyjs=False)
-            if plot2
-            else ""
-        )
-    else:
-        plot2_html = f"<p>No relation to target {target} as it is the same as feature {column_name}.</p>"
+    elif target == column_name:
+        plot2_html = f"<p>No plot as feature is to target ({target}).</p>"
 
     return {"plot1": plot1_html, "plot2": plot2_html}
 
