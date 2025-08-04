@@ -69,7 +69,9 @@ class AutoML_EDA:
             if current_column is None:
                 current_column = line
             else:
-                current_description.append(line)
+                current_description.append(
+                    line.replace("\t", "&nbsp;&nbsp;&nbsp;&nbsp;")
+                )
 
         # Add the last column if there wasn't an empty line after it
         if current_column is not None:
@@ -276,6 +278,7 @@ class AutoML_EDA:
             missing_pct = missing_count / len(self.df_train) * 100
             return {
                 "type": f"boolean ({self.type_conversion[column_name]['actual']}) - was {self.type_conversion[column_name]['original']}",
+                "description": self.dict_description.get(column_name, ""),
                 "missing_values": f"{missing_count} ({missing_pct:.1f}%)",
                 "frequency": frequency.replace("np.", "").replace("_", ""),
                 "suggestions": "- "
@@ -324,7 +327,7 @@ class AutoML_EDA:
 
             return {
                 "type": f"category  ({self.type_conversion[column_name]['actual']}) - was {self.type_conversion[column_name]['original']}",
-                "description": self.dict_description.get("column_name", ""),
+                "description": self.dict_description.get(column_name, ""),
                 "missing_values": f"{missing_count} ({missing_pct:.1f}%)",
                 "unique_count": f"{unique_count} ({unique_pct:.1f}%)",
                 "frequency": frequency,
@@ -343,6 +346,7 @@ class AutoML_EDA:
             unique_pct = unique_count / len(self.df_train) * 100
             return {
                 "type": f"string  ({self.type_conversion[column_name]['actual']}) - was {self.type_conversion[column_name]['original']}",
+                "description": self.dict_description.get(column_name, ""),
                 "missing_values": f"{missing_count} ({missing_pct:.1f}%)",
                 "unique_count": f"{unique_count} ({unique_pct:.1f}%)",
                 "suggestions": "- "
@@ -363,6 +367,7 @@ class AutoML_EDA:
             col_non_null = col_data.dropna()
             return {
                 "type": f"{self.type_conversion[column_name]["new"]}  ({self.type_conversion[column_name]['actual']}) - was {self.type_conversion[column_name]['original']}",
+                "description": self.dict_description.get(column_name, ""),
                 "missing_values": f"{missing_count} ({missing_pct:.1f}%)",
                 "min": col_non_null.min() if not col_non_null.empty else None,
                 "max": col_non_null.max() if not col_non_null.empty else None,
@@ -465,6 +470,7 @@ class AutoML_EDA:
                     )
                 self.target = new_target
         self.dict_description = self.read_description(self.description)
+        self.logger.debug(self.dict_description)
         self.analyse_columns()
         target_type = infer_dtype(self.df_train[self.target])
         self.logger.info("[GREEN]- Creating overview table")
