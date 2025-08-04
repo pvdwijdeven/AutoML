@@ -22,7 +22,7 @@
   }
 </script>
 {% if context.num_feats != 0 %}
-<h3>Note: {{ context.num_feats }} features have been analyzed for relations, others have too many missing values.</h3>
+<h3>Note: {{ context.num_feats }} features have been analyzed for relations, others might have too many missing values or there are simply too much features.</h3>
 {% endif %}
 <div style="display: flex; flex-direction: column; align-items: center;">
   <div id="correlation-plot" style="width: 100%; max-width: 800px;" class="anchor-offset">

@@ -483,7 +483,10 @@ class AutoML_EDA:
         features_html = get_html_from_template("features.j2", self.column_info)
         self.logger.info("[GREEN]- Getting feature relations")
         self.relation_info, self.num_feats = generate_feature_relations(
-            self.df_train, self.target, logger=self.logger
+            self.df_train,
+            self.target,
+            self.dict_description,
+            logger=self.logger,
         )
 
         suggestion_overview = {}

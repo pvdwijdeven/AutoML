@@ -71,7 +71,12 @@ def select_features_by_missingness(
 
 
 def generate_feature_relations(
-    df, target="", max_features=100, max_samples=10000, logger=None
+    df,
+    target="",
+    dict_descriptors={},
+    max_features=100,
+    max_samples=10000,
+    logger=None,
 ):
 
     warnings.filterwarnings("ignore")
@@ -172,6 +177,7 @@ def generate_feature_relations(
 
         insights[feature] = {
             "feature": feature,
+            "description": dict_descriptors.get(feature, ""),
             "related_features": "<br>".join(related) if related else "None",
             "mutual_info with target": (
                 f"{mi_score:.3f}" if mi_score is not None else "N/A"

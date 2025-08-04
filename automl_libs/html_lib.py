@@ -65,8 +65,8 @@ def get_html_from_template(template_file, context, plots=[]) -> str:
 
 
 def generate_relation_visuals(
-    df, target="", max_features=100, max_samples=10000
-):
+    df, target="", max_features=50, max_samples=10000
+) -> tuple[str, str, int]:
 
     # Step 1: Select features
     features = select_features_by_missingness(df, "")
@@ -103,8 +103,8 @@ def generate_relation_visuals(
     all_features = num_cols + cat_cols
     if len(all_features) > max_features:
         all_features = all_features[:max_features]
-    if all_features != len(df.columns):
-        num_feats = all_features
+    if len(all_features) != len(df.columns):
+        num_feats = len(all_features)
     else:
         num_feats = 0
     # Step 7: Correlation matrix
@@ -159,6 +159,8 @@ def generate_relation_visuals(
         width=1000,
         height=500,
     )
-    target_relation = fig_mi.to_html(full_html=False, include_plotlyjs=False)
+    target_relation_html = fig_mi.to_html(
+        full_html=False, include_plotlyjs=False
+    )
 
-    return correlation_html, target_relation, num_feats
+    return correlation_html, target_relation_html, num_feats
