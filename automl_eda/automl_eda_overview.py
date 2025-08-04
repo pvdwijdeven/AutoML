@@ -106,7 +106,7 @@ def create_overview_table(
         "target_type": target_type,
     }
 
-    template = env.get_template("overview_table.html")
+    template = env.get_template("overview_table.j2")
 
     html_body = template.render(context)
 

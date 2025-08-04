@@ -423,9 +423,7 @@ class AutoML_EDA:
             target_type=target_type,
             logger=self.logger,
         )
-        features_html = get_html_from_template(
-            "features.html", self.column_info
-        )
+        features_html = get_html_from_template("features.j2", self.column_info)
         self.logger.info("[GREEN]- Getting feature relations")
         self.relation_info, self.num_feats = generate_feature_relations(
             self.df_train, self.target, logger=self.logger
@@ -465,7 +463,7 @@ class AutoML_EDA:
         relation_context["plot2"] = plot2
 
         relations_html = get_html_from_template(
-            "relations.html", relation_context
+            "relations.j2", relation_context
         )
         self.logger.info("[GREEN]- Getting missing data info.")
         column_info_html, general_info_html = missing_data_summary(
@@ -481,7 +479,7 @@ class AutoML_EDA:
                 self.df_train,
             ),
         }
-        missing_html = get_html_from_template("missing.html", missing_context)
+        missing_html = get_html_from_template("missing.j2", missing_context)
         # Prepare tab content
         tabs = [
             {"title": "General overview", "content": overview_html},
@@ -517,7 +515,7 @@ class AutoML_EDA:
                 "samples_middle": samples_middle,
                 "samples_tail": samples_tail,
             }
-            testdata_html = get_html_from_template("testdata.html", context)
+            testdata_html = get_html_from_template("testdata.j2", context)
             tabs.append(
                 {"title": "Test data", "content": testdata_html},
             )
@@ -526,7 +524,7 @@ class AutoML_EDA:
             "summary": suggestion_overview,
         }
         recomm_html = get_html_from_template(
-            "recommendations.html", recomm_context
+            "recommendations.j2", recomm_context
         )
         tabs.append(
             {"title": "Recommendations", "content": recomm_html},
@@ -534,7 +532,7 @@ class AutoML_EDA:
 
         # Load and render the template
         env = Environment(loader=FileSystemLoader("templates"))
-        template = env.get_template("eda_report.html")
+        template = env.get_template("eda_report.j2")
         output_html = template.render(
             tabs=tabs,
             title=f"EDA Report {self.title}",
