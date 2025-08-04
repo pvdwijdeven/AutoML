@@ -66,13 +66,21 @@ class AutoML_EDA:
         self,
         column_name: str,
     ) -> None:
+
+        def convert_to_bool_if_binary(series):
+            if pd.api.types.is_numeric_dtype(
+                series
+            ) and not pd.api.types.is_bool_dtype(series):
+                unique_vals = set(series.dropna().unique())
+                if unique_vals <= {0, 1}:
+                    return series.map({0: False, 1: True}).astype("boolean")
+            return series
+
         def normalize_booleans(series: pd.Series) -> pd.Series:
 
-            if (
-                pd.api.types.is_object_dtype(series)
-                or pd.api.types.is_string_dtype(series)
-                or pd.api.types.is_bool_dtype(series)
-            ):
+            if pd.api.types.is_object_dtype(
+                series
+            ) or pd.api.types.is_string_dtype(series):
 
                 normalized = series.dropna().map(
                     lambda x: str(x).strip().lower()
@@ -110,7 +118,10 @@ class AutoML_EDA:
         col_series_train = self.df_train[column_name]
 
         # Step 1: Normalize booleans
+        col_series_train = convert_to_bool_if_binary(col_series_train)
+
         col_series_train = normalize_booleans(col_series_train)
+
         # Step 2: Detect if boolean
         unique_values = pd.Series(col_series_train.dropna().unique())
         if unique_values.isin([True, False]).all():

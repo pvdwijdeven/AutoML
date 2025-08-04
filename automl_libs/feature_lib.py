@@ -273,22 +273,25 @@ def detect_outliers_iqr(series):
 def analyze_boolean_column(
     df: pd.DataFrame, column_name: str, sample_size=1000
 ):
-
     # Reduce size for large datasets
     if len(df) > sample_size:
         df = df.sample(sample_size, random_state=42)
 
     col_data = df[column_name]
     col_non_null = col_data.dropna()
-    true_ratio = col_non_null.mean()
 
     suggestions = ["Consider replacing with binary encoding (0/1)"]
 
     if col_data.nunique(dropna=True) == 1:
         suggestions.append("Drop constant boolean column")
 
-    if true_ratio < 0.05 or true_ratio > 0.95:
-        suggestions.append("Class imbalance (may need resampling or weight)")
+    # Handle empty or NA case safely
+    if len(col_non_null) > 0:
+        true_ratio = col_non_null.mean()
+        if pd.notna(true_ratio) and (true_ratio < 0.05 or true_ratio > 0.95):
+            suggestions.append(
+                "Class imbalance (may need resampling or weight)"
+            )
 
     return suggestions
 
