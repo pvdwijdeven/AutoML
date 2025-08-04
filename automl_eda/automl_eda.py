@@ -36,6 +36,7 @@ class AutoML_EDA:
         file_test="",
         title="",
         target="",
+        description="",
         nogui=True,
     ) -> None:
         self.report_file = report_file
@@ -44,7 +45,55 @@ class AutoML_EDA:
         self.logger = logger
         self.title = title
         self.target = target
+        self.description = description
         self.nogui = nogui
+
+    def parse_column_descriptions_to_html(self, text):
+        result = {}
+        current_column = None
+        current_description = []
+
+        for line in text:
+            line = line.strip()
+            if not line:  # Empty line
+                # If we have a current column, save it to the dictionary
+                if current_column is not None:
+                    # Join with HTML line breaks and strip whitespace
+                    description = "<br>".join(current_description).strip()
+                    result[current_column] = description
+                    current_column = None
+                    current_description = []
+                continue
+
+            # If we're not currently processing a column, this must be a new column name
+            if current_column is None:
+                current_column = line
+            else:
+                current_description.append(line)
+
+        # Add the last column if there wasn't an empty line after it
+        if current_column is not None:
+            description = "<br>".join(current_description).strip()
+            result[current_column] = description
+
+        return result
+
+    def read_description(self, file_path):
+        self.logger.info(
+            f"[BLUE]- Reading column descriptions from {file_path}"
+        )
+        if not file_path:
+            return {}
+        try:
+            with open(file_path, "r") as f:
+                description = f.readlines()
+            return self.parse_column_descriptions_to_html(description)
+        except FileNotFoundError:
+            self.logger.error(f"File not found: {file_path}")
+            return {}
+        except Exception as e:
+            self.logger.error(f"Error reading {file_path}: {e}")
+            return {}
 
     def read_data(self, file_path) -> pd.DataFrame | None:
         self.logger.info(f"[BLUE]- Reading data from {file_path}")
@@ -272,8 +321,10 @@ class AutoML_EDA:
             suggestions = "- " + "<br>- ".join(
                 analyze_categorical_column(self.df_train, column_name)
             )
+
             return {
                 "type": f"category  ({self.type_conversion[column_name]['actual']}) - was {self.type_conversion[column_name]['original']}",
+                "description": self.dict_description.get("column_name", ""),
                 "missing_values": f"{missing_count} ({missing_pct:.1f}%)",
                 "unique_count": f"{unique_count} ({unique_pct:.1f}%)",
                 "frequency": frequency,
@@ -413,7 +464,7 @@ class AutoML_EDA:
                         f"Using '{new_target}' as target for EDA."
                     )
                 self.target = new_target
-
+        self.dict_description = self.read_description(self.description)
         self.analyse_columns()
         target_type = infer_dtype(self.df_train[self.target])
         self.logger.info("[GREEN]- Creating overview table")
@@ -450,14 +501,11 @@ class AutoML_EDA:
                 )
             else:
                 del suggestion_overview[column]
-        # df_summary = pd.DataFrame.from_dict(
-        #     suggestion_overview,
-        # )
-        # summary_html = df_summary.to_html(classes=["frequency-table"])
+
         relation_context = {}
         relation_context["relation_info"] = self.relation_info
         relation_context["num_feats"] = self.num_feats
-        # relations_html = str(self.relation_info) + "\n" + str(self.column_info)
+
         plot1, plot2 = generate_relation_visuals(self.df_train, self.target)
         relation_context["plot1"] = plot1
         relation_context["plot2"] = plot2

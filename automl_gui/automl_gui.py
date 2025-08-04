@@ -33,6 +33,10 @@ class AutoMLFrame(wx.Frame):
                 "text": "target column",
                 "function": lambda event: self.on_get_target(),
             },
+            "description": {
+                "text": "Select description file",
+                "function": lambda event: self.on_open_file("description"),
+            },
             "test": {
                 "text": "Open test data (.csv/.xlsx)",
                 "function": lambda event: self.on_open_file("test"),
@@ -48,10 +52,6 @@ class AutoMLFrame(wx.Frame):
             "title": {
                 "text": "Title for EDA Report",
                 "function": lambda event: self.on_get_title(),
-            },
-            "Button6": {
-                "text": "Button 6",
-                "function": lambda event: self.make_placeholder_handler(6),
             },
             "OutputFile": {
                 "text": "Select Output csv File",
@@ -126,6 +126,13 @@ class AutoMLFrame(wx.Frame):
                 test_path = args.project_root / args.test_data
             self.buttons_info["test"]["label"].SetLabel(f"{test_path}")
             self.logger.debug("[GREEN]test data from command line")
+        if args.description:
+            if Path(args.description).is_absolute():
+                test_path = Path(args.description)
+            else:
+                test_path = args.project_root / args.description
+            self.buttons_info["description"]["label"].SetLabel(f"{test_path}")
+            self.logger.debug("[GREEN]column description from command line")
         if args.report_file:
             if Path(args.report_file).is_absolute():
                 report_path = Path(args.report_file)
@@ -181,10 +188,16 @@ class AutoMLFrame(wx.Frame):
         dlg.Destroy()
 
     def on_open_file(self, kind):
+        if kind == "decription":
+            title = "column description file"
+            wildcard = "description files (*.txt)|*.txt"
+        else:
+            wildcard = "Data files (*.csv;*.xlsx)|*.csv;*.xlsx|CSV files (*.csv)|*.csv|Excel files (*.xlsx)|*.xlsx"
+            title = f"Open {kind} CSV/XLSX file"
         with wx.FileDialog(
             self,
-            f"Open {kind} CSV/XLSX file",
-            wildcard="Data files (*.csv;*.xlsx)|*.csv;*.xlsx|CSV files (*.csv)|*.csv|Excel files (*.xlsx)|*.xlsx",
+            title,
+            wildcard=wildcard,
             style=wx.FD_OPEN | wx.FD_FILE_MUST_EXIST,
         ) as file_dialog:
             if file_dialog.ShowModal() == wx.ID_CANCEL:
@@ -222,6 +235,7 @@ class AutoMLFrame(wx.Frame):
             file_test=self.buttons_info["test"]["label"].GetLabel(),
             title=self.buttons_info["title"]["label"].GetLabel(),
             target=self.buttons_info["target"]["label"].GetLabel(),
+            description=self.buttons_info["description"]["label"].GetLabel(),
             nogui=self.nogui,
         )
         result = current_EDA.perform_eda()

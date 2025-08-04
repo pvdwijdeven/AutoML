@@ -17,6 +17,11 @@ def automl(*args):
         default="",
     )
     parser.add_argument(
+        "--description",
+        help="filename for column info - see readme for format",
+        default="",
+    )
+    parser.add_argument(
         "--EDA",
         help="start EDA, default is False",
         action="store_true",
