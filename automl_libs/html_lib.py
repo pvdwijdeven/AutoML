@@ -122,7 +122,11 @@ def generate_relation_visuals(
         width=1000,
         height=1000,
     )
-    correlation_html = fig_corr.to_html(full_html=False, include_plotlyjs=False)
+    correlation_html = fig_corr.to_html(
+        full_html=False,
+        include_plotlyjs=False,
+        div_id="update-corr-plot",
+    )
 
     # Step 8: Mutual Information
     mi_scores = {}
@@ -160,7 +164,9 @@ def generate_relation_visuals(
         height=500,
     )
     target_relation_html = fig_mi.to_html(
-        full_html=False, include_plotlyjs=False
+        full_html=False,
+        include_plotlyjs=False,
+        div_id="update-mi-plot",
     )
 
     return correlation_html, target_relation_html, num_feats

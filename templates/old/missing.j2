@@ -1,0 +1,58 @@
+<div class="fixed-links">
+  <span class="label" style="margin-right: 20px;">Missing data </span>
+  <a href="#general-info-missing">General info</a> |  
+  <a href="#plot-missing">Missingness plot</a> | 
+  <a href="#per-feature">Per feature</a> |
+  <a href="#plot-missing-relation">Correlation plot</a> |
+  <a href="#missing-summary">Summary</a>
+  
+</div>
+
+    <h3 id="general-info-missing" class="anchor-offset">General info missingness</h3>
+    <div style="width: 50%;" class="anchor-offset">
+        {{ context.general_info | safe }}
+    </div>
+    <div style="clear: both;"></div>
+
+    <h3 id="plot-missing" class="anchor-offset">Missingness plot</h3>
+    <div class="anchor-offset" style="width: 100%;">
+        {{ context.plot_missing | safe }}
+    </div>
+
+    <div style="clear: both;"></div>
+    
+    <h3 id="per-feature" class="anchor-offset">Missingness per feature</h3>
+    <div style="width: 50%;" class="anchor-offset">
+        {{ context.feature_info | safe }}
+    </div>
+
+    <h3 id="plot-missing-relation" class="anchor-offset">Missingness correlation plot</h3>
+    <div style="display: flex; align-items: center;">
+        <div style="width: 100%; max-width: 1000px; margin: 0 auto;">
+            {{ context.plot_missing_correlation | safe }}
+        </div>
+    </div>
+
+    <h3 id="missing-summary" class="anchor-offset">Missingness summary</h3>
+    <div style="width: 100%;" class="anchor-offset">
+        {{ context.missing_summary | safe }}
+    </div>
+    <script>
+    // Poll for tab activation every 200ms
+    let plotResized = false;
+
+    const interval = setInterval(() => {
+        const tab = document.getElementById('tab-3');
+        const isActive = tab.classList.contains('active');
+
+        if (isActive && !plotResized) {
+        const plot = document.getElementById('my-plot');
+        if (plot) {
+            Plotly.Plots.resize(plot);
+            plotResized = true; // Only resize once per activation
+        }
+        } else if (!isActive) {
+        plotResized = false; // Reset if tab becomes inactive
+        }
+    }, 200);
+    </script>

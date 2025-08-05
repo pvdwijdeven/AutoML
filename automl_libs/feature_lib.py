@@ -16,6 +16,18 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 import io
 import base64
+import matplotlib as mpl
+
+mpl.rcParams.update(
+    {
+        "text.color": "#0777ff",
+        "axes.labelcolor": "#0777ff",
+        "xtick.color": "#0777ff",
+        "ytick.color": "#0777ff",
+        "axes.edgecolor": "#0777ff",
+        "axes.titlecolor": "#0777ff",
+    }
+)
 
 
 def select_features_by_missingness(
@@ -408,7 +420,7 @@ def analyze_numeric_column(
 def fig_to_base64(fig):
     """Convert a matplotlib figure to a base64-encoded HTML image."""
     buf = io.BytesIO()
-    fig.savefig(buf, format="png", bbox_inches="tight")
+    fig.savefig(buf, format="png", bbox_inches="tight", transparent=True)
     buf.seek(0)
     img_base64 = base64.b64encode(buf.read()).decode("utf-8")
     plt.close(fig)
@@ -464,6 +476,7 @@ def generate_eda_plots(
         ax.set_xlabel(column_name)
         ax.set_ylabel("Count")
         fig.tight_layout()
+        fig.patch.set_alpha(0.0)
         plot1_html = fig_to_base64(fig)
 
     elif inferred_type in ["integer", "float"]:

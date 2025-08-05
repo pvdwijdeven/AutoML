@@ -1,5 +1,7 @@
 <div class="fixed-links">
-  <span id="#rel-per-feature" class="label" style="margin-right: 600px;"></span>
+  <span class="label" style="margin-right: 20px;">Relations </span>
+  <a href="#correlation-plot">Correlation</a> |  
+  <a href="#mi-plot">Mutual information</a>
   <select id="feature-select-relation" class="feature-select" onchange="jumpToFeature(this)">
     <option value="">Select a feature...</option>
     {% for column_name in context.relation_info.keys() %}
@@ -22,28 +24,19 @@
 {% if context.num_feats != 0 %}
 <h3>Note: {{ context.num_feats }} features have been analyzed for relations, others might have too many missing values or there are simply too much features.</h3>
 {% endif %}
-
-<h3 id = "correlation-plot"><br></h3>
-<h3>Correlation plot</h3>
-
 <div style="display: flex; flex-direction: column; align-items: center;">
-  <div style="width: 100%; max-width: 800px;" class="anchor-offset">
+  <div id="correlation-plot" style="width: 100%; max-width: 800px;" class="anchor-offset">
     {{ context.plot1 | safe }}
   </div>
-  <br>
-<div style="clear: both;"></div>
-<h3 id = "mi-plot"><br></h3>
-<h3>Mutual information plot</h3>
-  <div style="width: 100%; max-width: 800px;" class="anchor-offset">
+  <div id="mi-plot" style="width: 100%; max-width: 800px;" class="anchor-offset">
     {{ context.plot2 | safe }}
   </div>
 </div>
 
-<div style="clear: both;"></div>
+    <div style="clear: both;"></div>
 
 {% for column_name, stats in context.relation_info.items() %}
-  <h3 id="{{ column_name }}_relations"><br></h3>
-  <h3>{{ column_name }}</h3>
+  <h3 id="{{ column_name }}_relations" class="anchor-offset">{{ column_name }}</h3>
   
   <table class="feature-summary">
     <tbody>

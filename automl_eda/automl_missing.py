@@ -103,7 +103,7 @@ def plot_missingness_matrix(df, top_n=100) -> str:
         full_html=False,
         include_plotlyjs=False,
         default_width="100%",
-        div_id="my-plot",
+        div_id="update-missing-plot",
         config=dict(responsive=True),
     )
 
@@ -139,7 +139,7 @@ def plot_missing_correlation(df, top_n=100):
         full_html=False,
         include_plotlyjs=False,
         default_width="100%",
-        div_id="my-plot2",
+        div_id="update-cor-miss",
         config=dict(responsive=True),
     )
 
