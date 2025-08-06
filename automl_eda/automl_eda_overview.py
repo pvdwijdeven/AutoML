@@ -15,7 +15,7 @@ def add_links_to_headers(html: str, target) -> str:
         return f"<th>{link}</th>"
 
     # Replace every <th>...</th> with a linked version
-    return re.sub(r"<th>(.*?)</th>", replace_th, html)
+    return re.sub(r"<th>(.*?)</th>", replace_th, html).replace('border="1"', "")
 
 
 def create_overview_table(
@@ -58,7 +58,7 @@ def create_overview_table(
 
     # Step 2: Build the HTML table
     feature_types = """
-    <table border="1" style="border-collapse: collapse;">
+    <table style="border-collapse: collapse;">
     <thead>
         <tr>
         <th>Type</th>

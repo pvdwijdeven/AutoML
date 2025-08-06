@@ -13,6 +13,7 @@
       href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css"
       rel="stylesheet"
     />
+    {{ styling | safe }}
     <style>
 
     html {
@@ -389,10 +390,11 @@
             </div>
           {% endfor %}
       </div>
-
+    </div>
 
     <!-- Bootstrap JS Bundle -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    
     <script>
       const sidebar = document.getElementById("sidebar");
       const toggleBtn = document.getElementById("toggleSidebar");
@@ -528,14 +530,6 @@
       document.querySelectorAll('.tab').forEach((el, i) => {
         el.classList.toggle('active', i == index);
       });
-      
-      // Remove active class from all buttons
-//        document.querySelectorAll('.tabs button').forEach(btn => {
- //       btn.classList.remove('active');
- //     });
-      
-      // Add active class to clicked button
- //     document.querySelectorAll('.tabs button')[index].classList.add('active');
     }
 
         let plotResized = false;
@@ -556,8 +550,6 @@
     }, 200);
   {% endif %}
     </script>
-<!-- Bootstrap JS -->
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 
   </body>
 </html>

@@ -1,24 +1,30 @@
 import pandas as pd
 import numpy as np
+import re
+from typing import Tuple
 
 
 def analyze_test_data(
     df_train: pd.DataFrame, df_test: pd.DataFrame, target
-) -> str:
+) -> Tuple[str, str]:
     html_sections = []
 
     # 1. Size comparison
     rows_train, cols_train = df_train.shape
     rows_test, cols_test = df_test.shape
-    size_table = pd.DataFrame(
-        {
-            "Dataset": ["Train", "Test"],
-            "Rows": [rows_train, rows_test],
-            "Columns": [cols_train, cols_test],
-        }
-    ).to_html(index=False, classes=["frequency-table"])
+    size_table = (
+        pd.DataFrame(
+            {
+                "Dataset": ["Train", "Test"],
+                "Rows": [rows_train, rows_test],
+                "Columns": [cols_train, cols_test],
+            }
+        )
+        .to_html(index=False, classes=["frequency-table"])
+        .replace('border="1"', "")
+    )
     html_sections.append(
-        f'<h3 id="size-comparison"><br></h3><h3>Dataset Size Comparison</h3>{size_table}'
+        f'<span id="size-comparison"><br></span><h3>Dataset Size Comparison</h3>{size_table}'
     )
     if rows_test < 0.5 * rows_train:
         html_sections.append(
@@ -43,7 +49,7 @@ def analyze_test_data(
         }
     )
     html_sections.append(
-        f'<h3 id="column-differences"><br></h3><h3>Column Differences</h3>{col_check.to_html(index=False, classes=["frequency-table"])}'
+        f'<span id="column-differences"><br></span><h3>Column Differences</h3>{col_check.to_html(index=False, classes=["frequency-table"]).replace('border="1"', "")}'
     )
     if len(only_in_train) > 0 or only_in_test:
         html_sections.append(
@@ -64,7 +70,7 @@ def analyze_test_data(
         }
     ).fillna("-")
     html_sections.append(
-        f'<h3 id="missing-values"><br></h3><h3>Missing Value Comparison</h3>{missing_df.to_html(classes=["frequency-table"])}'
+        f'<span id="missing-values"><br></span><h3>Missing Value Comparison</h3>{missing_df.to_html(classes=["frequency-table"]).replace('border="1"', "")}'
     )
     test_missing_cols = missing_test[missing_test > 0].sort_values(
         ascending=False
@@ -95,14 +101,14 @@ def analyze_test_data(
     if unseen_data:
         unseen_df = pd.DataFrame(unseen_data)
         html_sections.append(
-            f'<h3 id="unseen-categories"><br></h3><h3>Unseen Categories in Test Set</h3>{unseen_df.to_html(index=False,classes=["frequency-table"])}'
+            f'<span id="unseen-categories"><br></span><h3>Unseen Categories in Test Set</h3>{unseen_df.to_html(index=False,classes=["frequency-table"]).replace('border="1"', "")}'
         )
         html_sections.append(
             "<p><b>Suggestion:</b> Your model might fail or misinterpret unseen categories. Use encoders that support unknowns (e.g., `handle_unknown='ignore'` in sklearn’s OneHotEncoder or fallback labels in target encoding).</p>"
         )
     else:
         html_sections.append(
-            '<h3 id="unseen-categories"><br></h3><h3>Unseen Categories in Test Set</h3><p>None detected.</p>'
+            '<span id="unseen-categories"><br></span><h3>Unseen Categories in Test Set</h3><p>None detected.</p>'
         )
         html_sections.append(
             "<p><b>Suggestion:</b> No unseen categories found — safe for categorical handling.</p>"
@@ -183,16 +189,30 @@ def analyze_test_data(
     styled = stats_df.style.apply(highlight_shifts, axis=1)
     styled = styled.hide(
         axis=1, subset=["Mean Shift", "Std Shift", "Min Shift", "Max Shift"]
-    )  # hide flags
-
-    html_sections.append(
-        '<h3 id="numeric-comparison"><br></h3><h3>Numeric Feature Distribution Comparison</h3>'
     )
-    html_sections.append(
+
+    # Generate raw HTML
+    styled_html = (
         styled.hide(axis="index")
         .set_table_attributes('class="frequency-table"')
         .to_html()
+        .replace('border="1"', "")
     )
+
+    # Extract <style> block
+    style_match = re.search(r"(<style.*?>.*?</style>)", styled_html, re.DOTALL)
+    style_block = style_match.group(1) if style_match else ""
+
+    # Remove the style from table HTML
+    table_only = re.sub(
+        r"<style.*?>.*?</style>", "", styled_html, flags=re.DOTALL
+    )
+
+    # Append HTML content (Jinja handles placement)
+    html_sections.append(
+        '<span id="numeric-comparison"><br></span><h3>Numeric Feature Distribution Comparison</h3>'
+    )
+    html_sections.append(table_only)
     html_sections.append(
         """
         <p><b>Suggestion:</b> Cells highlighted in light red indicate significant distribution shifts between training and test data.</p>
@@ -219,17 +239,17 @@ def analyze_test_data(
     if dtype_issues:
         dtype_df = pd.DataFrame(dtype_issues)
         html_sections.append(
-            f'<h3 id="dtype-mismatches"><br></h3><h3>Data Type Mismatches</h3>{dtype_df.to_html(index=False,classes=["frequency-table"])}'
+            f'<span id="dtype-mismatches"><br></span><h3>Data Type Mismatches</h3>{dtype_df.to_html(index=False,classes=["frequency-table"]).replace('border="1"', "")}'
         )
         html_sections.append(
             "<p><b>Suggestion:</b> Apply consistent dtype conversions. Data type mismatches may break transformation or prediction pipelines.</p>"
         )
     else:
         html_sections.append(
-            '<h3 id="dtype-mismatches"><br></h3><h3>Data Type Mismatches</h3><p>None found.</p>'
+            '<span id="dtype-mismatches"><br></span><h3>Data Type Mismatches</h3><p>None found.</p>'
         )
         html_sections.append(
             "<p><b>Suggestion:</b> All columns have consistent data types.</p>"
         )
 
-    return "\n".join(html_sections)
+    return style_block, "\n".join(html_sections)

@@ -56,8 +56,12 @@ def missing_data_summary(df):
     )
 
     # Convert to HTML
-    column_info_html = column_info.to_html(classes=["frequency-table"])
-    general_info_html = general_info.to_html(header=False, index=False)
+    column_info_html = column_info.to_html(classes=["frequency-table"]).replace(
+        'border="1"', ""
+    )
+    general_info_html = general_info.to_html(header=False, index=False).replace(
+        'border="1"', ""
+    )
 
     return missing_count.sum(), column_info_html, general_info_html
 
@@ -245,4 +249,4 @@ def generate_missing_summary(df, drop_col_thresh=0.6, drop_row_thresh=0.05):
         )
     return df_results.to_html(
         classes=["frequency-table"], index=False, justify="left"
-    )
+    ).replace('border="1"', "")

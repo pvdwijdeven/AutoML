@@ -29,7 +29,7 @@ def get_frequency_table(df, column_name) -> str:
     total = len(df)
 
     frequency_table = """
-    <table class="frequency-table" border="1">
+    <table class="frequency-table">
     <thead>
         <tr>
         <th>Value</th>

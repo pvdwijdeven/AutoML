@@ -417,14 +417,14 @@ def analyze_numeric_column(
     return suggestions
 
 
-def fig_to_base64(fig):
+def fig_to_base64(fig, alt_text):
     """Convert a matplotlib figure to a base64-encoded HTML image."""
     buf = io.BytesIO()
     fig.savefig(buf, format="png", bbox_inches="tight", transparent=True)
     buf.seek(0)
     img_base64 = base64.b64encode(buf.read()).decode("utf-8")
     plt.close(fig)
-    return f'<img src="data:image/png;base64,{img_base64}" class="responsive-img"/>'
+    return f'<img src="data:image/png;base64,{img_base64}" alt="alt_text" class="responsive-img"/>'
 
 
 def generate_eda_plots(
@@ -477,7 +477,7 @@ def generate_eda_plots(
         ax.set_ylabel("Count")
         fig.tight_layout()
         fig.patch.set_alpha(0.0)
-        plot1_html = fig_to_base64(fig)
+        plot1_html = fig_to_base64(fig, "frequency plot")
 
     elif inferred_type in ["integer", "float"]:
         fig, ax = plt.subplots(figsize=(8, 4))
@@ -488,7 +488,7 @@ def generate_eda_plots(
         ax.set_xlabel(column_name)
         ax.set_ylabel("Frequency")
         fig.tight_layout()
-        plot1_html = fig_to_base64(fig)
+        plot1_html = fig_to_base64(fig, "Distribution plot")
 
     # Plot 2: Relation to target
     if target and column_name != target:
@@ -499,7 +499,7 @@ def generate_eda_plots(
                 ax.set_title(f"{target} per {column_name}")
                 ax.tick_params(axis="x", rotation=45)
                 fig.tight_layout()
-                plot2_html = fig_to_base64(fig)
+                plot2_html = fig_to_base64(fig, "Relation plot")
             else:
                 crosstab = (
                     df_sampled.groupby([column_name, target], observed=False)
@@ -514,7 +514,7 @@ def generate_eda_plots(
                 ax.set_title(f"{target} distribution per {column_name}")
                 ax.tick_params(axis="x", rotation=45)
                 fig.tight_layout()
-                plot2_html = fig_to_base64(fig)
+                plot2_html = fig_to_base64(fig, "Relation plot")
 
         elif inferred_type in ["integer", "float"]:
             feature_col = df_sampled[column_name].dropna()
@@ -535,7 +535,7 @@ def generate_eda_plots(
                 )
                 ax.set_title(f"{target} vs {column_name}")
                 fig.tight_layout()
-                plot2_html = fig_to_base64(fig)
+                plot2_html = fig_to_base64(fig, "relation plot")
             else:
                 try:
                     df_sampled["binned_feature"] = pd.qcut(
@@ -555,7 +555,7 @@ def generate_eda_plots(
                     ax.set_title(f"Mean {target} by binned {column_name}")
                     ax.tick_params(axis="x", rotation=45)
                     fig.tight_layout()
-                    plot2_html = fig_to_base64(fig)
+                    plot2_html = fig_to_base64(fig, "relation plot")
                 except Exception as e:
                     plot2_html = f"<p>Could not generate binned plot: {e}</p>"
 

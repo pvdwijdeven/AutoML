@@ -550,22 +550,29 @@ class AutoML_EDA:
                 "content": missing_html,
             },
         ]
+        styling = ""
         if self.df_test is not None:
             # Samples
             n_rows = len(self.df_test)
-            samples_head = self.df_test.head(10).to_html(
-                index=False, na_rep="<N/A>"
+            samples_head = (
+                self.df_test.head(10)
+                .to_html(index=False, na_rep="<N/A>")
+                .replace('border="1"', "")
             )
-            samples_middle = self.df_test.iloc[
-                n_rows // 2 - 5 : n_rows // 2 + 5
-            ].to_html(index=False, na_rep="<N/A>")
-            samples_tail = self.df_test.tail(10).to_html(
-                index=False, na_rep="<N/A>"
+            samples_middle = (
+                self.df_test.iloc[n_rows // 2 - 5 : n_rows // 2 + 5]
+                .to_html(index=False, na_rep="<N/A>")
+                .replace('border="1"', "")
+            )
+            samples_tail = (
+                self.df_test.tail(10)
+                .to_html(index=False, na_rep="<N/A>")
+                .replace('border="1"', "")
             )
 
             # --- Context dictionary for rendering ---
 
-            testdata_content = analyze_test_data(
+            styling, testdata_content = analyze_test_data(
                 self.df_train, self.df_test, self.target
             )
             self.logger.info("[GREEN]- Test data info retrieved.")
@@ -599,6 +606,7 @@ class AutoML_EDA:
             current_time=datetime.now(),
             show_test_data=self.df_test is not None,
             missing_data=(missing_count > 0),
+            styling=styling,
         )
 
         # Save to file

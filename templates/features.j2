@@ -22,11 +22,11 @@
 </script>
 
 {% for column_name, stats in context.items() %}
-  <h3 id="{{ column_name }}"><br></h3>
+  <span id="{{ column_name }}"><br></span>
   <h3>{{ column_name }}</h3>
   <table> 
     <tbody>
-      <tr><td width="100%">
+      <tr><td>
   <table class="feature-summary">
     <tbody>
       {% for key, value in stats.table.items() %}
@@ -40,16 +40,22 @@
   </td>
   </tr>
 <tr>
-  <td colspan="2">
+<td>
+<table>
+<tr>
+  <td>
     <div class="plot-wrapper">
       <div class="plot-cell">
         {{ stats.plots.plot1 | safe }}
       </div>
+
       <div class="plot-cell">
         {{ stats.plots.plot2 | safe }}
       </div>
     </div>
   </td>
+  </tr>
+  </table>
 </tr>
   </tbody>
   </table>
