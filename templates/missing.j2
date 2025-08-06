@@ -3,6 +3,7 @@
     <div style="width: 50%;" class="anchor-offset">
         {{ context.general_info | safe }}
     </div>
+    {% if context.missing_data %}
     <div style="clear: both;"></div>
     <h3 id="plot-missing"><br></h3>
     <h3>Missingness plot</h3>
@@ -30,22 +31,4 @@
     <div style="width: 100%;" class="anchor-offset">
         {{ context.missing_summary | safe }}
     </div>
-    <script>
-    // Poll for tab activation every 200ms
-    let plotResized = false;
-
-    const interval = setInterval(() => {
-        const tab = document.getElementById('tab-3');
-        const isActive = tab.classList.contains('active');
-
-        if (isActive && !plotResized) {
-        const plot = document.getElementById('update-missing-plot');
-        if (plot) {
-            Plotly.Plots.resize(plot);
-            plotResized = true; // Only resize once per activation
-        }
-        } else if (!isActive) {
-        plotResized = false; // Reset if tab becomes inactive
-        }
-    }, 200);
-    </script>
+    {% endif %}

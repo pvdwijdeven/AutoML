@@ -525,18 +525,19 @@ class AutoML_EDA:
             "relations.j2", relation_context
         )
         self.logger.info("[GREEN]- Getting missing data info.")
-        column_info_html, general_info_html = missing_data_summary(
-            self.df_train
+        missing_count, column_info_html, general_info_html = (
+            missing_data_summary(self.df_train)
         )
-
+        missing_summary = generate_missing_summary(
+            self.df_train,
+        )
         missing_context = {
             "feature_info": column_info_html,
             "general_info": general_info_html,
             "plot_missing": plot_missingness_matrix(self.df_train, top_n=20),
             "plot_missing_correlation": plot_missing_correlation(self.df_train),
-            "missing_summary": generate_missing_summary(
-                self.df_train,
-            ),
+            "missing_summary": missing_summary,
+            "missing_data": (missing_count > 0),
         }
         missing_html = get_html_from_template("missing.j2", missing_context)
         # Prepare tab content
@@ -596,6 +597,8 @@ class AutoML_EDA:
             tabs=tabs,
             title=f"EDA Report {self.title}",
             current_time=datetime.now(),
+            show_test_data=self.df_test is not None,
+            missing_data=(missing_count > 0),
         )
 
         # Save to file

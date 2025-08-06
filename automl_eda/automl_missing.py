@@ -59,7 +59,7 @@ def missing_data_summary(df):
     column_info_html = column_info.to_html(classes=["frequency-table"])
     general_info_html = general_info.to_html(header=False, index=False)
 
-    return column_info_html, general_info_html
+    return missing_count.sum(), column_info_html, general_info_html
 
 
 def plot_missingness_matrix(df, top_n=100) -> str:
