@@ -23,6 +23,11 @@
     .tab.active { display: block; }
 
 
+
+  .flex-grow-1 {
+    min-width: 0;
+    overflow-x: hidden;
+  }
     .feature-select {
       position: fixed;
       top: 30px; 
@@ -40,14 +45,13 @@
     .feature-link:hover {
       text-decoration: underline;
     }
-
   .table-wrapper {
     overflow-x: auto;
-    max-height: 500px;
+    width: 90%;
   }
   .table-wrapper table {
-    border-collapse: collapse;
-    width: 100%;
+    width: max-content;
+    min-width: 90%;
   }
   .table-wrapper th, .table-wrapper td {
     padding: 8px;
@@ -65,7 +69,6 @@
       cursor: pointer;
     }
   
-  .tab-inner_test button.active { background-color: #ccc; }
   .tabcontent-inner_test { display: none; padding: 10px 0; }
     .tab-inner_test button { 
       margin-right: 5px; 
@@ -161,13 +164,14 @@
       transition: width 0.3s ease;
     }
 
-      .sidebar.collapsed {
-        width: 60px;
-      }
-
-      .sidebar.expanded {
-        width: 250px;
-      }
+.sidebar.collapsed {
+  flex: 0 0 60px;
+  width: 60px;
+}
+.sidebar.expanded {
+  flex: 0 0 250px;
+  width: 250px;
+}
 
       #toggleSidebar {
         display: flex;
@@ -297,6 +301,7 @@
                 class="nav-link"
                 data-bs-toggle="collapse"
                 href="#menu4"
+                onclick="showTab('3')"
                 role="button"
               >
                 <i class="bi bi-exclamation-diamond"></i
@@ -304,11 +309,11 @@
               </a>
               <div class="collapse" id="menu4">
                 <div class="collapse-inner">
-                  <a class="nav-link" href="#" onclick="showTab('3')">General information</a>
-                  <a class="nav-link" href="#" onclick="showTab('3')">Missingness plot</a>
-                  <a class="nav-link" href="#" onclick="showTab('3')">Per feature</a>
-                  <a class="nav-link" href="#" onclick="showTab('3')">Correlation plot</a>
-                  <a class="nav-link" href="#" onclick="showTab('3')">Summary</a>
+                  <a class="nav-link" href="#general-info-missing" onclick="showTab('3')">General information</a>
+                  <a class="nav-link" href="#plot-missing" onclick="showTab('3')">Missingness plot</a>
+                  <a class="nav-link" href="#per-feature" onclick="showTab('3')">Per feature</a>
+                  <a class="nav-link" href="#plot-missing-relation" onclick="showTab('3')">Correlation plot</a>
+                  <a class="nav-link" href="#missing-summary" onclick="showTab('3')">Summary</a>
                 </div>
               </div>
             </li>
@@ -319,6 +324,7 @@
                 class="nav-link"
                 data-bs-toggle="collapse"
                 href="#menu5"
+                onclick="showTab('4')"
                 role="button"
               >
                 <i class="bi bi-clipboard-data"></i
@@ -326,13 +332,13 @@
               </a>
               <div class="collapse" id="menu5">
                 <div class="collapse-inner">
-                  <a class="nav-link" href="#" onclick="showTab('4')">Size comparison</a>
-                  <a class="nav-link" href="#" onclick="showTab('4')">Column differences</a>
-                  <a class="nav-link" href="#" onclick="showTab('4')">Missingness</a>
-                  <a class="nav-link" href="#" onclick="showTab('4')">Unseen categories</a>
-                  <a class="nav-link" href="#" onclick="showTab('4')">Numeric comparison</a>
-                  <a class="nav-link" href="#" onclick="showTab('4')">Type mismatches</a>
-                  <a class="nav-link" href="#" onclick="showTab('4')">Sample data</a>
+                  <a class="nav-link" href="#size-comparison" onclick="showTab('4')">Size comparison</a>
+                  <a class="nav-link" href="#column-differences" onclick="showTab('4')">Column differences</a>
+                  <a class="nav-link" href="#missing-values" onclick="showTab('4')">Missingness</a>
+                  <a class="nav-link" href="#unseen-categories" onclick="showTab('4')">Unseen categories</a>
+                  <a class="nav-link" href="#numeric-comparison" onclick="showTab('4')">Numeric comparison</a>
+                  <a class="nav-link" href="#dtype-mismatches" onclick="showTab('4')">Type mismatches</a>
+                  <a class="nav-link" href="#test-samples" onclick="showTab('4')">Sample data</a>
                 </div>
               </div>
             </li>
@@ -517,7 +523,8 @@
       document.querySelectorAll('.tabs button')[index].classList.add('active');
     }
     </script>
-
+<!-- Bootstrap JS -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 
   </body>
 </html>

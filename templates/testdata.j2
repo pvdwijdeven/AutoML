@@ -1,22 +1,16 @@
-<div class="fixed-links">
-  <span class="label" style="margin-right: 20px;">Missing data </span>
-  <a href="#size-comparison">Size comparison</a> |  
-  <a href="#column-differences">Column differences</a> | 
-  <a href="#missing-values">Missingness</a> |
-  <a href="#unseen-categories">Unseen categories</a> |
-  <a href="#numeric-comparison">Numeric comparison</a> |
-  <a href="#dtype-mismatches">Type mismatches</a> |
-  <a href="#test-samples">Sample data</a>
-</div>
+
 {{ context.tables | safe }}
 
-<h3 id="test-samples" class="anchor-offset">Sample Data</h3>
+<h3 id="test-samples"><br></h3>
+<h3>Sample Data</h3>
 <div class="tab-inner_test">
-  <button class="tablinks-inner_test" onclick="openInnerTab_test(event, 'HeadTab_test')" id="defaultInnerOpen_test">Head</button>
-  <button class="tablinks-inner_test" onclick="openInnerTab_test(event, 'MiddleTab_test')">Middle</button>
-  <button class="tablinks-inner_test" onclick="openInnerTab_test(event, 'TailTab_test')">Tail</button>
+<div class="btn-group_test" role="group" aria-label="Inner tab group">
+  <button class="btn btn-outline-primary" onclick="openInnerTab_test(event, 'HeadTab_test')" id="defaultInnerOpen_test">Head</button>
+  <button class="btn btn-outline-primary" onclick="openInnerTab_test(event, 'MiddleTab_test')">Middle</button>
+  <button class="btn btn-outline-primary" onclick="openInnerTab_test(event, 'TailTab_test')">Tail</button>
 </div>
-
+</div>
+<h3><br></h3>
 <div id="HeadTab_test" class="tabcontent-inner_test">
   <div class="table-wrapper">
     {{ context.samples_head | safe }}
@@ -34,17 +28,23 @@
     {{ context.samples_tail | safe }}
   </div>
 </div>
-
 <script>
 function openInnerTab_test(evt, tabId) {
-  const contents = document.querySelectorAll('.tabcontent-inner_test');
-  contents.forEach(c => c.style.display = 'none');
+  // Hide all tab contents
+  document.querySelectorAll('.tabcontent-inner_test').forEach(el => el.style.display = 'none');
 
-  const buttons = document.querySelectorAll('.tablinks-inner_test');
-  buttons.forEach(b => b.classList.remove('active'));
+  // Remove 'active' class from all tab buttons
+  document.querySelectorAll('.btn-group_test .btn').forEach(btn => btn.classList.remove('active'));
 
+  // Show selected tab content
   document.getElementById(tabId).style.display = 'block';
+
+  // Mark clicked button as active
   evt.currentTarget.classList.add('active');
 }
-document.getElementById("defaultInnerOpen_test").click();
+
+// Run this after DOM is loaded
+document.addEventListener("DOMContentLoaded", () => {
+  document.getElementById("defaultInnerOpen_test").click();
+});
 </script>

@@ -18,7 +18,7 @@ def analyze_test_data(
         }
     ).to_html(index=False, classes=["frequency-table"])
     html_sections.append(
-        f'<h3 id="size-comparison" class="anchor-offset">Dataset Size Comparison</h3>{size_table}'
+        f'<h3 id="size-comparison"><br></h3><h3>Dataset Size Comparison</h3>{size_table}'
     )
     if rows_test < 0.5 * rows_train:
         html_sections.append(
@@ -43,7 +43,7 @@ def analyze_test_data(
         }
     )
     html_sections.append(
-        f'<h3 id="column-differences" class="anchor-offset">Column Differences</h3>{col_check.to_html(index=False, classes=["frequency-table"])}'
+        f'<h3 id="column-differences"><br></h3><h3>Column Differences</h3>{col_check.to_html(index=False, classes=["frequency-table"])}'
     )
     if len(only_in_train) > 0 or only_in_test:
         html_sections.append(
@@ -64,7 +64,7 @@ def analyze_test_data(
         }
     ).fillna("-")
     html_sections.append(
-        f'<h3 id="missing-values" class="anchor-offset">Missing Value Comparison</h3>{missing_df.to_html(classes=["frequency-table"])}'
+        f'<h3 id="missing-values"><br></h3><h3>Missing Value Comparison</h3>{missing_df.to_html(classes=["frequency-table"])}'
     )
     test_missing_cols = missing_test[missing_test > 0].sort_values(
         ascending=False
@@ -95,14 +95,14 @@ def analyze_test_data(
     if unseen_data:
         unseen_df = pd.DataFrame(unseen_data)
         html_sections.append(
-            f'<h3 id="unseen-categories" class="anchor-offset">Unseen Categories in Test Set</h3>{unseen_df.to_html(index=False,classes=["frequency-table"])}'
+            f'<h3 id="unseen-categories"><br></h3><h3>Unseen Categories in Test Set</h3>{unseen_df.to_html(index=False,classes=["frequency-table"])}'
         )
         html_sections.append(
             "<p><b>Suggestion:</b> Your model might fail or misinterpret unseen categories. Use encoders that support unknowns (e.g., `handle_unknown='ignore'` in sklearn’s OneHotEncoder or fallback labels in target encoding).</p>"
         )
     else:
         html_sections.append(
-            '<h3 id="unseen-categories" class="anchor-offset">Unseen Categories in Test Set</h3><p>None detected.</p>'
+            '<h3 id="unseen-categories"><br></h3><h3>Unseen Categories in Test Set</h3><p>None detected.</p>'
         )
         html_sections.append(
             "<p><b>Suggestion:</b> No unseen categories found — safe for categorical handling.</p>"
@@ -163,13 +163,21 @@ def analyze_test_data(
         style = [""] * len(row)
         col_idx = list(row.index)
         if row["Mean Shift"]:
-            style[col_idx.index("Test Mean")] = "background-color: #f8d7da"
+            style[col_idx.index("Test Mean")] = (
+                "background-color: var(--bs-danger);color: var(--bs-light);"
+            )
         if row["Std Shift"]:
-            style[col_idx.index("Test Std")] = "background-color: #f8d7da"
+            style[col_idx.index("Test Std")] = (
+                "background-color: var(--bs-danger);color: var(--bs-light);"
+            )
         if row["Min Shift"]:
-            style[col_idx.index("Test Min")] = "background-color: #f8d7da"
+            style[col_idx.index("Test Min")] = (
+                "background-color: var(--bs-danger);color: var(--bs-light);"
+            )
         if row["Max Shift"]:
-            style[col_idx.index("Test Max")] = "background-color: #f8d7da"
+            style[col_idx.index("Test Max")] = (
+                "background-color: var(--bs-danger);color: var(--bs-light);"
+            )
         return style
 
     styled = stats_df.style.apply(highlight_shifts, axis=1)
@@ -178,7 +186,7 @@ def analyze_test_data(
     )  # hide flags
 
     html_sections.append(
-        '<h3 id="numeric-comparison" class="anchor-offset">Numeric Feature Distribution Comparison</h3>'
+        '<h3 id="numeric-comparison"><br></h3><h3>Numeric Feature Distribution Comparison</h3>'
     )
     html_sections.append(
         styled.hide(axis="index")
@@ -211,14 +219,14 @@ def analyze_test_data(
     if dtype_issues:
         dtype_df = pd.DataFrame(dtype_issues)
         html_sections.append(
-            f'<h3 id="dtype-mismatches" class="anchor-offset">Data Type Mismatches</h3>{dtype_df.to_html(index=False,classes=["frequency-table"])}'
+            f'<h3 id="dtype-mismatches"><br></h3><h3>Data Type Mismatches</h3>{dtype_df.to_html(index=False,classes=["frequency-table"])}'
         )
         html_sections.append(
             "<p><b>Suggestion:</b> Apply consistent dtype conversions. Data type mismatches may break transformation or prediction pipelines.</p>"
         )
     else:
         html_sections.append(
-            '<h3 id="dtype-mismatches" class="anchor-offset">Data Type Mismatches</h3><p>None found.</p>'
+            '<h3 id="dtype-mismatches"><br></h3><h3>Data Type Mismatches</h3><p>None found.</p>'
         )
         html_sections.append(
             "<p><b>Suggestion:</b> All columns have consistent data types.</p>"

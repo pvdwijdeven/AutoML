@@ -1,5 +1,5 @@
 <div class="fixed-links">
-  <span id="#rel-per-feature" class="label" style="margin-right: 600px;"></span>
+  <span class="label" style="margin-right: 600px;"></span>
   <select id="feature-select-relation" class="feature-select" onchange="jumpToFeature(this)">
     <option value="">Select a feature...</option>
     {% for column_name in context.relation_info.keys() %}
@@ -31,16 +31,19 @@
     {{ context.plot1 | safe }}
   </div>
   <br>
+</div>
 <div style="clear: both;"></div>
 <h3 id = "mi-plot"><br></h3>
 <h3>Mutual information plot</h3>
+<div style="display: flex; flex-direction: column; align-items: center;">
   <div style="width: 100%; max-width: 800px;" class="anchor-offset">
     {{ context.plot2 | safe }}
   </div>
 </div>
 
 <div style="clear: both;"></div>
-
+<h3 id = "rel-per-feature"><br></h3>
+<h3>Relations per feature</h3>
 {% for column_name, stats in context.relation_info.items() %}
   <h3 id="{{ column_name }}_relations"><br></h3>
   <h3>{{ column_name }}</h3>

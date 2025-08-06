@@ -20,12 +20,12 @@ import matplotlib as mpl
 
 mpl.rcParams.update(
     {
-        "text.color": "#0777ff",
-        "axes.labelcolor": "#0777ff",
-        "xtick.color": "#0777ff",
-        "ytick.color": "#0777ff",
-        "axes.edgecolor": "#0777ff",
-        "axes.titlecolor": "#0777ff",
+        "text.color": "tab:blue",
+        "axes.labelcolor": "tab:blue",
+        "xtick.color": "tab:blue",
+        "ytick.color": "tab:blue",
+        "axes.edgecolor": "tab:blue",
+        "axes.titlecolor": "tab:blue",
     }
 )
 

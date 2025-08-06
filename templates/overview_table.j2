@@ -1,7 +1,8 @@
 
 
-
-<h3 id="feature-overview" class="anchor-offset">Feature overview</h3>
+<h3 id="feature-overview"><br></h3>
+<h3>Feature overview</h3>
+<div class="table-wrapper">
 <table>
   <tr><td>Number of features</td><td>{{ num_features }}</td></tr>
   <tr><td>Constant features</td><td>{{ constant_cols | join(', ') if constant_cols else 'None' }}</td></tr>
@@ -12,20 +13,25 @@
   <tr><td>Duplicate samples</td><td>{{ duplicate_rows }} ({{ (duplicate_rows / num_rows) | percentage }})</td></tr>
   <tr><td>Empty samples</td><td>{{ empty_rows }} ({{ (empty_rows / num_rows) | percentage }})</td></tr>
 </table>
+</div>
 <br>
 <h3 id="target-overview" class="anchor-offset">Target overview</h3>
+<div class="table-wrapper">
 <table>
   <tr><td>Target</td><td><a href="#{{target | replace(' ', '-')}}" onclick="showTab(1)" class="feature-link">{{target}}</a></td></tr>
   <tr><td>Target type</td><td>{{ target_type }}</td></tr>
 </table>
+</div>
 <br>
 <h3 id="general" class="anchor-offset">General</h3>
+<div class="table-wrapper">
 <table>
   <tr><td>Table size</td><td>{{num_features + 1}} x {{num_rows}}</td></tr>
   <tr><td>Number of cells</td><td>{{total_cells }}</td></tr>
   <tr><td>Memory usage</td><td>{{ memory_usage_kb }} KB</td></tr>
   <tr><td>Total missing values</td><td>{{ missing_values }} ({{ (missing_values / total_cells) | percentage }})</td></tr>
 </table>
+</div>
 <br>
 <h3 id="sample-data" class="anchor-offset">Sample Data</h3>
 <div class="tab-inner">
