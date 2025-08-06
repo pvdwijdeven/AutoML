@@ -41,6 +41,10 @@ class AutoMLFrame(wx.Frame):
                 "text": "Open test data (.csv/.xlsx)",
                 "function": lambda event: self.on_open_file("test"),
             },
+            "update_script": {
+                "text": "Open update script (.py)",
+                "function": lambda event: self.on_open_file("update"),
+            },
             "ReportFile": {
                 "text": "Select report file (.html)",
                 "function": lambda event: self.on_select_output("ReportFile"),
@@ -119,6 +123,15 @@ class AutoMLFrame(wx.Frame):
                 train_path = args.project_root / args.training_data
             self.buttons_info["training"]["label"].SetLabel(f"{train_path}")
             self.logger.debug("[GREEN]training data from command line")
+        if args.update_script:
+            if Path(args.update_script).is_absolute():
+                update_script_path = Path(args.update_script)
+            else:
+                update_script_path = args.project_root / args.update_script
+            self.buttons_info["update_script"]["label"].SetLabel(
+                f"{update_script_path}"
+            )
+            self.logger.debug("[GREEN]test data from command line")
         if args.test_data:
             if Path(args.test_data).is_absolute():
                 test_path = Path(args.test_data)
@@ -191,6 +204,9 @@ class AutoMLFrame(wx.Frame):
         if kind == "decription":
             title = "column description file"
             wildcard = "description files (*.txt)|*.txt"
+        elif kind == "update":
+            title = "Update script file"
+            wildcard = "Python files (*.py)|*.py"
         else:
             wildcard = "Data files (*.csv;*.xlsx)|*.csv;*.xlsx|CSV files (*.csv)|*.csv|Excel files (*.xlsx)|*.xlsx"
             title = f"Open {kind} CSV/XLSX file"
@@ -237,6 +253,9 @@ class AutoMLFrame(wx.Frame):
             target=self.buttons_info["target"]["label"].GetLabel(),
             description=self.buttons_info["description"]["label"].GetLabel(),
             nogui=self.nogui,
+            update_script=self.buttons_info["update_script"][
+                "label"
+            ].GetLabel(),
         )
         result = current_EDA.perform_eda()
         self.buttons_info["StartEDA"]["label"].SetLabel(result)

@@ -18,6 +18,39 @@ def add_links_to_headers(html: str, target) -> str:
     return re.sub(r"<th>(.*?)</th>", replace_th, html).replace('border="1"', "")
 
 
+def join_feature_links_with_linebreaks(
+    feature_links: list[str], max_line_length=90
+) -> str:
+    lines = []
+    current_line = ""
+    current_len = 0
+
+    for html_link in feature_links:
+        # Extract visible text from the HTML link
+        # Assumes format: <a ...>VISIBLE TEXT</a>
+        visible_text = html_link.split(">")[-2].split("<")[0]
+        part_len = len(visible_text) + (
+            2 if current_line else 0
+        )  # +2 for ", " if needed
+
+        if current_len + part_len > max_line_length:
+            lines.append(current_line)
+            current_line = html_link
+            current_len = len(visible_text)
+        else:
+            if current_line:
+                current_line += ", " + html_link
+                current_len += part_len
+            else:
+                current_line = html_link
+                current_len = len(visible_text)
+
+    if current_line:
+        lines.append(current_line)
+
+    return "<br>".join(lines)
+
+
 def create_overview_table(
     df: pd.DataFrame, target: str, target_type: str, logger=None
 ) -> str:
@@ -57,7 +90,9 @@ def create_overview_table(
         )
 
     # Step 2: Build the HTML table
+
     feature_types = """
+    <div class="feature-table-internal">
     <table style="border-collapse: collapse;">
     <thead>
         <tr>
@@ -70,10 +105,12 @@ def create_overview_table(
     """
 
     for dtype, features in type_to_features.items():
-        feature_list = ", ".join(features)
+        # this is required, because wordwrap is not working with links for some reason.
+        feature_list = join_feature_links_with_linebreaks(features)
         feature_types += f"<tr><td>{dtype}</td><td>{len(features)}</td><td>{feature_list}</td></tr>\n"
 
-    feature_types += "</tbody>\n</table>"
+    feature_types += "</tbody>\n</table></div>"
+    # feature_types = "HIERZO"
     samples_head = add_links_to_headers(
         df.head(10).to_html(
             index=False, na_rep="<N/A>", classes="table table-striped"

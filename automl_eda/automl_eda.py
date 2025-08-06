@@ -25,6 +25,9 @@ from automl_libs import (
 import numpy as np
 from scipy.stats import entropy as scipy_entropy
 from datetime import datetime
+import importlib.util
+import sys
+import pathlib
 
 
 class AutoML_EDA:
@@ -38,6 +41,7 @@ class AutoML_EDA:
         target="",
         description="",
         nogui=True,
+        update_script="",
     ) -> None:
         self.report_file = report_file
         self.file_train = file_train
@@ -47,6 +51,7 @@ class AutoML_EDA:
         self.target = target
         self.description = description
         self.nogui = nogui
+        self.update_script = update_script
 
     def parse_column_descriptions_to_html(self, text):
         result = {}
@@ -112,6 +117,28 @@ class AutoML_EDA:
         except Exception as e:
             self.logger.error(f"Error reading {file_path}: {e}")
             return None
+
+    def update_with_user_function(self, df, filepath):
+
+        # Ensure absolute path and module name
+        filepath = pathlib.Path(filepath).resolve()
+        module_name = filepath.stem  # e.g. "user_file"
+
+        # Load module from file
+        spec = importlib.util.spec_from_file_location(module_name, filepath)
+        assert spec is not None
+        assert spec.loader is not None
+        user_module = importlib.util.module_from_spec(spec)
+        sys.modules[module_name] = user_module
+        spec.loader.exec_module(user_module)
+
+        # Get the function
+        update_func = getattr(user_module, "update_df", None)
+        if update_func is None:
+            raise AttributeError(f"No function 'update_df' found in {filepath}")
+
+        # Apply the function to the dataframe
+        return update_func(df)
 
     def column_type(
         self,
@@ -440,6 +467,10 @@ class AutoML_EDA:
         self.logger.info("[MAGENTA]\nStarting EDA (Exploratory Data Analysis)")
         self.logger.info(f"[MAGENTA]for {project}")
         self.df_train = self.read_data(self.file_train)
+        if self.update_script != "":
+            self.df_train = self.update_with_user_function(
+                self.df_train, self.update_script
+            )
         if self.df_train is None:
             self.logger.error("Training data could not be loaded.")
             return "Failed to load training data. EDA cannot proceed."
@@ -453,7 +484,10 @@ class AutoML_EDA:
                 "Test data could not be loaded. Using only training data."
             )
         else:
-
+            if self.update_script != "":
+                self.df_test = self.update_with_user_function(
+                    self.df_test, self.update_script
+                )
             training_columns = set(self.df_train.columns)
             test_columns = set(self.df_test.columns)
             if len(training_columns - test_columns) != 1:

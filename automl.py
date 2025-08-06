@@ -12,6 +12,9 @@ def automl(*args):
     parser.add_argument("--training_data", help="filename for training data")
     parser.add_argument("--test_data", help="filename for test data")
     parser.add_argument(
+        "--update_script", help="filename for python update script"
+    )
+    parser.add_argument(
         "--target",
         help="name of target column (if no test data available and is not last column in training data)",
         default="",
