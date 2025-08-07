@@ -288,7 +288,6 @@ class AutoMLFrame(wx.Frame):
             "preprocessing started"
         )
         current_prepro = AutoML_Preprocess(
-            logger=self.logger,
             report_file=self.buttons_info["ReportFile"]["label"].GetLabel(),
             file_train=self.buttons_info["training"]["label"].GetLabel(),
             file_test=self.buttons_info["test"]["label"].GetLabel(),
@@ -299,6 +298,7 @@ class AutoMLFrame(wx.Frame):
             update_script=self.buttons_info["update_script"][
                 "label"
             ].GetLabel(),
+            logger=self.logger,
         )
         result = current_prepro.preprocess()
         self.buttons_info["Startprepro"]["label"].SetLabel(result)

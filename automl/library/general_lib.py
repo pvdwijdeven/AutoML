@@ -264,6 +264,7 @@ class Logger(logging.getLoggerClass()):
     ) -> None:
         self.setLevel(level=level_file)
         if filename != "":
+            self.filename = filename
             log_folder = os.path.dirname(filename)
             if log_folder and not os.path.exists(log_folder):
                 os.makedirs(log_folder)
