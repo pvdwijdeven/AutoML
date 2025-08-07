@@ -525,9 +525,7 @@ class AutoML_EDA:
         self.logger.info(f"{sameline}[GREEN]- EDA data completed.")
 
     def load_data(self):
-        project = self.title if self.title else "dataset"
 
-        self.logger.info(f"[MAGENTA]for {project}")
         self.df_train = self.read_data(self.file_train)
         if self.update_script != "":
             self.df_train = self.update_with_user_function(
@@ -570,7 +568,11 @@ class AutoML_EDA:
         return ""
 
     def perform_eda(self) -> str:
-        self.logger.info("[MAGENTA]\nStarting EDA (Exploratory Data Analysis)")
+        project = self.title if self.title else "dataset"
+        self.logger.info(
+            f"[MAGENTA]\nStarting EDA (Exploratory Data Analysis) for {project}"
+        )
+
         result = self.load_data()
         assert self.df_train is not None
         if result != "":

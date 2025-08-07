@@ -67,7 +67,7 @@ class AutoML_Preprocess:
         )
         self.df_test = self.eda.df_test
         self.logger.info(
-            f"[GREEN]- Split train/test/validation ({self.X_train.shape[0]}/{self.X_test.shape[0]}/{self.X_val.shape[0]} rows)"
+            f"[GREEN]- Split train/test/validation 80%/10%/10% ({self.X_train.shape[0]}/{self.X_test.shape[0]}/{self.X_val.shape[0]} rows)"
         )
 
     def drop_duplicate_rows(self):
@@ -86,16 +86,18 @@ class AutoML_Preprocess:
         self.logger.info("[GREEN]- Dropped no duplicate rows.")
         if num_rows_after < num_rows_before:
             self.logger.info(
-                f"[GREEN]- Dropped {num_rows_before - num_rows_after} duplicate rows."
+                f"[GREEN]- Duplicate rows to be dropped: {num_rows_before - num_rows_after}"
             )
             self.logger.info(
                 f"[GREEN]  Dropped rows with indices: {dropped_indices}"
             )
+        else:
+            self.logger.info("[GREEN]- Duplicate rows to be dropped: None")
 
     def drop_duplicate_columns(self):
         duplicate_columns = self.X_train.columns[self.X_train.T.duplicated()]
         self.logger.info(
-            f"[GREEN] - Duplicate columns to be dropped: {list(duplicate_columns) if len(list(duplicate_columns))>0 else 'None'}"
+            f"[GREEN]- Duplicate columns to be dropped: {list(duplicate_columns) if len(list(duplicate_columns))>0 else 'None'}"
         )
         # Drop duplicate columns in self.df_train
         self.X_train = self.X_train.loc[:, ~self.X_train.T.duplicated()]
@@ -114,7 +116,7 @@ class AutoML_Preprocess:
         ]
 
         self.logger.info(
-            f"[GREEN] - Constant columns to be dropped: {constant_columns if len(constant_columns)>0 else 'None'}"
+            f"[GREEN]- Constant columns to be dropped: {constant_columns if len(constant_columns)>0 else 'None'}"
         )
 
         # Drop these constant columns from X_train
@@ -445,7 +447,7 @@ class AutoML_Preprocess:
                         X_test[col] > upper_bound, upper_bound, X_test[col]
                     )
                     self.logger.info(
-                        f"[GREEN]- {outliers_train.sum()} outliers in column {col} capped between {lower_bound} and {upper_bound}"
+                        f"[GREEN]- {outliers_train.sum()} outliers in column {col} capped between {X_train[col].min()} and {X_train[col].max()}"
                     )
                 elif cur_method == "impute":
                     median = X_train[col].median()
@@ -460,7 +462,7 @@ class AutoML_Preprocess:
                         col,
                     ] = median
                     self.logger.info(
-                        f"[GREEN]- {outliers_train.sum()} outliers in column {col} imputed with {median}"
+                        f"[GREEN]- {outliers_train.sum()} outliers in column {col} imputed with median {median}"
                     )
                 else:
                     raise ValueError("Unsupported handling method")
@@ -470,7 +472,8 @@ class AutoML_Preprocess:
         self.X_test[columns] = X_test
 
     def preprocess(self):
-        self.logger.info("[MAGENTA]\nStarting preprocessing")
+        project = self.title if self.title else "dataset"
+        self.logger.info(f"[MAGENTA]\nStarting preprocessing for {project}")
         result = self.eda.load_data()
         assert self.eda.df_train is not None
         if result != "":
@@ -491,8 +494,6 @@ class AutoML_Preprocess:
         self.drop_constant_columns()
 
         # 4 decide to handle outliers before or after dealing with missing values
-
-        # 4a handle outliers before dealing with missing values
         before_cols = []
         for col in self.X_train.select_dtypes(include=[np.number]).columns:
             if (
@@ -500,6 +501,8 @@ class AutoML_Preprocess:
                 == "before_imputation"
             ):
                 before_cols.append(col)
+
+        # 4a handle outliers before dealing with missing values
         self.handle_outliers(
             columns=before_cols,
             before_or_after="before missing imputation",
