@@ -1,11 +1,11 @@
 from library import (
     Logger,
 )
-import pandas as pd
 from eda import AutoML_EDA
 from sklearn.model_selection import train_test_split
 from scipy.stats import shapiro
 import numpy as np
+from library import infer_dtype
 
 
 class AutoML_Preprocess:
@@ -337,7 +337,8 @@ class AutoML_Preprocess:
             bool: True if considered continuous numeric feature; False if likely categorical/count.
         """
         # If non-numeric dtype (object, category), treat as categorical
-        if not pd.api.types.is_numeric_dtype(column):
+        infer_type = infer_dtype(column)
+        if infer_type not in ["integer", "float"]:
             return False
 
         # If numeric but with very few unique values, treat as categorical/count
@@ -478,7 +479,7 @@ class AutoML_Preprocess:
         assert self.eda.df_train is not None
         if result != "":
             return result
-        self.eda.set_column_types()
+        self.eda.set_column_types(also_ints=False)
 
         # 1 drop duplicate rows
         self.drop_duplicate_rows()

@@ -195,10 +195,7 @@ class AutoML_EDA:
         # Apply the function to the dataframe
         return update_func(df)
 
-    def set_column_type(
-        self,
-        column_name: str,
-    ) -> None:
+    def set_column_type(self, column_name: str, also_ints: bool = True) -> None:
 
         def convert_to_bool_if_binary(series):
             if pd.api.types.is_numeric_dtype(
@@ -296,7 +293,9 @@ class AutoML_EDA:
             converted = None
 
         if converted is not None:
-            is_int_like = np.isclose(converted.dropna() % 1, 0).all()
+            is_int_like = (
+                np.isclose(converted.dropna() % 1, 0).all() and also_ints
+            )
             non_na_count = col_series_train.notna().sum()
             if converted.notna().sum() == non_na_count:
                 if pd.api.types.is_float_dtype(converted) and is_int_like:
@@ -476,7 +475,7 @@ class AutoML_EDA:
                 ),
             }
 
-    def set_column_types(self):
+    def set_column_types(self, also_ints):
         assert (
             self.df_train is not None
         ), "Training DataFrame is not initialized"
@@ -493,15 +492,15 @@ class AutoML_EDA:
             self.type_conversion[column]["original"] = infer_dtype(
                 self.df_train[column]
             )
-            self.set_column_type(column)
+            self.set_column_type(column, also_ints)
             self.type_conversion[column]["new"] = infer_dtype(
                 self.df_train[column]
             )
         sameline = "[FLUSH]" if self.nogui else "[SAMELINE]"
         self.logger.info(f"{sameline}[GREEN]- Feature typing completed.")
 
-    def analyse_columns(self) -> None:
-        self.set_column_types()
+    def analyse_columns(self, also_ints) -> None:
+        self.set_column_types(also_ints)
 
         self.column_info = {}
         self.target_info = {}
@@ -578,7 +577,7 @@ class AutoML_EDA:
         if result != "":
             return result
 
-        self.analyse_columns()
+        self.analyse_columns(also_ints=False)
 
         target_type = infer_dtype(self.df_train[self.target])
         self.logger.info("[GREEN]- Creating overview table")
