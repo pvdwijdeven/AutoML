@@ -1,5 +1,5 @@
 from jinja2 import Environment, FileSystemLoader
-from library import infer_dtype
+from automl.library import infer_dtype
 from collections import defaultdict
 import pandas as pd
 import re

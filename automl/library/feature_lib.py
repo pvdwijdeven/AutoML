@@ -2,7 +2,7 @@ import pandas as pd
 import re
 from collections import Counter
 from scipy.stats import skew
-from library import infer_dtype
+from automl.library import infer_dtype
 import numpy as np
 from sklearn.feature_selection import (
     mutual_info_classif,

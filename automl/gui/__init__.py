@@ -1,4 +1,4 @@
-# gui/__init__.py
+# automl/gui/__init__.py
 
 from .gui import AutoMLFrame
 

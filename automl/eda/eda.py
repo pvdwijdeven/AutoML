@@ -9,7 +9,7 @@ from .missing import (
 )
 from .testdata import analyze_test_data
 from scipy.stats import skew
-from library import (
+from automl.library import (
     infer_dtype,
     Logger,
     get_html_from_template,

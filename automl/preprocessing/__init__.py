@@ -1,4 +1,4 @@
-# preprocessing/__init__.py
+# automl/preprocessing/__init__.py
 
 from .preprocess import AutoML_Preprocess
 

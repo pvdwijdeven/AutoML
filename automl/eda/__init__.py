@@ -1,4 +1,4 @@
-# automl_eda/__init__.py
+# automl/eda/__init__.py
 
 from .eda import AutoML_EDA
 from .overview import create_overview_table
