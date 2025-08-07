@@ -142,7 +142,6 @@ class AutoML_Preprocess:
         # Drop duplicate rows
         self.eda.df_train = self.eda.df_train.drop_duplicates()
         num_rows_after = self.eda.df_train.shape[0]
-        self.logger.info("[GREEN]- Dropped no duplicate rows.")
         if num_rows_after < num_rows_before:
             self.logger.info(
                 f"[GREEN]- Duplicate rows to be dropped: {num_rows_before - num_rows_after}"
@@ -154,34 +153,38 @@ class AutoML_Preprocess:
             self.logger.info("[GREEN]- Duplicate rows to be dropped: None")
 
     def drop_duplicate_columns(self):
-        duplicate_columns = self.X_train.columns[self.X_train.T.duplicated()]
-        self.logger.info(
-            f"[GREEN]- Duplicate columns to be dropped: {list(duplicate_columns) if len(list(duplicate_columns))>0 else 'None'}"
+        # Step 1: Compute hash sum per column to detect duplicates
+        hashes = self.X_train.apply(
+            lambda col: pd.util.hash_pandas_object(col, index=False).sum()
         )
-        # Drop duplicate columns in self.df_train
-        self.X_train = self.X_train.loc[:, ~self.X_train.T.duplicated()]
-        # Drop the same duplicate columns from self.X_test and self.X_val
+
+        # Step 2: Identify duplicated hashes (i.e., duplicate columns)
+        duplicated_mask = hashes.duplicated()
+        duplicate_columns = self.X_train.columns[duplicated_mask]
+
+        # Log the duplicate columns (if any)
+        self.logger.info(
+            f"[GREEN]- Duplicate columns to be dropped: {list(duplicate_columns) if len(duplicate_columns) > 0 else 'None'}"
+        )
+
+        # Step 3: Drop duplicate columns from train, test, and val sets
+        self.X_train = self.X_train.drop(columns=duplicate_columns)
         self.X_test = self.X_test.drop(
             columns=duplicate_columns, errors="ignore"
         )
         self.X_val = self.X_val.drop(columns=duplicate_columns, errors="ignore")
 
     def drop_constant_columns(self):
-        # Identify columns in X_train that have the same value in every row
-        constant_columns = [
-            col
-            for col in self.X_train.columns
-            if self.X_train[col].nunique() == 1
-        ]
+        # Vectorized approach: find columns where number of unique values is 1
+        nunique_per_col = self.X_train.nunique()
+        constant_columns = nunique_per_col[nunique_per_col == 1].index.tolist()
 
         self.logger.info(
-            f"[GREEN]- Constant columns to be dropped: {constant_columns if len(constant_columns)>0 else 'None'}"
+            f"[GREEN]- Constant columns to be dropped: {constant_columns if len(constant_columns) > 0 else 'None'}"
         )
 
-        # Drop these constant columns from X_train
+        # Drop constant columns from train, test, and val sets
         self.X_train = self.X_train.drop(columns=constant_columns)
-
-        # Drop the same columns from X_test and X_val (ignore errors if some col don't exist)
         self.X_test = self.X_test.drop(
             columns=constant_columns, errors="ignore"
         )
@@ -532,14 +535,13 @@ class AutoML_Preprocess:
         self.X_test = X_test
 
     def skip_outliers(self) -> bool:
-        target_col = self.X_train[self.target]
+        target_col = self.y_train
         # Check if target's dtype is categorical
-        if infer_dtype(target_col) == "categorical":
+        if infer_dtype(target_col) in ["category", "boolean"]:
             unique_classes = target_col.unique()
             total_samples = len(target_col)
             if len(unique_classes) <= 5:
                 for cls in unique_classes:
-
                     freq = (target_col == cls).sum() / total_samples
                     if freq < 0.01:
                         return True
@@ -568,8 +570,8 @@ class AutoML_Preprocess:
         self.drop_constant_columns()
         skip_outliers = self.skip_outliers()
         if skip_outliers:
-            self.logger.info(
-                "Skipping outliers due to target type (low #classes with at least 1 low freq class)"
+            self.logger.warning(
+                "Leaving outliers as is due to target type (imbalanced classification)"
             )
         else:
             # 4 decide to handle outliers before or after dealing with missing values
