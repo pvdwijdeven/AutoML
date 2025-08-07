@@ -3,5 +3,5 @@ personal/
 __pycache__/
 *.pyc
 *.pyo
-test*.py
+my_test*.py
 run_all.ps1
