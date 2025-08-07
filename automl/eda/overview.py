@@ -1,8 +1,9 @@
 from jinja2 import Environment, FileSystemLoader
-from automl.library import infer_dtype
+from library import infer_dtype
 from collections import defaultdict
 import pandas as pd
 import re
+import os
 
 
 def add_links_to_headers(html: str, target) -> str:
@@ -57,7 +58,10 @@ def create_overview_table(
     def percentage(value) -> str:
         return f"{value:.1%}"
 
-    env = Environment(loader=FileSystemLoader("templates"))
+    current_dir = os.path.dirname(os.path.abspath(__file__))  # automl/gui
+    automl_dir = os.path.dirname(current_dir)  # automl
+    templates_dir = os.path.join(automl_dir, "templates")  # automl/templates
+    env = Environment(loader=FileSystemLoader(templates_dir))
     env.filters["percentage"] = percentage
 
     # --- Collect the statistics ---

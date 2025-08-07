@@ -9,7 +9,7 @@ from .missing import (
 )
 from .testdata import analyze_test_data
 from scipy.stats import skew
-from automl.library import (
+from library import (
     infer_dtype,
     Logger,
     get_html_from_template,
@@ -23,7 +23,7 @@ from automl.library import (
     generate_relation_visuals,
     generate_eda_plots,
 )
-
+import os
 import numpy as np
 from scipy.stats import entropy as scipy_entropy
 from datetime import datetime
@@ -687,7 +687,12 @@ class AutoML_EDA:
         )
 
         # Load and render the template
-        env = Environment(loader=FileSystemLoader("templates"))
+        current_dir = os.path.dirname(os.path.abspath(__file__))  # automl/gui
+        automl_dir = os.path.dirname(current_dir)  # automl
+        templates_dir = os.path.join(
+            automl_dir, "templates"
+        )  # automl/templates
+        env = Environment(loader=FileSystemLoader(templates_dir))
         template = env.get_template("eda_report.j2")
         output_html = template.render(
             tabs=tabs,

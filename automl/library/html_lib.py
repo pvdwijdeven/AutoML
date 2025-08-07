@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 import plotly.express as px
 from jinja2 import Environment, FileSystemLoader
+import os
 from sklearn.feature_selection import (
     mutual_info_classif,
     mutual_info_regression,
@@ -58,7 +59,10 @@ def get_frequency_table(df, column_name) -> str:
 
 
 def get_html_from_template(template_file, context, plots=[]) -> str:
-    env = Environment(loader=FileSystemLoader("templates"))
+    current_dir = os.path.dirname(os.path.abspath(__file__))  # automl/gui
+    automl_dir = os.path.dirname(current_dir)  # automl
+    templates_dir = os.path.join(automl_dir, "templates")  # automl/templates
+    env = Environment(loader=FileSystemLoader(templates_dir))
     template = env.get_template(template_file)
     rendered_html = template.render(context=context, plots=plots)
     return rendered_html

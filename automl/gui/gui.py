@@ -1,10 +1,11 @@
 import wx
-from automl.eda import AutoML_EDA
+from eda import AutoML_EDA
 from pathlib import Path
-from automl.library import Logger, TextCtrlHandler, WxTextRedirector
+from library import Logger, TextCtrlHandler, WxTextRedirector
 import logging
 import sys
 import threading
+import os
 
 
 class AutoMLFrame(wx.Frame):
@@ -21,7 +22,16 @@ class AutoMLFrame(wx.Frame):
         # === MAIN OUTER SIZER ===
         outer_sizer = wx.BoxSizer(wx.VERTICAL)
 
-        icon = wx.Icon("data/icons/automl_icon.png", wx.BITMAP_TYPE_PNG)
+        # Directory where this current Python file lives (i.e., automl/gui/)
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+
+        # Go one level up to automl/
+        automl_dir = os.path.dirname(current_dir)
+
+        # Construct full path to the icon file inside automl/data/icons/
+        icon_path = os.path.join(automl_dir, "data", "icons", "automl_icon.png")
+
+        icon = wx.Icon(icon_path, wx.BITMAP_TYPE_PNG)
         self.SetIcon(icon)
 
         self.buttons_info = {
