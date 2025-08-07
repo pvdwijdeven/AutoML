@@ -195,7 +195,7 @@ class AutoML_EDA:
         # Apply the function to the dataframe
         return update_func(df)
 
-    def column_type(
+    def set_column_type(
         self,
         column_name: str,
     ) -> None:
@@ -476,7 +476,7 @@ class AutoML_EDA:
                 ),
             }
 
-    def analyse_columns(self) -> None:
+    def set_column_types(self):
         assert (
             self.df_train is not None
         ), "Training DataFrame is not initialized"
@@ -493,15 +493,22 @@ class AutoML_EDA:
             self.type_conversion[column]["original"] = infer_dtype(
                 self.df_train[column]
             )
-            self.column_type(column)
+            self.set_column_type(column)
             self.type_conversion[column]["new"] = infer_dtype(
                 self.df_train[column]
             )
         sameline = "[FLUSH]" if self.nogui else "[SAMELINE]"
-        self.logger.info(f"{sameline}[GREEN]- Column analysis completed.")
+        self.logger.info(f"{sameline}[GREEN]- Feature typing completed.")
+
+    def analyse_columns(self) -> None:
+        self.set_column_types()
+
         self.column_info = {}
         self.target_info = {}
-
+        assert (
+            self.df_train is not None
+        ), "Training DataFrame is not initialized"
+        total = len(self.df_train.columns)
         for i, column in enumerate(self.df_train.columns, start=1):
             self.logger.info(
                 f"{'[SAMELINE]' if i != 1 or self.nogui else ''}[GREEN]Generating EDA ({i}/{total})"
@@ -517,9 +524,9 @@ class AutoML_EDA:
         sameline = "[FLUSH]" if self.nogui else "[SAMELINE]"
         self.logger.info(f"{sameline}[GREEN]- EDA data completed.")
 
-    def perform_eda(self) -> str:
+    def load_data(self):
         project = self.title if self.title else "dataset"
-        self.logger.info("[MAGENTA]\nStarting EDA (Exploratory Data Analysis)")
+
         self.logger.info(f"[MAGENTA]for {project}")
         self.df_train = self.read_data(self.file_train)
         if self.update_script != "":
@@ -560,7 +567,17 @@ class AutoML_EDA:
                 self.target = new_target
         self.dict_description = self.read_description(self.description)
         self.logger.debug(self.dict_description)
+        return ""
+
+    def perform_eda(self) -> str:
+        self.logger.info("[MAGENTA]\nStarting EDA (Exploratory Data Analysis)")
+        result = self.load_data()
+        assert self.df_train is not None
+        if result != "":
+            return result
+
         self.analyse_columns()
+
         target_type = infer_dtype(self.df_train[self.target])
         self.logger.info("[GREEN]- Creating overview table")
         overview_html = create_overview_table(

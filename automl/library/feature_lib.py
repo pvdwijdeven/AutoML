@@ -18,6 +18,9 @@ import io
 import base64
 import matplotlib as mpl
 
+# matplotlib not using GUI (thread used by wx)
+mpl.use("Agg")
+
 mpl.rcParams.update(
     {
         "text.color": "tab:blue",

@@ -31,6 +31,12 @@ def automl(*args):
         default=False,
     )
     parser.add_argument(
+        "--prepro",
+        help="start preproprocessing, default is False",
+        action="store_true",
+        default=False,
+    )
+    parser.add_argument(
         "--nogui",
         help="execute without GUI, default is False",
         action="store_true",
