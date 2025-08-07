@@ -1,6 +1,6 @@
 import pandas as pd
 import plotly.express as px
-from automl_libs import infer_dtype
+from library import infer_dtype
 
 
 def missing_data_summary(df):

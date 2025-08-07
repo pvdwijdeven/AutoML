@@ -1,15 +1,15 @@
 import pandas as pd
 from jinja2 import Environment, FileSystemLoader
-from .automl_eda_overview import create_overview_table
-from .automl_missing import (
+from .overview import create_overview_table
+from .missing import (
     missing_data_summary,
     plot_missingness_matrix,
     plot_missing_correlation,
     generate_missing_summary,
 )
-from .automl_testdata import analyze_test_data
+from .testdata import analyze_test_data
 from scipy.stats import skew
-from automl_libs import (
+from library import (
     infer_dtype,
     Logger,
     get_html_from_template,

@@ -1,14 +1,14 @@
 # automl_eda/__init__.py
 
-from .automl_eda import AutoML_EDA
-from .automl_eda_overview import create_overview_table
-from .automl_missing import (
+from .eda import AutoML_EDA
+from .overview import create_overview_table
+from .missing import (
     missing_data_summary,
     plot_missingness_matrix,
     plot_missing_correlation,
     generate_missing_summary,
 )
-from .automl_testdata import analyze_test_data
+from .testdata import analyze_test_data
 
 __all__ = [
     "AutoML_EDA",
