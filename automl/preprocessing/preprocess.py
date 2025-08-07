@@ -6,6 +6,7 @@ from sklearn.model_selection import train_test_split
 from scipy.stats import shapiro
 import numpy as np
 from library import infer_dtype
+import pandas as pd
 
 
 class AutoML_Preprocess:
@@ -53,18 +54,76 @@ class AutoML_Preprocess:
 
     def split_train_test_val(self):
         assert self.eda.df_train is not None
+
+        y = self.eda.df_train[self.target]
+        X = self.eda.df_train.drop(columns=[self.target])
+
+        # Determine if target is classification or regression
+        # Simple heuristic: if target is numeric with many unique values, treat as regression
+        is_classification = False
+        if pd.api.types.is_numeric_dtype(y):
+            unique_vals = y.nunique()
+            if (
+                unique_vals < 20
+            ):  # threshold for unique classes (tune as needed)
+                is_classification = True
+        else:
+            # Non-numeric targets are treated as classification
+            is_classification = True
+
+        if is_classification:
+            stratify_obj = y
+        else:
+            # Regression case: create quantile bins for stratification
+            try:
+                # Use qcut for 10 bins, drop duplicates to avoid errors in small datasets
+                stratify_obj = pd.qcut(y, q=10, duplicates="drop")
+            except ValueError:
+                # fallback: no stratification if binning fails
+                stratify_obj = None
+
         # First split: train and temp (validation + test)
-        self.X_train, X_temp, self.y_train, y_temp = train_test_split(
-            self.eda.df_train.drop(columns=[self.target]),
-            self.eda.df_train[self.target],
-            test_size=0.2,
-            random_state=42,
-            stratify=self.eda.df_train[self.target],
-        )
-        # Second split: split temp into validation and test (each 10% if test_size=0.5 here)
-        self.X_val, self.X_test, self.y_val, self.y_test = train_test_split(
-            X_temp, y_temp, test_size=0.5, random_state=42, stratify=y_temp
-        )
+        if stratify_obj is not None:
+            self.X_train, X_temp, self.y_train, y_temp = train_test_split(
+                X,
+                y,
+                test_size=0.2,
+                random_state=42,
+                stratify=stratify_obj,
+            )
+        else:
+            self.X_train, X_temp, self.y_train, y_temp = train_test_split(
+                X,
+                y,
+                test_size=0.2,
+                random_state=42,
+            )
+
+        # For validation/test split, apply same stratify logic on y_temp
+        if stratify_obj is not None:
+            if is_classification:
+                stratify_temp = y_temp
+            else:
+                try:
+                    stratify_temp = pd.qcut(y_temp, q=5, duplicates="drop")
+                except ValueError:
+                    stratify_temp = None
+        else:
+            stratify_temp = None
+
+        if stratify_temp is not None:
+            self.X_val, self.X_test, self.y_val, self.y_test = train_test_split(
+                X_temp,
+                y_temp,
+                test_size=0.5,
+                random_state=42,
+                stratify=stratify_temp,
+            )
+        else:
+            self.X_val, self.X_test, self.y_val, self.y_test = train_test_split(
+                X_temp, y_temp, test_size=0.5, random_state=42
+            )
+
         self.df_test = self.eda.df_test
         self.logger.info(
             f"[GREEN]- Split train/test/validation 80%/10%/10% ({self.X_train.shape[0]}/{self.X_test.shape[0]}/{self.X_val.shape[0]} rows)"
@@ -364,11 +423,11 @@ class AutoML_Preprocess:
             threshold_method: str, one of ['iqr', 'zscore']
         """
 
-        X_train = self.X_train[columns].copy()
-        X_val = self.X_val[columns].copy()
-        X_test = self.X_test[columns].copy()
+        X_train = self.X_train.copy()
+        X_val = self.X_val.copy()
+        X_test = self.X_test.copy()
 
-        for col in X_train.select_dtypes(include=[np.number]).columns:
+        for col in X_train[columns].select_dtypes(include=[np.number]).columns:
             if self.is_continuous_feature(X_train[col]):
                 if threshold_method == "":
                     cur_threshold_method = self.get_threshold_method(
@@ -468,9 +527,9 @@ class AutoML_Preprocess:
                 else:
                     raise ValueError("Unsupported handling method")
 
-        self.X_train[columns] = X_train
-        self.X_val[columns] = X_val
-        self.X_test[columns] = X_test
+        self.X_train = X_train
+        self.X_val = X_val
+        self.X_test = X_test
 
     def preprocess(self):
         project = self.title if self.title else "dataset"
