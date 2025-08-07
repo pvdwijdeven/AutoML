@@ -11,6 +11,7 @@ from .automl_testdata import analyze_test_data
 from scipy.stats import skew
 from automl_libs import (
     infer_dtype,
+    Logger,
     get_html_from_template,
     get_frequency_table,
     analyze_string_column,
@@ -22,6 +23,7 @@ from automl_libs import (
     generate_relation_visuals,
     generate_eda_plots,
 )
+
 import numpy as np
 from scipy.stats import entropy as scipy_entropy
 from datetime import datetime
@@ -31,27 +33,80 @@ import pathlib
 
 
 class AutoML_EDA:
+    """
+    AutoML_EDA is a class for automated exploratory data analysis (EDA) on tabular datasets.
+    It generates a comprehensive HTML report summarizing dataset features, relations, missing values,
+    and recommendations for further analysis or modeling.
+    Attributes:
+        report_file (str): Path to save the generated EDA report.
+        file_train (str): Path to the training dataset file (CSV or XLSX).
+        file_test (str): Path to the test dataset file (optional).
+        title (str): Title for the EDA report.
+        target (str): Name of the target column for analysis.
+        description (str): Path to a file containing column descriptions (optional).
+        nogui (bool): If True, disables GUI-related logging.
+        update_script (str): Path to a user-defined script for custom DataFrame updates (optional).
+        logger (Logger): Logger instance for logging messages.
+    Methods:
+        parse_column_descriptions_to_html(text):
+            Parses column descriptions from text and formats them as HTML.
+        read_description(file_path):
+            Reads and parses column descriptions from a file.
+        read_data(file_path) -> pd.DataFrame | None:
+            Loads data from a CSV or XLSX file into a pandas DataFrame.
+        update_with_user_function(df, filepath):
+            Applies a user-defined function from a script to update the DataFrame.
+        column_type(column_name: str) -> None:
+            Infers and converts the data type of a column, synchronizing train and test sets.
+        analyse_column(column_name: str):
+            Analyzes a single column, returning statistics and suggestions based on its type.
+        analyse_columns() -> None:
+            Performs type inference and analysis for all columns in the training set.
+        perform_eda() -> str:
+            Executes the full EDA workflow, generates the HTML report, and saves it to file.
+    Usage:
+        Instantiate the class with dataset paths and parameters, then call `perform_eda()` to generate the report.
+    Example:
+        eda = AutoML_EDA(
+            report_file="eda_report.html",
+            file_train="train.csv",
+            file_test="test.csv",
+            title="My Dataset",
+            target="target_column",
+            description="column_descriptions.txt"
+        eda.perform_eda()
+    """
+
     def __init__(
         self,
-        logger,
-        report_file,
-        file_train,
-        file_test="",
-        title="",
-        target="",
-        description="",
+        report_file: str,
+        file_train: str,
+        file_test: str = "",
+        title: str = "",
+        target: str = "",
+        description: str = "",
         nogui=True,
-        update_script="",
+        update_script: str = "",
+        logger: Logger | None = None,
     ) -> None:
+
         self.report_file = report_file
         self.file_train = file_train
         self.file_test = file_test
-        self.logger = logger
         self.title = title
         self.target = target
         self.description = description
         self.nogui = nogui
         self.update_script = update_script
+        if logger is None:
+            self.logger = Logger(
+                level_console=Logger.INFO,
+                level_file=Logger.DEBUG,
+                filename="",
+                wx_handler=None,
+            )
+        else:
+            self.logger = logger
 
     def parse_column_descriptions_to_html(self, text):
         result = {}
