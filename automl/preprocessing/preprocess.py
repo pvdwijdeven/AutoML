@@ -147,7 +147,7 @@ class AutoML_Preprocess:
             self.logger.info(
                 f"[GREEN]- Duplicate rows to be dropped: {num_rows_before - num_rows_after}"
             )
-            self.logger.info(
+            self.logger.debug(
                 f"[GREEN]  Dropped rows with indices: {dropped_indices}"
             )
         else:
@@ -531,6 +531,20 @@ class AutoML_Preprocess:
         self.X_val = X_val
         self.X_test = X_test
 
+    def skip_outliers(self) -> bool:
+        target_col = self.X_train[self.target]
+        # Check if target's dtype is categorical
+        if infer_dtype(target_col) == "categorical":
+            unique_classes = target_col.unique()
+            total_samples = len(target_col)
+            if len(unique_classes) <= 5:
+                for cls in unique_classes:
+
+                    freq = (target_col == cls).sum() / total_samples
+                    if freq < 0.01:
+                        return True
+        return False
+
     def preprocess(self):
         project = self.title if self.title else "dataset"
         self.logger.info(f"[MAGENTA]\nStarting preprocessing for {project}")
@@ -552,32 +566,43 @@ class AutoML_Preprocess:
         # 3 drop duplicate and constant columns
         self.drop_duplicate_columns()
         self.drop_constant_columns()
+        skip_outliers = self.skip_outliers()
+        if skip_outliers:
+            self.logger.info(
+                "Skipping outliers due to target type (low #classes with at least 1 low freq class)"
+            )
+        else:
+            # 4 decide to handle outliers before or after dealing with missing values
 
-        # 4 decide to handle outliers before or after dealing with missing values
-        before_cols = []
-        for col in self.X_train.select_dtypes(include=[np.number]).columns:
-            if (
-                self.decide_outlier_imputation_order(column=self.X_train[col])
-                == "before_imputation"
-            ):
-                before_cols.append(col)
+            before_cols = []
+            for col in self.X_train.select_dtypes(include=[np.number]).columns:
+                if (
+                    self.decide_outlier_imputation_order(
+                        column=self.X_train[col]
+                    )
+                    == "before_imputation"
+                ):
+                    before_cols.append(col)
 
-        # 4a handle outliers before dealing with missing values
-        self.handle_outliers(
-            columns=before_cols,
-            before_or_after="before missing imputation",
-            method="",
-            threshold_method="",
-        )
+            # 4a handle outliers before dealing with missing values
+            self.handle_outliers(
+                columns=before_cols,
+                before_or_after="before missing imputation",
+                method="",
+                threshold_method="",
+            )
         # 5 missing values
-
+        num_missing = self.X_train.isna().sum().sum()
+        if num_missing > 0:
+            pass
         # 5a handle outliers after dealing with missing values
-        self.handle_outliers(
-            columns=self.X_train.select_dtypes(include=[np.number]).columns,
-            before_or_after="after missing imputation",
-            method="",
-            threshold_method="",
-        )
+        if not skip_outliers and num_missing > 0:
+            self.handle_outliers(
+                columns=self.X_train.select_dtypes(include=[np.number]).columns,
+                before_or_after="after missing imputation",
+                method="",
+                threshold_method="",
+            )
         # 6 encoding
         # 7 normalizing/scaling
         # 8 dim. reduction
