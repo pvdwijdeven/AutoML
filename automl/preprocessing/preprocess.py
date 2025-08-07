@@ -608,5 +608,5 @@ class AutoML_Preprocess:
         # 6 encoding
         # 7 normalizing/scaling
         # 8 dim. reduction
-        self.logger.info("[MAGENTA] I am done here...")
+        self.logger.info(f"[MAGENTA]Done preprocessing for {project}")
         return "Done! So far...."

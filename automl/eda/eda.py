@@ -537,7 +537,10 @@ class AutoML_EDA:
         if self.target == "":
             self.target = self.df_train.columns[-1]
             last_column = True
-        self.df_test = self.read_data(self.file_test)
+        if self.file_test != "":
+            self.df_test = self.read_data(self.file_test)
+        else:
+            self.df_test = None
         if self.df_test is None:
             self.logger.warning(
                 "Test data could not be loaded. Using only training data."
@@ -562,8 +565,11 @@ class AutoML_EDA:
                         f"Using '{new_target}' as target for EDA."
                     )
                 self.target = new_target
-        self.dict_description = self.read_description(self.description)
-        self.logger.debug(self.dict_description)
+        if self.description != "":
+            self.dict_description = self.read_description(self.description)
+            self.logger.debug(self.dict_description)
+        else:
+            self.dict_description = {}
         return ""
 
     def perform_eda(self) -> str:
