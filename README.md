@@ -1,5 +1,5 @@
 # AutoML
-![automl icon](data/icons/automl_icon_big.jpg?raw=true "AutoML icon")
+![automl icon](automl/data/icons/automl_icon_big.jpg?raw=true "AutoML icon")
 
 Automated Machine Learning module
 
