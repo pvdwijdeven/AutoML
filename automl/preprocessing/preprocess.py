@@ -7,6 +7,9 @@ from scipy.stats import shapiro
 import numpy as np
 from library import infer_dtype
 import pandas as pd
+from sklearn.impute import SimpleImputer
+from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
+from sklearn.preprocessing import OrdinalEncoder
 
 
 class AutoML_Preprocess:
@@ -425,7 +428,7 @@ class AutoML_Preprocess:
             method: str, one of ['drop', 'cap', 'impute']
             threshold_method: str, one of ['iqr', 'zscore']
         """
-
+        self.logger.info(f"[GREEN]- Handling outliers {before_or_after}")
         X_train = self.X_train.copy()
         X_val = self.X_val.copy()
         X_test = self.X_test.copy()
@@ -487,7 +490,7 @@ class AutoML_Preprocess:
                     )
                     X_test = X_test.loc[~outliers_test]
                     self.y_test = self.y_test.loc[X_test.index]
-                    self.logger.info(
+                    self.logger.debug(
                         f"[GREEN]- {outliers_train.sum()} outliers in column {col} dropped"
                     )
                 elif cur_method == "cap":
@@ -509,8 +512,8 @@ class AutoML_Preprocess:
                     X_test[col] = np.where(
                         X_test[col] > upper_bound, upper_bound, X_test[col]
                     )
-                    self.logger.info(
-                        f"[GREEN]- {outliers_train.sum()} outliers in column {col} capped between {X_train[col].min()} and {X_train[col].max()}"
+                    self.logger.debug(
+                        f"[GREEN]  - {outliers_train.sum()} outliers in column {col} capped between {X_train[col].min()} and {X_train[col].max()}"
                     )
                 elif cur_method == "impute":
                     median = X_train[col].median()
@@ -524,8 +527,8 @@ class AutoML_Preprocess:
                         | (X_test[col] > upper_bound),
                         col,
                     ] = median
-                    self.logger.info(
-                        f"[GREEN]- {outliers_train.sum()} outliers in column {col} imputed with median {median}"
+                    self.logger.debug(
+                        f"[GREEN]  - {outliers_train.sum()} outliers in column {col} imputed with median {median}"
                     )
                 else:
                     raise ValueError("Unsupported handling method")
@@ -536,16 +539,230 @@ class AutoML_Preprocess:
 
     def skip_outliers(self) -> bool:
         target_col = self.y_train
-        # Check if target's dtype is categorical
-        if infer_dtype(target_col) in ["category", "boolean"]:
-            unique_classes = target_col.unique()
-            total_samples = len(target_col)
-            if len(unique_classes) <= 5:
-                for cls in unique_classes:
-                    freq = (target_col == cls).sum() / total_samples
-                    if freq < 0.01:
-                        return True
+        unique_classes = target_col.unique()
+        total_samples = len(target_col)
+        if len(unique_classes) <= 5:
+            for cls in unique_classes:
+                freq = (target_col == cls).sum() / total_samples
+                if freq < 0.01:
+                    return True
         return False
+
+    def get_feature_importances(self):
+        X_train_enc = self.X_train.copy()
+
+        # Identify categorical columns by dtype inference
+        cat_cols = []
+        for col in X_train_enc.columns:
+            dtype = infer_dtype(X_train_enc[col])
+            if dtype in {"string", "category", "boolean", "object"}:
+                cat_cols.append(col)
+
+        # Encode categorical features with OrdinalEncoder
+        if cat_cols:
+            enc = OrdinalEncoder()
+            X_train_enc[cat_cols] = enc.fit_transform(X_train_enc[cat_cols])
+
+        # Determine if target is classification or regression
+        y = self.y_train
+
+        is_regression = infer_dtype(y) in {"integer", "float"}
+        if np.issubdtype(y.dtype, np.number):
+            # Numeric target: treat as regression
+            is_regression = True
+        else:
+            # Non-numeric, treat as classification
+            is_regression = False
+
+        # Alternatively, you might check number of unique classes or task knowledge
+        # Here a simple numeric dtype check is used
+
+        # Fit appropriate model
+        if is_regression:
+            model = RandomForestRegressor(random_state=42)
+        else:
+            model = RandomForestClassifier(random_state=42)
+
+        model.fit(X_train_enc, y)
+
+        importances = dict(zip(X_train_enc.columns, model.feature_importances_))
+        return importances
+
+    def preprocess_missing_values(
+        self,
+        col_importance_thresh=0.01,
+        col_missing_thresh=0.5,
+        row_missing_thresh=0.05,
+        max_row_drop_frac=0.1,
+        skew_thresh=0.5,
+    ):
+        """
+        Handles missing values by deciding to drop or impute based on X_train.
+        Applies the same transformations to X_val and X_test.
+
+        Parameters:
+        - X_train, X_val, X_test: pd.DataFrame inputs
+        - col_missing_thresh: fraction missing above which to drop the column
+        - row_missing_thresh: fraction missing per row below which to drop rows
+        - skew_thresh: absolute skewness above which a numerical feature is considered skewed
+        - cat_cols: list of categorical column names (if None, inferred by dtype)
+
+        Returns:
+        - X_train_processed, X_val_processed, X_test_processed (pd.DataFrame)
+        """
+
+        X_train = self.X_train
+        X_val = self.X_val
+        X_test = self.X_test
+        self.logger.info("[GREEN]- Processing missing values")
+        feature_importances = self.get_feature_importances()
+        # Step 1: Drop columns based on missingness and feature importance
+
+        # Compute missingness per column
+        missing_per_col = X_train.isna().mean()
+
+        # Filter feature_importances to existing columns
+        feature_importances = {
+            k: v for k, v in feature_importances.items() if k in X_train.columns
+        }
+
+        # Normalize importance scores to sum to 1 (avoid zero sum)
+        total_imp = sum(feature_importances.values())
+        if total_imp == 0:
+            norm_importances = {
+                k: 1 / len(feature_importances) for k in feature_importances
+            }
+        else:
+            norm_importances = {
+                k: v / total_imp for k, v in feature_importances.items()
+            }
+
+        # Decide which columns to drop:
+        cols_to_drop = []
+        for col in X_train.columns:
+            missingness = missing_per_col[col]
+            importance = norm_importances.get(col, 0)
+            # Drop column if missingness > threshold and importance < threshold
+            if (
+                missingness > col_missing_thresh
+                and importance < col_importance_thresh
+            ):
+                cols_to_drop.append(col)
+        if cols_to_drop != []:
+            for col in cols_to_drop:
+                self.logger.debug(
+                    f"[GREEN]  - Dropping {col} because of too much missing values"
+                )
+        # Drop selected columns from all datasets
+        X_train = X_train.drop(columns=cols_to_drop)
+        X_val = X_val.drop(columns=cols_to_drop, errors="ignore")
+        X_test = X_test.drop(columns=cols_to_drop, errors="ignore")
+
+        # Update feature importance dict accordingly
+        feature_importances = {
+            k: v
+            for k, v in feature_importances.items()
+            if k not in cols_to_drop
+        }
+
+        # Step 2: Drop rows based on weighted missingness and feature importance
+
+        # Create missing mask for X_train (boolean DataFrame)
+        missing_mask = X_train.isna()
+
+        # Assign weights to missing values based on feature importance
+        weights = pd.DataFrame(0, index=X_train.index, columns=X_train.columns)
+        for col in X_train.columns:
+            weights[col] = missing_mask[col].astype(
+                float
+            ) * norm_importances.get(col, 0)
+
+        # Weighted missingness sum per row
+        weighted_missing_per_row = weights.sum(axis=1)
+
+        # Identify rows exceeding missingness threshold
+        rows_to_drop = weighted_missing_per_row[
+            weighted_missing_per_row > row_missing_thresh
+        ].index
+
+        fraction_rows_to_drop = len(rows_to_drop) / len(X_train)
+
+        # Drop rows only if fraction is within allowable max
+        if fraction_rows_to_drop <= max_row_drop_frac:
+            X_train = X_train.drop(index=rows_to_drop)
+            self.logger.debug(
+                f"[GREEN]  - Dropped {len(rows_to_drop)} rows because of missing values."
+            )
+        else:
+            # No rows dropped; keep all for imputation
+            rows_to_drop = pd.Index([])
+
+        # Step 3: Identify categorical columns
+        cat_cols = []
+        num_cols = []
+        for col in X_train.columns:
+            if infer_dtype(X_train[col]) in [
+                "string",
+                "category",
+                "boolean",
+                "object",
+            ]:
+                cat_cols.append(col)
+            else:
+                num_cols.append(col)
+
+        # Step 4: Compute skewness on numerical cols
+        skewness = X_train[num_cols].skew().abs()
+
+        # Prepare imputers dict to hold imputers for each type
+        imputers = {}
+
+        # Numerical - split by skewness
+        num_cols_low_skew = skewness[skewness <= skew_thresh].index.tolist()
+        num_cols_high_skew = skewness[skewness > skew_thresh].index.tolist()
+
+        # Imputer for numerical low skew with mean
+        if num_cols_low_skew:
+            imp_mean = SimpleImputer(strategy="mean")
+            imp_mean.fit(X_train[num_cols_low_skew])
+            imputers["num_mean"] = (imp_mean, num_cols_low_skew)
+            for col in num_cols_low_skew:
+                self.logger.debug(
+                    f"[GREEN]  - Imputing missing values with 'mean'(low skewness numeric) for column {col}"
+                )
+
+        # Imputer for numerical high skew with median
+        if num_cols_high_skew:
+            imp_median = SimpleImputer(strategy="median")
+            imp_median.fit(X_train[num_cols_high_skew])
+            imputers["num_median"] = (imp_median, num_cols_high_skew)
+            for col in num_cols_high_skew:
+                self.logger.debug(
+                    f"[GREEN]  - Imputing missing values with 'median'(high skewness numeric) for column {col}"
+                )
+
+        # Imputer for categorical with mode (most frequent)
+        if cat_cols:
+            imp_mode = SimpleImputer(strategy="most_frequent")
+            imp_mode.fit(X_train[cat_cols])
+            imputers["cat_mode"] = (imp_mode, cat_cols)
+            for col in num_cols_high_skew:
+                self.logger.debug(
+                    f"[GREEN]  - Imputing missing values with 'mode'(category) for column {col}"
+                )
+
+        # Define a helper function to apply imputers consistently
+        def apply_imputers(X):
+            X = X.copy()
+            for imp, cols in imputers.values():
+                if cols:
+                    X[cols] = imp.transform(X[cols])
+            return X
+
+        # Apply imputers to train/val/test
+        self.X_train = apply_imputers(X_train)
+        self.X_val = apply_imputers(X_val)
+        self.X_test = apply_imputers(X_test)
 
     def preprocess(self):
         project = self.title if self.title else "dataset"
@@ -554,7 +771,7 @@ class AutoML_Preprocess:
         assert self.eda.df_train is not None
         if result != "":
             return result
-        self.eda.set_column_types(also_ints=False)
+        # self.eda.set_column_types(also_ints_and_bools=False)
 
         # 1 drop duplicate rows
         self.drop_duplicate_rows()
@@ -570,8 +787,8 @@ class AutoML_Preprocess:
         self.drop_constant_columns()
         skip_outliers = self.skip_outliers()
         if skip_outliers:
-            self.logger.warning(
-                "Leaving outliers as is due to target type (imbalanced classification)"
+            self.logger.info(
+                "[GREEN]- Leaving outliers as is due to target type (imbalanced classification)"
             )
         else:
             # 4 decide to handle outliers before or after dealing with missing values
@@ -596,7 +813,10 @@ class AutoML_Preprocess:
         # 5 missing values
         num_missing = self.X_train.isna().sum().sum()
         if num_missing > 0:
-            pass
+            self.preprocess_missing_values()
+        else:
+
+            self.logger.info("[GREEN]- No missing values to be processed.")
         # 5a handle outliers after dealing with missing values
         if not skip_outliers and num_missing > 0:
             self.handle_outliers(
