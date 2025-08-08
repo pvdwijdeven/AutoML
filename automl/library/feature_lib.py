@@ -33,9 +33,9 @@ mpl.rcParams.update(
 )
 
 
-def check_classification(target: pd.Series) -> bool:
+def check_classification(target: pd.Series, no_strings=False) -> bool:
     is_classification = False
-    if pd.api.types.is_numeric_dtype(target):
+    if pd.api.types.is_numeric_dtype(target) or no_strings:
         unique_vals = target.nunique()
         if unique_vals < 20:  # threshold for unique classes (tune as needed)
             is_classification = True

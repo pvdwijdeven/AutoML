@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 import re
 from typing import Tuple
+from library import check_classification
 
 
 def analyze_test_data(
@@ -81,7 +82,11 @@ def analyze_test_data(
         )
 
     # 4. Categorical: unseen categories
-    cat_cols = df_train.select_dtypes(include=["category", "object"]).columns
+    cat_cols = []
+    for col in df_train.columns:
+        if check_classification(df_train[col], True):
+            cat_cols.append(col)
+    cat_cols = sorted(cat_cols, key=str.lower)
     unseen_data = []
     for col in cat_cols:
         if col in df_test.columns:
