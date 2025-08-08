@@ -5,7 +5,7 @@ from eda import AutoML_EDA
 from sklearn.model_selection import train_test_split
 from scipy.stats import shapiro
 import numpy as np
-from library import infer_dtype
+from library import infer_dtype, check_classification
 import pandas as pd
 from sklearn.impute import SimpleImputer
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
@@ -63,16 +63,8 @@ class AutoML_Preprocess:
 
         # Determine if target is classification or regression
         # Simple heuristic: if target is numeric with many unique values, treat as regression
-        is_classification = False
-        if pd.api.types.is_numeric_dtype(y):
-            unique_vals = y.nunique()
-            if (
-                unique_vals < 20
-            ):  # threshold for unique classes (tune as needed)
-                is_classification = True
-        else:
-            # Non-numeric targets are treated as classification
-            is_classification = True
+
+        is_classification = check_classification(y)
 
         if is_classification:
             stratify_obj = y

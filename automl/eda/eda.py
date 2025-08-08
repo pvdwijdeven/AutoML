@@ -364,7 +364,7 @@ class AutoML_EDA:
 
         # type boolean:
         # - missing values, frequency True/False, graph
-        if self.type_conversion[column_name]["new"] == "boolean":
+        if infer_dtype(self.df_train[column_name]) == "boolean":
             frequency = get_frequency_table(self.df_train, column_name)
             missing_count = self.df_train[column_name].isna().sum()
             missing_pct = missing_count / len(self.df_train) * 100
@@ -381,7 +381,7 @@ class AutoML_EDA:
 
         # type category:
         # - missing values, #unique, most occuring
-        if self.type_conversion[column_name]["new"] == "category":
+        if infer_dtype(self.df_train[column_name]) in {"category", "object"}:
             # Column-level stats
             missing_count = self.df_train[column_name].isna().sum()
             missing_pct = missing_count / len(self.df_train) * 100
@@ -431,7 +431,7 @@ class AutoML_EDA:
 
         # type string:
         # - missing values, #unique, most occuring
-        if self.type_conversion[column_name]["new"] == "string":
+        if infer_dtype(self.df_train[column_name]) == "string":
             missing_count = self.df_train[column_name].isna().sum()
             missing_pct = missing_count / len(self.df_train) * 100
             unique_count = self.df_train[column_name].nunique(dropna=True)
@@ -452,7 +452,7 @@ class AutoML_EDA:
 
         # type numeric:
         # - missing values, #unique, min, max, average, graph
-        if self.type_conversion[column_name]["new"] in ["integer", "float"]:
+        if infer_dtype(self.df_train[column_name]) in ["integer", "float"]:
             missing_count = self.df_train[column_name].isna().sum()
             missing_pct = missing_count / len(self.df_train) * 100
             col_data = self.df_train[column_name]
@@ -503,7 +503,8 @@ class AutoML_EDA:
             self.type_conversion[column]["original"] = infer_dtype(
                 self.df_train[column]
             )
-            self.set_column_type(column, also_ints_and_bools)
+            # self.set_column_type(column, also_ints_and_bools)
+            self.type_conversion[column]["actual"] = self.df_train[column].dtype
             self.type_conversion[column]["new"] = infer_dtype(
                 self.df_train[column]
             )

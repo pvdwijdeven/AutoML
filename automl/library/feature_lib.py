@@ -33,6 +33,18 @@ mpl.rcParams.update(
 )
 
 
+def check_classification(target: pd.Series) -> bool:
+    is_classification = False
+    if pd.api.types.is_numeric_dtype(target):
+        unique_vals = target.nunique()
+        if unique_vals < 20:  # threshold for unique classes (tune as needed)
+            is_classification = True
+    else:
+        # Non-numeric targets are treated as classification
+        is_classification = True
+    return is_classification
+
+
 def select_features_by_missingness(
     df: pd.DataFrame,
     target: str = "",
@@ -455,24 +467,16 @@ def generate_eda_plots(
     plot1_html = plot2_html = ""
 
     # Determine target type
-    if target:
-        target_type = pd.api.types.infer_dtype(df_sampled[target], skipna=True)
-        is_target_numeric = target_type in [
-            "integer",
-            "floating",
-            "mixed-integer-float",
-        ]
-    else:
-        is_target_numeric = False
+    is_target_numeric = not check_classification(df_sampled[target])
 
     # Truncate high-cardinality categories
-    if inferred_type in ["category", "boolean", "string"]:
+    if inferred_type in ["category", "boolean", "string", "object"]:
         top_categories = col.value_counts().nlargest(TOP_CATEGORIES).index
         col = col[col.isin(top_categories)]
         df_sampled = df_sampled[df_sampled[column_name].isin(top_categories)]
 
     # Plot 1: Distribution / Frequency
-    if inferred_type in ["category", "boolean", "string"]:
+    if inferred_type in ["category", "boolean", "string", "object"]:
         fig, ax = plt.subplots(figsize=(8, 4))
         sns.countplot(x=col, order=col.value_counts().index, ax=ax)
         ax.set_title(f"Frequency of {column_name}")
@@ -495,7 +499,7 @@ def generate_eda_plots(
 
     # Plot 2: Relation to target
     if target and column_name != target:
-        if inferred_type in ["category", "boolean", "string"]:
+        if inferred_type in ["category", "boolean", "string", "object"]:
             if is_target_numeric:
                 fig, ax = plt.subplots(figsize=(8, 4))
                 sns.boxplot(x=column_name, y=target, data=df_sampled, ax=ax)
@@ -541,23 +545,30 @@ def generate_eda_plots(
                 plot2_html = fig_to_base64(fig, "relation plot")
             else:
                 try:
-                    df_sampled["binned_feature"] = pd.qcut(
-                        df_sampled[column_name], q=10, duplicates="drop"
+                    df_sampled[target] = df_sampled[target].astype("category")
+                    # Bin the numeric feature
+                    df_sampled["binned_feature"] = pd.cut(
+                        df_sampled[column_name], bins=10, duplicates="drop"
                     )
-                    grouped = (
-                        df_sampled.groupby("binned_feature", observed=False)[
-                            target
-                        ]
-                        .mean()
-                        .reset_index()
+
+                    # Create a cross-tab of counts per class per bin
+                    grouped = pd.crosstab(
+                        df_sampled["binned_feature"], df_sampled[target]
                     )
-                    fig, ax = plt.subplots(figsize=(8, 4))
-                    sns.barplot(
-                        data=grouped, x="binned_feature", y=target, ax=ax
+
+                    # Plot stacked bar chart (using counts)
+                    fig, ax = plt.subplots(figsize=(10, 5))
+                    grouped.plot(kind="bar", stacked=True, ax=ax)
+
+                    ax.set_title(
+                        f"Distribution of '{target}' per binned '{column_name}'"
                     )
-                    ax.set_title(f"Mean {target} by binned {column_name}")
-                    ax.tick_params(axis="x", rotation=45)
+                    ax.set_xlabel(f"Binned {column_name}")
+                    ax.set_ylabel("Count")
+                    ax.legend(title=target)
+                    plt.xticks(rotation=45)
                     fig.tight_layout()
+
                     plot2_html = fig_to_base64(fig, "relation plot")
                 except Exception as e:
                     plot2_html = f"<p>Could not generate binned plot: {e}</p>"
