@@ -137,7 +137,8 @@ def generate_feature_relations(
         le_dict[col] = le
 
     # Step 6: Restrict to max_features
-    all_features = num_cols + cat_cols
+    all_features = sorted(num_cols + cat_cols, key=str.lower)
+
     if len(all_features) > max_features:
         all_features = all_features[:max_features]
 

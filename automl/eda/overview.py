@@ -67,7 +67,7 @@ def create_overview_table(
     # --- Collect the statistics ---
     n_rows = len(df)
     n_features = df.shape[1] - 1
-    feature_cols = df.columns.difference([target])
+    feature_cols = sorted(df.columns.difference([target]), key=str.lower)
     constant_cols = [
         col for col in feature_cols if df[col].nunique(dropna=False) == 1
     ]
@@ -87,6 +87,7 @@ def create_overview_table(
     memory_usage = df.memory_usage(deep=True).sum()
     missing_values = df.isnull().sum().sum()
     type_to_features = defaultdict(list)
+
     for col in feature_cols:
         dtype = infer_dtype(df[col])
         type_to_features[dtype].append(

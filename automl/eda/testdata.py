@@ -115,7 +115,9 @@ def analyze_test_data(
         )
 
     # 5. Numeric distributions (with mean/std/min/max shift detection and inline coloring)
-    num_cols = df_train.select_dtypes(include=np.number).columns
+    num_cols = sorted(
+        df_train.select_dtypes(include=np.number).columns, key=str.lower
+    )
     stats = []
     for col in num_cols:
         if col in df_test.columns:

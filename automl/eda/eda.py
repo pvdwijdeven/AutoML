@@ -332,7 +332,8 @@ class AutoML_EDA:
             self.df_train is not None
         ), "Training DataFrame is not initialized"
         total = len(self.df_train.columns)
-        for i, column in enumerate(self.df_train.columns, start=1):
+        sorted_columns = sorted(self.df_train.columns, key=str.lower)
+        for i, column in enumerate(sorted_columns, start=1):
             self.logger.info(
                 f"{'[SAMELINE]' if i != 1 or self.nogui else ''}[GREEN]Generating EDA ({i}/{total})"
             )
@@ -427,7 +428,7 @@ class AutoML_EDA:
         )
 
         suggestion_overview = {}
-        for column in self.df_train.columns:
+        for column in sorted(self.df_train.columns, key=str.lower):
             summary_suggestions = []
             suggestion_overview[column] = {}
             for cur_suggestion in (
