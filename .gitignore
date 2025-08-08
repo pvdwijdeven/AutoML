@@ -4,4 +4,4 @@ __pycache__/
 *.pyc
 *.pyo
 my_test*.py
-run_all.ps1
+run_all*.ps1
