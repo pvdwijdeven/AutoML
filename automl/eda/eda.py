@@ -24,7 +24,6 @@ from library import (
     generate_eda_plots,
 )
 import os
-import numpy as np
 from scipy.stats import entropy as scipy_entropy
 from datetime import datetime
 import importlib.util
@@ -56,8 +55,6 @@ class AutoML_EDA:
             Loads data from a CSV or XLSX file into a pandas DataFrame.
         update_with_user_function(df, filepath):
             Applies a user-defined function from a script to update the DataFrame.
-        column_type(column_name: str) -> None:
-            Infers and converts the data type of a column, synchronizing train and test sets.
         analyse_column(column_name: str):
             Analyzes a single column, returning statistics and suggestions based on its type.
         analyse_columns() -> None:
@@ -197,165 +194,6 @@ class AutoML_EDA:
         # Apply the function to the dataframe
         return update_func(df)
 
-    def set_column_type(
-        self, column_name: str, also_ints_and_bools: bool = True
-    ) -> None:
-
-        def convert_to_bool_if_binary(series):
-            if pd.api.types.is_numeric_dtype(
-                series
-            ) and not pd.api.types.is_bool_dtype(series):
-                if also_ints_and_bools:
-                    unique_vals = set(series.dropna().unique())
-                else:
-                    unique_vals = set(series.unique())
-                if unique_vals <= {0, 1}:
-                    return series.map({0: False, 1: True}).astype("boolean")
-            return series
-
-        def normalize_booleans(series: pd.Series) -> pd.Series:
-
-            if pd.api.types.is_object_dtype(
-                series
-            ) or pd.api.types.is_string_dtype(series):
-                if also_ints_and_bools:
-                    normalized = series.dropna().map(
-                        lambda x: str(x).strip().lower()
-                    )
-                else:
-                    normalized = series.map(lambda x: str(x).strip().lower())
-                valid_values = {"true", "false"}
-
-                unexpected = normalized[~normalized.isin(valid_values)]
-                if not unexpected.empty:
-                    return series
-
-                return series.map(
-                    lambda x: (
-                        True
-                        if str(x).strip().lower() == "true"
-                        else (
-                            False
-                            if str(x).strip().lower() == "false"
-                            else pd.NA
-                        )
-                    )
-                ).astype("boolean")
-            return series
-
-        def convert_to_numeric(series: pd.Series) -> pd.Series:
-            return pd.to_numeric(
-                series.astype(str)
-                .str.strip()
-                .str.replace(r'^[\'"]+|[\'"]+$', "", regex=True),
-                errors="coerce",
-            )
-
-        assert (
-            self.df_train is not None
-        ), "Training DataFrame is not initialized"
-        col_series_train = self.df_train[column_name]
-
-        # Step 1: Normalize booleans
-        col_series_train = convert_to_bool_if_binary(col_series_train)
-
-        col_series_train = normalize_booleans(col_series_train)
-        # Step 2: Detect if boolean
-        if also_ints_and_bools:
-            unique_values = pd.Series(col_series_train.dropna().unique())
-        else:
-            unique_values = pd.Series(col_series_train.unique())
-        if unique_values.isin([True, False]).all():
-            self.df_train[column_name] = col_series_train.astype("boolean")
-
-            if self.df_test is not None and column_name in self.df_test.columns:
-                self.df_test[column_name] = normalize_booleans(
-                    self.df_test[column_name]
-                ).astype("boolean")
-        # Step 3: Categorical vs String
-        inferred_dtype = None
-        if pd.api.types.is_object_dtype(self.df_train[column_name]):
-            unique_ratio = self.df_train[column_name].nunique(
-                dropna=True
-            ) / len(self.df_train)
-            inferred_dtype = "category" if unique_ratio < 0.1 else "string"
-            self.df_train[column_name] = self.df_train[column_name].astype(
-                inferred_dtype
-            )
-        # Step 4: Attempt numeric conversion
-        try_numeric = pd.api.types.is_object_dtype(
-            col_series_train
-        ) or pd.api.types.is_string_dtype(col_series_train)
-
-        if try_numeric:
-            try:
-                converted = convert_to_numeric(col_series_train)
-            except Exception as e:
-                self.logger.warning(
-                    f"Conversion to numeric failed for column '{column_name}': {e}"
-                )
-                converted = None
-        elif pd.api.types.is_numeric_dtype(
-            col_series_train
-        ) and not pd.api.types.is_bool_dtype(col_series_train):
-            converted = col_series_train.copy()
-        else:
-            converted = None
-
-        if converted is not None:
-            is_int_like = (
-                np.isclose(converted.dropna() % 1, 0).all()
-                and also_ints_and_bools
-            )
-            non_na_count = col_series_train.notna().sum()
-            if converted.notna().sum() == non_na_count:
-                if pd.api.types.is_float_dtype(converted) and is_int_like:
-                    self.df_train[column_name] = converted.astype("Int64")
-                    inferred_dtype = "Int64"
-                elif is_int_like:
-                    self.df_train[column_name] = converted.astype("Int64")
-                    inferred_dtype = "Int64"
-                else:
-                    self.df_train[column_name] = converted
-                    inferred_dtype = str(converted.dtype).capitalize()
-
-        # Step 5: Apply same dtype to df_test
-        if self.df_test is not None and column_name in self.df_test.columns:
-            col_test = self.df_test[column_name]
-            if inferred_dtype == "boolean":
-                self.df_test[column_name] = normalize_booleans(col_test).astype(
-                    "boolean"
-                )
-            elif inferred_dtype == "category":
-                self.df_test[column_name] = col_test.astype("category")
-            elif inferred_dtype == "string":
-                self.df_test[column_name] = col_test.astype("string")
-            elif inferred_dtype == "Int64":
-                try:
-                    converted_test = convert_to_numeric(col_test)
-                    self.df_test[column_name] = converted_test.astype("Int64")
-                except Exception as e:
-                    self.logger.warning(
-                        f"Failed to apply Int64 conversion to test column '{column_name}': {e}"
-                    )
-            elif inferred_dtype is not None and inferred_dtype.startswith(
-                "Float"
-            ):
-                try:
-                    converted_test = convert_to_numeric(col_test)
-                    # Use numpy dtype object for astype
-
-                    self.df_test[column_name] = converted_test.astype(
-                        np.float64
-                    )
-                except Exception as e:
-                    self.logger.warning(
-                        f"Failed to apply float conversion to test column '{column_name}': {e}"
-                    )
-        self.type_conversion[column_name]["actual"] = self.df_train[
-            column_name
-        ].dtype
-
     def analyse_column(self, column_name: str):
 
         assert (
@@ -369,7 +207,7 @@ class AutoML_EDA:
             missing_count = self.df_train[column_name].isna().sum()
             missing_pct = missing_count / len(self.df_train) * 100
             return {
-                "type": f"boolean ({self.type_conversion[column_name]['actual']}) - was {self.type_conversion[column_name]['original']}",
+                "type": f"boolean ({self.df_train[column_name].dtype})",
                 "description": self.dict_description.get(column_name, ""),
                 "missing_values": f"{missing_count} ({missing_pct:.1f}%)",
                 "frequency": frequency.replace("np.", "").replace("_", ""),
@@ -418,7 +256,7 @@ class AutoML_EDA:
             )
 
             return {
-                "type": f"category  ({self.type_conversion[column_name]['actual']}) - was {self.type_conversion[column_name]['original']}",
+                "type": f"category ({self.df_train[column_name].dtype})",
                 "description": self.dict_description.get(column_name, ""),
                 "missing_values": f"{missing_count} ({missing_pct:.1f}%)",
                 "unique_count": f"{unique_count} ({unique_pct:.1f}%)",
@@ -437,7 +275,7 @@ class AutoML_EDA:
             unique_count = self.df_train[column_name].nunique(dropna=True)
             unique_pct = unique_count / len(self.df_train) * 100
             return {
-                "type": f"string  ({self.type_conversion[column_name]['actual']}) - was {self.type_conversion[column_name]['original']}",
+                "type": f"string ({self.df_train[column_name].dtype})",
                 "description": self.dict_description.get(column_name, ""),
                 "missing_values": f"{missing_count} ({missing_pct:.1f}%)",
                 "unique_count": f"{unique_count} ({unique_pct:.1f}%)",
@@ -458,7 +296,7 @@ class AutoML_EDA:
             col_data = self.df_train[column_name]
             col_non_null = col_data.dropna()
             return {
-                "type": f"{self.type_conversion[column_name]["new"]}  ({self.type_conversion[column_name]['actual']}) - was {self.type_conversion[column_name]['original']}",
+                "type": f"{infer_dtype(self.df_train[column_name])} ({self.df_train[column_name].dtype})",
                 "description": self.dict_description.get(column_name, ""),
                 "missing_values": f"{missing_count} ({missing_pct:.1f}%)",
                 "min": col_non_null.min() if not col_non_null.empty else None,
@@ -486,33 +324,7 @@ class AutoML_EDA:
                 ),
             }
 
-    def set_column_types(self, also_ints_and_bools):
-        assert (
-            self.df_train is not None
-        ), "Training DataFrame is not initialized"
-        self.type_conversion = {}
-        total = len(self.df_train.columns)
-
-        for i, column in enumerate(self.df_train.columns, start=1):
-            sameline = "[SAMELINE]" if i != 1 or self.nogui else ""
-            if i % 2 == 0:
-                self.logger.info(
-                    f"{sameline}[GREEN]Analyzing columns ({i}/{total})"
-                )
-            self.type_conversion[column] = {}
-            self.type_conversion[column]["original"] = infer_dtype(
-                self.df_train[column]
-            )
-            # self.set_column_type(column, also_ints_and_bools)
-            self.type_conversion[column]["actual"] = self.df_train[column].dtype
-            self.type_conversion[column]["new"] = infer_dtype(
-                self.df_train[column]
-            )
-        sameline = "[FLUSH]" if self.nogui else "[SAMELINE]"
-        self.logger.info(f"{sameline}[GREEN]- Feature typing completed.")
-
-    def analyse_columns(self, also_ints_and_bools) -> None:
-        self.set_column_types(also_ints_and_bools)
+    def analyse_columns(self) -> None:
 
         self.column_info = {}
         self.target_info = {}
@@ -595,7 +407,7 @@ class AutoML_EDA:
         if result != "":
             return result
 
-        self.analyse_columns(also_ints_and_bools=False)
+        self.analyse_columns()
 
         target_type = infer_dtype(self.df_train[self.target])
         self.logger.info("[GREEN]- Creating overview table")
@@ -625,7 +437,7 @@ class AutoML_EDA:
             ):
                 if "correlated" in cur_suggestion:
                     summary_suggestions = [cur_suggestion]
-            if self.type_conversion[column]["new"] == "string":
+            if infer_dtype(self.df_train[column]) == "string":
                 summary_suggestions += self.column_info[column]["table"][
                     "suggestions"
                 ].split("<br>")
