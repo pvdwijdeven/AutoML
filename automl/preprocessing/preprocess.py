@@ -10,6 +10,7 @@ import pandas as pd
 from sklearn.impute import SimpleImputer
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 from sklearn.preprocessing import OrdinalEncoder
+from pandas.api.types import is_numeric_dtype
 
 
 class AutoML_Preprocess:
@@ -756,10 +757,176 @@ class AutoML_Preprocess:
         self.X_val = apply_imputers(X_val)
         self.X_test = apply_imputers(X_test)
 
+    def convert_column_to_boolean(self, column_name) -> bool:
+        def is_boolean_series(series):
+            # Check for boolean strings (case insensitive)
+            str_vals = series.dropna().astype(str).str.lower().unique()
+            bool_str_vals = {"true", "false"}
+            # Check for numeric 0/1
+            num_vals = set(series.dropna().unique())
+
+            # Condition 1: strings are only "true" or "false"
+            condition_str = all(val in bool_str_vals for val in str_vals)
+
+            # Condition 2: Numeric values only 0 or 1
+            condition_num = num_vals.issubset({0, 1})
+
+            return condition_str or condition_num
+
+        if is_boolean_series(self.X_train[column_name]):
+            # Convert the column in all datasets
+            def to_bool(series):
+                # If string values
+                if series.dtype == object or series.dtype.name == "string":
+                    return series.astype(str).str.lower() == "true"
+                # Else numeric: convert 1 to True, 0 to False
+                else:
+                    return series.astype(bool)
+
+            self.X_train[column_name] = to_bool(self.X_train[column_name])
+            self.X_val[column_name] = to_bool(self.X_val[column_name])
+            self.X_test[column_name] = to_bool(self.X_test[column_name])
+            self.logger.debug(
+                f"[GREEN] - Column '{column_name}' converted to boolean."
+            )
+            return True
+        else:
+            return False
+
+    def convert_column_to_category(self, column_name) -> bool:
+        convert = False
+        col = self.X_train[column_name]
+        max_unique = min(
+            20, max(10, int(0.01 * len(self.X_train[column_name])))
+        )
+        # Remove missing values for uniqueness check
+        unique_vals = col.dropna().unique()
+
+        if len(unique_vals) == 0:
+            return False  # empty or all missing, skip
+
+        # Case 1: Non-numeric and few unique values
+        if not is_numeric_dtype(col) and len(unique_vals) <= max_unique:
+            convert = True
+
+        # Case2: Numeric but integer-like and few unique values
+        elif is_numeric_dtype(col) and len(unique_vals) <= max_unique:
+            # For float columns with integers + missing values, check integer-likeness
+            if col.dtype == float:
+                # Check if all non-NaN values are integer-like
+                if col.dropna().apply(float.is_integer).all():
+                    convert = True
+            else:
+                # integer dtype or others
+                convert = True
+        if convert:
+            self.X_train[column_name] = col.astype("category")
+            self.X_test[column_name] = self.X_test[column_name].astype(
+                "category"
+            )
+            self.X_val[column_name] = self.X_val[column_name].astype("category")
+            self.logger.debug(
+                f"[GREEN] - Column '{column_name}' converted to category."
+            )
+            return True
+        else:
+            return False
+
+    def is_numeric_string_series(self, series):
+        # Check if all non-null values can be converted to numbers
+        # This allows int, float, scientific notation, negative sign, decimals
+        # Return True if all non-null values are strings representing numbers
+
+        # Drop missing values first
+        s = series.dropna()
+
+        # If empty after drop, return False (nothing to detect)
+        if s.empty:
+            return False
+
+        # All values must be strings (or object dtype with strings)
+        # Convert all to string (in case)
+        s_str = s.astype(str)
+
+        # Use pd.to_numeric with errors='coerce' to detect numeric strings
+        numeric_converted = pd.to_numeric(s_str, errors="coerce")
+
+        # If any non-null value failed conversion (NaN after to_numeric), then not all numeric strings
+        return numeric_converted.notna().all()
+
+    def convert_column_to_string(self, column_name) -> bool:
+        col = self.X_train[column_name]
+
+        # If column is already numeric, no need to convert to string
+        if is_numeric_dtype(col):
+            return False
+
+        # Check if column values are numeric strings
+        if self.is_numeric_string_series(col):
+            return False
+
+        # Otherwise, convert to string dtype
+        self.X_train[column_name] = col.astype("string")
+        self.X_test[column_name] = self.X_test[column_name].astype("string")
+        self.X_val[column_name] = self.X_val[column_name].astype("string")
+        self.logger.debug(
+            f"[GREEN] - Column '{column_name}' converted to string."
+        )
+        return True
+
+    def convert_column_to_integer(self, column_name) -> bool:
+        col = self.X_train[column_name]
+        if self.is_numeric_string_series(col):
+            col = col.astype("float64")
+        if col.apply(float.is_integer).all():
+            self.X_train[column_name] = col.astype("int64")
+            self.X_test[column_name] = self.X_test[column_name].astype("int64")
+            self.X_val[column_name] = self.X_val[column_name].astype("int64")
+            # self.logger.debug(
+            #     f"[GREEN] - Column '{column_name}' converted to integer."
+            # )
+            return True
+        else:
+            non_integers_mask = ~col.apply(float.is_integer)
+
+            # Filter and show those non-integer values
+            non_integer_values = col[non_integers_mask]
+
+            self.logger.debug(f"{column_name}: {non_integer_values}")
+        return False
+
+    def convert_column_to_float(self, column_name) -> bool:
+        col = self.X_train[column_name]
+        if self.is_numeric_string_series(col):
+            self.X_train[column_name] = col.astype("float64")
+            self.X_test[column_name] = self.X_test[column_name].astype(
+                "float64"
+            )
+            self.X_val[column_name] = self.X_val[column_name].astype("float64")
+            self.logger.debug(
+                f"[GREEN] - Column '{column_name}' converted to float."
+            )
+            return True
+        self.logger.error(f"Could not convert column {column_name}")
+        return False
+
+    def update_column_type(self, column_name: str) -> None:
+        # check if boolean
+        if self.convert_column_to_boolean(column_name):
+            return
+        if self.convert_column_to_category(column_name):
+            return
+        if self.convert_column_to_string(column_name):
+            return
+        if self.convert_column_to_integer(column_name):
+            return
+        self.convert_column_to_float(column_name)
+
     def preprocess(self):
         project = self.title if self.title else "dataset"
         self.logger.info(f"[MAGENTA]\nStarting preprocessing for {project}")
         result = self.eda.load_data()
+        self.dict_description = self.eda.dict_description
         assert self.eda.df_train is not None
         if result != "":
             return result
@@ -817,8 +984,40 @@ class AutoML_Preprocess:
                 method="",
                 threshold_method="",
             )
-        # 6 encoding
-        # 7 normalizing/scaling
-        # 8 dim. reduction
+
+        # 6 update column types
+        self.logger.info("[GREEN]- Updating column types.")
+        for col in self.X_train.columns:
+            self.update_column_type(col)
+        # 7 encoding
+        # 8 normalizing/scaling
+        # 9 dim. reduction
+
         self.logger.info(f"[MAGENTA]Done preprocessing for {project}")
+        self.post_process_eda()
+        # self.X_train.to_csv(
+        #     self.file_train.replace(".csv", "_prepro.csv"),
+        #     index=False,
+        # )
         return "Done! So far...."
+
+    def post_process_eda(self):
+        self.eda = AutoML_EDA(
+            report_file=self.report_file,
+            file_train=self.file_train,
+            file_test=self.file_test,
+            title=self.title,
+            target=self.target,
+            description=self.description,
+            nogui=self.nogui,
+            update_script=self.update_script,
+            logger=self.logger,
+        )
+        self.eda.df_train = pd.concat([self.X_train, self.y_train], axis=1)
+        self.eda.report_file = self.eda.report_file.replace(
+            ".html", "-prepro.html"
+        )
+        self.eda.dict_description = self.dict_description
+        self.eda.target = self.target
+        self.eda.df_test = None
+        self.eda.perform_eda(skip_load=True)

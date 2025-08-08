@@ -397,16 +397,17 @@ class AutoML_EDA:
             self.dict_description = {}
         return ""
 
-    def perform_eda(self) -> str:
-        project = self.title if self.title else "dataset"
-        self.logger.info(
-            f"[MAGENTA]\nStarting EDA (Exploratory Data Analysis) for {project}"
-        )
+    def perform_eda(self, skip_load=False) -> str:
+        if not skip_load:
+            project = self.title if self.title else "dataset"
+            self.logger.info(
+                f"[MAGENTA]\nStarting EDA (Exploratory Data Analysis) for {project}"
+            )
 
-        result = self.load_data()
+            result = self.load_data()
+            if result != "":
+                return result
         assert self.df_train is not None
-        if result != "":
-            return result
 
         self.analyse_columns()
 
