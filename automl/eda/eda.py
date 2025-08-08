@@ -175,6 +175,8 @@ class AutoML_EDA:
 
     def update_with_user_function(self, df, filepath):
 
+        database = "train" if df is self.df_train else "test"
+        self.logger.info(f"[GREEN]- Applying user update to {database} dataset")
         # Ensure absolute path and module name
         filepath = pathlib.Path(filepath).resolve()
         module_name = filepath.stem  # e.g. "user_file"
@@ -195,13 +197,18 @@ class AutoML_EDA:
         # Apply the function to the dataframe
         return update_func(df)
 
-    def set_column_type(self, column_name: str, also_ints: bool = True) -> None:
+    def set_column_type(
+        self, column_name: str, also_ints_and_bools: bool = True
+    ) -> None:
 
         def convert_to_bool_if_binary(series):
             if pd.api.types.is_numeric_dtype(
                 series
             ) and not pd.api.types.is_bool_dtype(series):
-                unique_vals = set(series.dropna().unique())
+                if also_ints_and_bools:
+                    unique_vals = set(series.dropna().unique())
+                else:
+                    unique_vals = set(series.unique())
                 if unique_vals <= {0, 1}:
                     return series.map({0: False, 1: True}).astype("boolean")
             return series
@@ -211,10 +218,12 @@ class AutoML_EDA:
             if pd.api.types.is_object_dtype(
                 series
             ) or pd.api.types.is_string_dtype(series):
-
-                normalized = series.dropna().map(
-                    lambda x: str(x).strip().lower()
-                )
+                if also_ints_and_bools:
+                    normalized = series.dropna().map(
+                        lambda x: str(x).strip().lower()
+                    )
+                else:
+                    normalized = series.map(lambda x: str(x).strip().lower())
                 valid_values = {"true", "false"}
 
                 unexpected = normalized[~normalized.isin(valid_values)]
@@ -251,9 +260,11 @@ class AutoML_EDA:
         col_series_train = convert_to_bool_if_binary(col_series_train)
 
         col_series_train = normalize_booleans(col_series_train)
-
         # Step 2: Detect if boolean
-        unique_values = pd.Series(col_series_train.dropna().unique())
+        if also_ints_and_bools:
+            unique_values = pd.Series(col_series_train.dropna().unique())
+        else:
+            unique_values = pd.Series(col_series_train.unique())
         if unique_values.isin([True, False]).all():
             self.df_train[column_name] = col_series_train.astype("boolean")
 
@@ -271,7 +282,6 @@ class AutoML_EDA:
             self.df_train[column_name] = self.df_train[column_name].astype(
                 inferred_dtype
             )
-
         # Step 4: Attempt numeric conversion
         try_numeric = pd.api.types.is_object_dtype(
             col_series_train
@@ -294,7 +304,8 @@ class AutoML_EDA:
 
         if converted is not None:
             is_int_like = (
-                np.isclose(converted.dropna() % 1, 0).all() and also_ints
+                np.isclose(converted.dropna() % 1, 0).all()
+                and also_ints_and_bools
             )
             non_na_count = col_series_train.notna().sum()
             if converted.notna().sum() == non_na_count:
@@ -475,7 +486,7 @@ class AutoML_EDA:
                 ),
             }
 
-    def set_column_types(self, also_ints):
+    def set_column_types(self, also_ints_and_bools):
         assert (
             self.df_train is not None
         ), "Training DataFrame is not initialized"
@@ -492,15 +503,15 @@ class AutoML_EDA:
             self.type_conversion[column]["original"] = infer_dtype(
                 self.df_train[column]
             )
-            self.set_column_type(column, also_ints)
+            self.set_column_type(column, also_ints_and_bools)
             self.type_conversion[column]["new"] = infer_dtype(
                 self.df_train[column]
             )
         sameline = "[FLUSH]" if self.nogui else "[SAMELINE]"
         self.logger.info(f"{sameline}[GREEN]- Feature typing completed.")
 
-    def analyse_columns(self, also_ints) -> None:
-        self.set_column_types(also_ints)
+    def analyse_columns(self, also_ints_and_bools) -> None:
+        self.set_column_types(also_ints_and_bools)
 
         self.column_info = {}
         self.target_info = {}
@@ -541,11 +552,11 @@ class AutoML_EDA:
             self.df_test = self.read_data(self.file_test)
         else:
             self.df_test = None
-        if self.df_test is None:
+        if self.df_test is None and self.file_test != "":
             self.logger.warning(
                 "Test data could not be loaded. Using only training data."
             )
-        else:
+        if self.df_test is not None:
             if self.update_script != "":
                 self.df_test = self.update_with_user_function(
                     self.df_test, self.update_script
@@ -583,7 +594,7 @@ class AutoML_EDA:
         if result != "":
             return result
 
-        self.analyse_columns(also_ints=False)
+        self.analyse_columns(also_ints_and_bools=False)
 
         target_type = infer_dtype(self.df_train[self.target])
         self.logger.info("[GREEN]- Creating overview table")
