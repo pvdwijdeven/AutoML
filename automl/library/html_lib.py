@@ -112,7 +112,10 @@ def generate_relation_visuals(
     else:
         num_feats = 0
     # Step 7: Correlation matrix
+
     corr_matrix = df[all_features].corr()
+    sorted_features = sorted(corr_matrix.columns, key=lambda x: x.lower())
+    corr_matrix = corr_matrix.loc[sorted_features[::-1], sorted_features]
     fig_corr = px.imshow(
         corr_matrix,
         text_auto=True,
@@ -122,10 +125,9 @@ def generate_relation_visuals(
         aspect="auto",
     )
     fig_corr.update_layout(
-        autosize=False,
-        width=1000,
-        height=1000,
+        autosize=False, width=1000, height=1000, xaxis_side="top"
     )
+    fig_corr.update_xaxes(side="top")
     correlation_html = fig_corr.to_html(
         full_html=False,
         include_plotlyjs=False,
@@ -153,20 +155,40 @@ def generate_relation_visuals(
         mi_scores = {feature: None for feature in all_features}
 
     # Step 9: Plot MI
-    mi_series = pd.Series(mi_scores).dropna().sort_values(ascending=False)
+    mi_series = pd.Series(mi_scores).dropna().sort_values(ascending=True)
+
+    # Pass the data as a dataframe for easy control
+    df_mi = mi_series.reset_index()
+    df_mi.columns = ["Feature", "MutualInformation"]
+
     fig_mi = px.bar(
-        mi_series,
-        x=mi_series.index,
-        y=mi_series.values,
+        df_mi,
+        x="Feature",
+        y="MutualInformation",
         title=f"Mutual Information with Target: {target}",
-        labels={"x": "Feature", "y": "Mutual Information"},
+        labels={
+            "Feature": "Feature",
+            "MutualInformation": "Mutual Information",
+        },
     )
+
+    # Set categoryorder to 'array' and provide categories in descending order of MI score
     fig_mi.update_layout(
-        xaxis_tickangle=-45,
+        xaxis=dict(
+            categoryorder="array",
+            categoryarray=df_mi["Feature"].tolist(),
+            tickangle=-45,
+            autorange=True,  # Not reversed to keep left→right ascending categories (highest MI on left)
+        ),
+        yaxis=dict(
+            autorange=True,
+        ),
         autosize=False,
         width=1000,
         height=500,
     )
+    # fig_mi.update_yaxes(range=[0, 1])
+
     target_relation_html = fig_mi.to_html(
         full_html=False,
         include_plotlyjs=False,

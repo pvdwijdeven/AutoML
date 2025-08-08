@@ -71,7 +71,7 @@ def plot_missingness_matrix(df, top_n=100) -> str:
     missing_counts = df.isnull().sum()
     missing_counts = missing_counts[missing_counts > 0]
     top_missing_cols = (
-        missing_counts.sort_values(ascending=False).head(top_n).index.tolist()
+        missing_counts.sort_values(ascending=True).head(top_n).index.tolist()
     )
 
     # Step 2: Create a boolean mask: True = missing, False = present
