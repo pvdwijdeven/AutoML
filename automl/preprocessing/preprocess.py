@@ -1,16 +1,17 @@
-from library import (
-    Logger,
-)
+# internal imports
+from library import Logger, infer_dtype, check_classification
 from eda import AutoML_EDA
-from sklearn.model_selection import train_test_split
+
+# external imports
 from scipy.stats import shapiro
 import numpy as np
-from library import infer_dtype, check_classification
 import pandas as pd
-from sklearn.impute import SimpleImputer
-from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
-from sklearn.preprocessing import OrdinalEncoder
 from pandas.api.types import is_numeric_dtype
+from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
+from sklearn.impute import SimpleImputer
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import OneHotEncoder, OrdinalEncoder, LabelEncoder
+import warnings
 
 
 class AutoML_Preprocess:
@@ -578,13 +579,7 @@ class AutoML_Preprocess:
         # Determine if target is classification or regression
         y = self.y_train
 
-        is_regression = infer_dtype(y) in {"integer", "float"}
-        if np.issubdtype(y.dtype, np.number):
-            # Numeric target: treat as regression
-            is_regression = True
-        else:
-            # Non-numeric, treat as classification
-            is_regression = False
+        is_regression = not check_classification(y)
 
         # Alternatively, you might check number of unique classes or task knowledge
         # Here a simple numeric dtype check is used
@@ -785,7 +780,7 @@ class AutoML_Preprocess:
         if self.df_test is not None:
             self.df_test = apply_imputers(df_test)
 
-    def convert_column_to_boolean(self, column_name, is_target=False) -> bool:
+    def convert_column_to_boolean(self, column_name) -> bool:
         def is_boolean_series(series):
             # Check for boolean strings (case insensitive)
             str_vals = series.dropna().astype(str).str.lower().unique()
@@ -801,10 +796,8 @@ class AutoML_Preprocess:
 
             return condition_str or condition_num
 
-        if not is_target:
-            cur_series = self.X_train[column_name]
-        else:
-            cur_series = self.y_train
+        cur_series = self.X_train[column_name]
+
         if is_boolean_series(cur_series):
             # Convert the column in all datasets
             def to_bool(series):
@@ -815,31 +808,31 @@ class AutoML_Preprocess:
                 else:
                     return series.astype(bool)
 
-            if not is_target:
-                self.X_train[column_name] = to_bool(self.X_train[column_name])
-                self.X_val[column_name] = to_bool(self.X_val[column_name])
-                self.X_test[column_name] = to_bool(self.X_test[column_name])
-                if self.df_test is not None:
-                    self.df_test[column_name] = to_bool(
-                        self.df_test[column_name]
-                    )
-            else:
-                self.y_train = to_bool(self.y_train)
-                self.y_val = to_bool(self.y_val)
-                self.y_test = to_bool(self.y_test)
+            self.X_train[column_name] = to_bool(
+                self.X_train[column_name]
+            ).astype(int)
+            self.X_val[column_name] = to_bool(self.X_val[column_name]).astype(
+                int
+            )
+            self.X_test[column_name] = to_bool(self.X_test[column_name]).astype(
+                int
+            )
+            if self.df_test is not None:
+                self.df_test[column_name] = to_bool(
+                    self.df_test[column_name]
+                ).astype(int)
+
             self.logger.debug(
-                f"[GREEN] - Column '{column_name}' converted to boolean."
+                f"[GREEN] - Column '{column_name}' converted to (0/1) boolean."
             )
             return True
         else:
             return False
 
-    def convert_column_to_category(self, column_name, is_target=False) -> bool:
+    def convert_column_to_category(self, column_name) -> bool:
         convert = False
-        if not is_target:
-            col = self.X_train[column_name]
-        else:
-            col = self.y_train
+        col = self.X_train[column_name]
+
         max_unique = min(20, max(10, int(0.01 * len(col))))
         # Remove missing values for uniqueness check
         unique_vals = col.dropna().unique()
@@ -862,23 +855,15 @@ class AutoML_Preprocess:
                 # integer dtype or others
                 convert = True
         if convert:
-            if not is_target:
-                self.X_train[column_name] = col.astype("category")
-                self.X_test[column_name] = self.X_test[column_name].astype(
+            self.X_train[column_name] = col.astype("category")
+            self.X_test[column_name] = self.X_test[column_name].astype(
+                "category"
+            )
+            self.X_val[column_name] = self.X_val[column_name].astype("category")
+            if self.df_test is not None:
+                self.df_test[column_name] = self.df_test[column_name].astype(
                     "category"
                 )
-                self.X_val[column_name] = self.X_val[column_name].astype(
-                    "category"
-                )
-                if self.df_test is not None:
-                    self.df_test[column_name] = self.df_test[
-                        column_name
-                    ].astype("category")
-            else:
-                self.y_train = col.astype("category")
-                self.y_test = self.y_test.astype("category")
-                self.y_val = self.y_val.astype("category")
-
             self.logger.debug(
                 f"[GREEN] - Column '{column_name}' converted to category."
             )
@@ -908,11 +893,9 @@ class AutoML_Preprocess:
         # If any non-null value failed conversion (NaN after to_numeric), then not all numeric strings
         return numeric_converted.notna().all()
 
-    def convert_column_to_string(self, column_name, is_target=False) -> bool:
-        if not is_target:
-            col = self.X_train[column_name]
-        else:
-            col = self.y_train
+    def convert_column_to_string(self, column_name) -> bool:
+
+        col = self.X_train[column_name]
 
         # If column is already numeric, no need to convert to string
         if is_numeric_dtype(col):
@@ -923,74 +906,51 @@ class AutoML_Preprocess:
             return False
 
         # Otherwise, convert to string dtype
-        if not is_target:
-            self.X_train[column_name] = col.astype("string")
-            self.X_test[column_name] = self.X_test[column_name].astype("string")
-            self.X_val[column_name] = self.X_val[column_name].astype("string")
-            if self.df_test is not None:
-                self.df_test[column_name] = self.df_test[column_name].astype(
-                    "string"
-                )
-        else:
-            self.y_train = col.astype("string")
-            self.y_test = self.y_test.astype("string")
-            self.y_val = self.y_val.astype("string")
+
+        self.X_train[column_name] = col.astype("string")
+        self.X_test[column_name] = self.X_test[column_name].astype("string")
+        self.X_val[column_name] = self.X_val[column_name].astype("string")
+        if self.df_test is not None:
+            self.df_test[column_name] = self.df_test[column_name].astype(
+                "string"
+            )
         self.logger.debug(
             f"[GREEN] - Column '{column_name}' converted to string."
         )
         return True
 
-    def convert_column_to_integer(self, column_name, is_target=False) -> bool:
-        if not is_target:
-            col = self.X_train[column_name]
-        else:
-            col = self.y_train
+    def convert_column_to_integer(self, column_name) -> bool:
+
+        col = self.X_train[column_name]
+
         if self.is_numeric_string_series(col):
             col = col.astype("float64")
         if col.apply(float.is_integer).all():
-            if not is_target:
-                self.X_train[column_name] = col.astype("int64")
-                self.X_test[column_name] = self.X_test[column_name].astype(
+
+            self.X_train[column_name] = col.astype("int64")
+            self.X_test[column_name] = self.X_test[column_name].astype("int64")
+            self.X_val[column_name] = self.X_val[column_name].astype("int64")
+            if self.df_test is not None:
+                self.df_test[column_name] = self.df_test[column_name].astype(
                     "int64"
                 )
-                self.X_val[column_name] = self.X_val[column_name].astype(
-                    "int64"
-                )
-                if self.df_test is not None:
-                    self.df_test[column_name] = self.df_test[
-                        column_name
-                    ].astype("int64")
-            else:
-                self.y_train = col.astype("int64")
-                self.y_test = self.y_test.astype("int64")
-                self.y_val = self.y_val.astype("int64")
-            return True
         return False
 
-    def convert_column_to_float(self, column_name, is_target=False) -> bool:
-        if not is_target:
-            col = self.X_train[column_name]
-        else:
-            col = self.y_train[column_name]
+    def convert_column_to_float(self, column_name) -> bool:
+
+        col = self.X_train[column_name]
+
         if self.is_numeric_string_series(col):
-            if not is_target:
-                self.X_train[column_name] = col.astype("float64")
-                self.X_test[column_name] = self.X_test[column_name].astype(
+
+            self.X_train[column_name] = col.astype("float64")
+            self.X_test[column_name] = self.X_test[column_name].astype(
+                "float64"
+            )
+            self.X_val[column_name] = self.X_val[column_name].astype("float64")
+            if self.df_test is not None:
+                self.df_test[column_name] = self.df_test[column_name].astype(
                     "float64"
                 )
-                self.X_val[column_name] = self.X_val[column_name].astype(
-                    "float64"
-                )
-                if self.df_test is not None:
-                    self.df_test[column_name] = self.df_test[
-                        column_name
-                    ].astype("float64")
-            else:
-                self.y_train[column_name] = col.astype("float64")
-                self.y_test[column_name] = self.y_test[column_name].astype(
-                    "float64"
-                )
-                self.y_val = self.y_val.astype("float64")
             self.logger.debug(
                 f"[GREEN] - Column '{column_name}' converted to float."
             )
@@ -998,17 +958,389 @@ class AutoML_Preprocess:
         self.logger.error(f"Could not convert column {column_name}")
         return False
 
-    def update_column_type(self, column_name: str, is_target=False) -> None:
+    def update_column_type(self, column_name: str) -> None:
         # check if boolean
-        if self.convert_column_to_boolean(column_name, is_target):
+        if self.convert_column_to_boolean(column_name):
             return
-        if self.convert_column_to_category(column_name, is_target):
+        if self.convert_column_to_category(column_name):
             return
-        if self.convert_column_to_string(column_name, is_target):
+        if self.convert_column_to_string(column_name):
             return
-        if self.convert_column_to_integer(column_name, is_target):
+        if self.convert_column_to_integer(column_name):
             return
-        self.convert_column_to_float(column_name, is_target)
+        self.convert_column_to_float(column_name)
+
+    def auto_encode_features(self, max_unique_for_categorical=15):
+        # suppress warnings during encoding when new categories are found in val/test/df_test
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            encoders = {}
+            transformed_train = self.X_train.copy()
+            transformed_val = self.X_val.copy()
+            transformed_test = self.X_test.copy()
+            transformed_df_test = None
+            if self.df_test is not None:
+                transformed_df_test = self.df_test.copy()
+            df = self.X_train.copy()
+
+            for col in df.columns:
+                self.logger.debug(f"{col}")
+                col_data = df[col]
+                unique_vals = col_data.nunique()
+                dtype = col_data.dtype
+
+                # Boolean: convert to int (0/1)
+                if pd.api.types.is_bool_dtype(dtype):
+                    transformed_train[col] = col_data.astype(int)
+                    transformed_val[col] = self.X_val[col].astype(int)
+                    transformed_test[col] = self.X_test[col].astype(int)
+                    if (
+                        self.df_test is not None
+                        and transformed_df_test is not None
+                    ):
+                        transformed_df_test[col] = self.df_test[col].astype(int)
+                    continue
+
+                # Category dtype: nominal categorical -> OneHotEncoder with handle_unknown='ignore'
+                elif isinstance(dtype, pd.CategoricalDtype):
+                    self.logger.debug(f"{col}: OneHotEncoder")
+                    encoder = OneHotEncoder(
+                        drop="first",
+                        sparse_output=False,
+                        handle_unknown="ignore",
+                    )
+                    encoded_train = encoder.fit_transform(
+                        col_data.values.reshape(-1, 1)
+                    )
+                    cats = encoder.categories_[0]
+                    cols_one_hot = [f"{col}_{cat}" for cat in cats[1:]]  # type: ignore
+                    encoded_train_df = pd.DataFrame(
+                        encoded_train, columns=cols_one_hot, index=df.index
+                    )
+                    transformed_train = transformed_train.drop(
+                        columns=[col]
+                    ).join(encoded_train_df)
+
+                    encoded_val = encoder.transform(
+                        self.X_val[col].values.reshape(-1, 1)
+                    )
+                    encoded_val_df = pd.DataFrame(
+                        encoded_val, columns=cols_one_hot, index=self.X_val.index  # type: ignore
+                    )
+                    transformed_val = transformed_val.drop(columns=[col]).join(
+                        encoded_val_df
+                    )
+
+                    encoded_test = encoder.transform(
+                        self.X_test[col].values.reshape(-1, 1)
+                    )
+                    encoded_test_df = pd.DataFrame(
+                        encoded_test, columns=cols_one_hot, index=self.X_test.index  # type: ignore
+                    )
+                    transformed_test = transformed_test.drop(
+                        columns=[col]
+                    ).join(encoded_test_df)
+                    if (
+                        self.df_test is not None
+                        and transformed_df_test is not None
+                    ):
+                        encoded_df_test = encoder.transform(
+                            self.df_test[col].values.reshape(-1, 1)
+                        )
+                        encoded_df_test_df = pd.DataFrame(
+                            encoded_df_test, columns=cols_one_hot, index=self.df_test.index  # type: ignore
+                        )
+                        transformed_df_test = transformed_df_test.drop(
+                            columns=[col]
+                        ).join(encoded_df_test_df)
+                    encoders[col] = encoder
+                    continue
+
+                # String/object dtype: treat as nominal categorical with OneHotEncoder and handle_unknown='ignore'
+                elif pd.api.types.is_object_dtype(dtype):
+                    self.logger.debug(f"{col}: OneHotEncoder")
+                    temp_cat = col_data.astype("category")
+                    encoder = OneHotEncoder(
+                        drop="first",
+                        sparse_output=False,
+                        handle_unknown="ignore",
+                    )
+                    encoded_train = encoder.fit_transform(
+                        temp_cat.values.reshape(-1, 1)
+                    )
+                    cats = encoder.categories_[0]
+                    cols_one_hot = [f"{col}_{cat}" for cat in cats[1:]]  # type: ignore
+                    encoded_train_df = pd.DataFrame(
+                        encoded_train, columns=cols_one_hot, index=df.index
+                    )
+                    transformed_train = transformed_train.drop(
+                        columns=[col]
+                    ).join(encoded_train_df)
+
+                    encoded_val = encoder.transform(
+                        self.X_val[col].astype("category").values.reshape(-1, 1)
+                    )
+                    encoded_val_df = pd.DataFrame(
+                        encoded_val, columns=cols_one_hot, index=self.X_val.index  # type: ignore
+                    )
+                    transformed_val = transformed_val.drop(columns=[col]).join(
+                        encoded_val_df
+                    )
+
+                    encoded_test = encoder.transform(
+                        self.X_test[col]
+                        .astype("category")
+                        .values.reshape(-1, 1)
+                    )
+                    encoded_test_df = pd.DataFrame(
+                        encoded_test, columns=cols_one_hot, index=self.X_test.index  # type: ignore
+                    )
+                    transformed_test = transformed_test.drop(
+                        columns=[col]
+                    ).join(encoded_test_df)
+                    if (
+                        self.df_test is not None
+                        and transformed_df_test is not None
+                    ):
+                        encoded_df_test = encoder.transform(
+                            self.df_test[col]
+                            .astype("category")
+                            .values.reshape(-1, 1)
+                        )
+                        encoded_df_test_df = pd.DataFrame(
+                            encoded_df_test, columns=cols_one_hot, index=self.df_test.index  # type: ignore
+                        )
+                        transformed_df_test = transformed_df_test.drop(
+                            columns=[col]
+                        ).join(encoded_df_test_df)
+                    encoders[col] = encoder
+                    continue
+
+                # Numeric dtype with low cardinality: one-hot or ordinal encoding with unknown category handling
+                elif pd.api.types.is_numeric_dtype(dtype):
+                    if unique_vals <= max_unique_for_categorical:
+                        if self.y_train is not None:
+                            df_combined = df.copy()
+                            df_combined[self.y_train.name] = self.y_train
+                            means = df_combined.groupby(col)[
+                                self.y_train.name
+                            ].mean()
+                            if (
+                                means.is_monotonic_increasing
+                                or means.is_monotonic_decreasing
+                            ):
+                                # OrdinalEncoder with unknown category handling
+                                encoder = OrdinalEncoder(
+                                    handle_unknown="use_encoded_value",
+                                    unknown_value=-1,
+                                )
+                                transformed_train[[col]] = (
+                                    encoder.fit_transform(
+                                        col_data.values.reshape(-1, 1)
+                                    )
+                                )
+                                transformed_val[[col]] = encoder.transform(
+                                    self.X_val[col].values.reshape(-1, 1)
+                                )
+                                transformed_test[[col]] = encoder.transform(
+                                    self.X_test[col].values.reshape(-1, 1)
+                                )
+                                if (
+                                    self.df_test is not None
+                                    and transformed_df_test is not None
+                                ):
+                                    transformed_df_test[[col]] = (
+                                        encoder.transform(
+                                            self.df_test[col].values.reshape(
+                                                -1, 1
+                                            )
+                                        )
+                                    )
+                                self.logger.debug(
+                                    f"{col}: OrdinalEncoder with unknown category handling"
+                                )
+                                encoders[col] = encoder
+                            else:
+                                # OneHotEncoder with handle_unknown='ignore'
+                                encoder = OneHotEncoder(
+                                    drop="first",
+                                    sparse_output=False,
+                                    handle_unknown="ignore",
+                                )
+                                encoded_train = encoder.fit_transform(
+                                    col_data.values.reshape(-1, 1)
+                                )
+                                cols_one_hot = [
+                                    f"{col}_{cat}"
+                                    for cat in encoder.categories_[0][1:]  # type: ignore
+                                ]
+                                encoded_train_df = pd.DataFrame(
+                                    encoded_train,
+                                    columns=cols_one_hot,
+                                    index=df.index,
+                                )
+                                transformed_train = transformed_train.drop(
+                                    columns=[col]
+                                ).join(encoded_train_df)
+
+                                encoded_val = encoder.transform(
+                                    self.X_val[col].values.reshape(-1, 1)
+                                )
+                                encoded_val_df = pd.DataFrame(
+                                    encoded_val,  # type: ignore
+                                    columns=cols_one_hot,
+                                    index=self.X_val.index,
+                                )
+                                transformed_val = transformed_val.drop(
+                                    columns=[col]
+                                ).join(encoded_val_df)
+
+                                encoded_test = encoder.transform(
+                                    self.X_test[col].values.reshape(-1, 1)
+                                )
+                                encoded_test_df = pd.DataFrame(
+                                    encoded_test,  # type: ignore
+                                    columns=cols_one_hot,
+                                    index=self.X_test.index,
+                                )
+                                transformed_test = transformed_test.drop(
+                                    columns=[col]
+                                ).join(encoded_test_df)
+                                if (
+                                    self.df_test is not None
+                                    and transformed_df_test is not None
+                                ):
+                                    encoded_df_test = encoder.transform(
+                                        self.df_test[col].values.reshape(-1, 1)
+                                    )
+                                    encoded_df_test_df = pd.DataFrame(
+                                        encoded_df_test,  # type: ignore
+                                        columns=cols_one_hot,
+                                        index=self.df_test.index,
+                                    )
+                                    transformed_df_test = (
+                                        transformed_df_test.drop(
+                                            columns=[col]
+                                        ).join(encoded_df_test_df)
+                                    )
+                                self.logger.debug(
+                                    f"{col}: OneHotEncoder with unknown category handling"
+                                )
+                                encoders[col] = encoder
+                        else:
+                            encoder = OneHotEncoder(
+                                drop="first",
+                                sparse_output=False,
+                                handle_unknown="ignore",
+                            )
+                            encoded_train = encoder.fit_transform(
+                                col_data.values.reshape(-1, 1)
+                            )
+                            cols_one_hot = [
+                                f"{col}_{cat}" for cat in encoder.categories_[0][1:]  # type: ignore
+                            ]
+                            encoded_train_df = pd.DataFrame(
+                                encoded_train,
+                                columns=cols_one_hot,
+                                index=df.index,
+                            )
+                            transformed_train = transformed_train.drop(
+                                columns=[col]
+                            ).join(encoded_train_df)
+
+                            encoded_val = encoder.transform(
+                                self.X_val[col].values.reshape(-1, 1)
+                            )
+                            encoded_val_df = pd.DataFrame(
+                                encoded_val,  # type: ignore
+                                columns=cols_one_hot,
+                                index=self.X_val.index,
+                            )
+                            transformed_val = transformed_val.drop(
+                                columns=[col]
+                            ).join(encoded_val_df)
+
+                            encoded_test = encoder.transform(
+                                self.X_test[col].values.reshape(-1, 1)
+                            )
+                            encoded_test_df = pd.DataFrame(
+                                encoded_test,  # type: ignore
+                                columns=cols_one_hot,
+                                index=self.X_test.index,
+                            )
+                            transformed_test = transformed_test.drop(
+                                columns=[col]
+                            ).join(encoded_test_df)
+                            if (
+                                self.df_test is not None
+                                and transformed_df_test is not None
+                            ):
+                                encoded_df_test = encoder.transform(
+                                    self.df_test[col].values.reshape(-1, 1)
+                                )
+                                encoded_df_test_df = pd.DataFrame(
+                                    encoded_df_test,  # type: ignore
+                                    columns=cols_one_hot,
+                                    index=self.df_test.index,
+                                )
+                                transformed_df_test = transformed_df_test.drop(
+                                    columns=[col]
+                                ).join(encoded_df_test_df)
+                            self.logger.debug(
+                                f"{col}: OneHotEncoder with unknown category handling"
+                            )
+                            encoders[col] = encoder
+                    else:
+                        # Leave continuous numeric unchanged
+                        pass
+
+        self.X_train = transformed_train
+        self.X_val = transformed_val
+        self.X_test = transformed_test
+        if self.df_test is not None and transformed_df_test is not None:
+            self.df_test = transformed_df_test
+        return encoders
+
+    def encode_targets(self):
+        le = LabelEncoder()
+        if not pd.api.types.is_numeric_dtype(self.y_train):
+            # Fit on y_train
+            le.fit(self.y_train)
+            # Transform y_train, y_test, y_val using the same encoder
+            self.y_train = pd.Series(
+                le.transform(self.y_train),  # type: ignore
+                index=self.y_train.index,
+                name=self.y_train.name,
+            )
+            self.y_test = pd.Series(
+                le.transform(self.y_test),  # type: ignore
+                index=self.y_test.index,
+                name=self.y_test.name,
+            )
+            self.y_val = pd.Series(
+                le.transform(self.y_val),  # type: ignore
+                index=self.y_val.index,
+                name=self.y_val.name,
+            )
+        elif pd.api.types.is_bool_dtype(self.y_train):
+            self.y_train = self.y_train.astype(int)
+            self.y_test = self.y_test.astype(int)
+            self.y_val = self.y_val.astype(int)
+
+    def drop_strings(self):
+        # Identify columns with string dtype (including object dtype with strings)
+        drop_cols = [
+            col
+            for col in self.X_train.columns
+            if pd.api.types.is_string_dtype(self.X_train[col])
+        ]
+        self.logger.debug(f"[GREEN]- dropping {drop_cols} as they are strings")
+        if drop_cols:
+            self.X_train.drop(columns=drop_cols, inplace=True)
+            self.X_val.drop(columns=drop_cols, inplace=True)
+            self.X_test.drop(columns=drop_cols, inplace=True)
+            if self.df_test is not None:
+                self.df_test.drop(columns=drop_cols, inplace=True)
 
     def preprocess(self):
         project = self.title if self.title else "dataset"
@@ -1077,18 +1409,20 @@ class AutoML_Preprocess:
         self.logger.info("[GREEN]- Updating column types.")
         for col in self.X_train.columns:
             self.update_column_type(col)
-        self.update_column_type(self.target, is_target=True)
-
+        self.encode_targets()
+        self.drop_strings()
         # 7 encoding
+        self.auto_encode_features()
         # 8 normalizing/scaling
         # 9 dim. reduction
 
         self.logger.info(f"[MAGENTA]Done preprocessing for {project}")
         self.post_process_eda()
-        # self.X_train.to_csv(
-        #     self.file_train.replace(".csv", "_prepro.csv"),
-        #     index=False,
-        # )
+
+        self.X_train.to_csv(
+            self.file_train.replace(".csv", "_prepro.csv"),
+            index=False,
+        )
         return "Done! So far...."
 
     def post_process_eda(self):
