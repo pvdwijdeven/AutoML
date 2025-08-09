@@ -169,6 +169,10 @@ class AutoML_Preprocess:
             columns=duplicate_columns, errors="ignore"
         )
         self.X_val = self.X_val.drop(columns=duplicate_columns, errors="ignore")
+        if self.df_test is not None:
+            self.df_test = self.df_test.drop(
+                columns=duplicate_columns, errors="ignore"
+            )
 
     def drop_constant_columns(self):
         # Vectorized approach: find columns where number of unique values is 1
@@ -185,6 +189,10 @@ class AutoML_Preprocess:
             columns=constant_columns, errors="ignore"
         )
         self.X_val = self.X_val.drop(columns=constant_columns, errors="ignore")
+        if self.df_test is not None:
+            self.df_test = self.df_test.drop(
+                columns=constant_columns, errors="ignore"
+            )
 
     def decide_outlier_imputation_order(
         self,
@@ -425,6 +433,10 @@ class AutoML_Preprocess:
         X_train = self.X_train.copy()
         X_val = self.X_val.copy()
         X_test = self.X_test.copy()
+        if self.df_test is not None:
+            df_test = self.df_test.copy()
+        else:
+            df_test = None
 
         for col in X_train[columns].select_dtypes(include=[np.number]).columns:
             if self.is_continuous_feature(X_train[col]):
@@ -471,18 +483,6 @@ class AutoML_Preprocess:
                     # Also drop these rows in y_train if applicable
                     self.y_train = self.y_train.loc[X_train.index]
 
-                    # For val/test sets, drop rows that would be outliers by same bounds
-                    outliers_val = (X_val[col] < lower_bound) | (
-                        X_val[col] > upper_bound
-                    )
-                    X_val = X_val.loc[~outliers_val]
-                    self.y_val = self.y_val.loc[X_val.index]
-
-                    outliers_test = (X_test[col] < lower_bound) | (
-                        X_test[col] > upper_bound
-                    )
-                    X_test = X_test.loc[~outliers_test]
-                    self.y_test = self.y_test.loc[X_test.index]
                     self.logger.debug(
                         f"[GREEN]- {outliers_train.sum()} outliers in column {col} dropped"
                     )
@@ -505,6 +505,17 @@ class AutoML_Preprocess:
                     X_test[col] = np.where(
                         X_test[col] > upper_bound, upper_bound, X_test[col]
                     )
+                    if df_test is not None:
+                        df_test[col] = np.where(
+                            df_test[col] < lower_bound,
+                            lower_bound,
+                            df_test[col],
+                        )
+                        df_test[col] = np.where(
+                            df_test[col] > upper_bound,
+                            upper_bound,
+                            df_test[col],
+                        )
                     self.logger.debug(
                         f"[GREEN]  - {outliers_train.sum()} outliers in column {col} capped between {X_train[col].min()} and {X_train[col].max()}"
                     )
@@ -520,6 +531,12 @@ class AutoML_Preprocess:
                         | (X_test[col] > upper_bound),
                         col,
                     ] = median
+                    if df_test is not None:
+                        df_test.loc[
+                            (df_test[col] < lower_bound)
+                            | (df_test[col] > upper_bound),
+                            col,
+                        ] = median
                     self.logger.debug(
                         f"[GREEN]  - {outliers_train.sum()} outliers in column {col} imputed with median {median}"
                     )
@@ -529,6 +546,8 @@ class AutoML_Preprocess:
         self.X_train = X_train
         self.X_val = X_val
         self.X_test = X_test
+        if df_test is not None:
+            self.df_test = df_test
 
     def skip_outliers(self) -> bool:
         target_col = self.y_train
@@ -607,6 +626,11 @@ class AutoML_Preprocess:
         X_train = self.X_train
         X_val = self.X_val
         X_test = self.X_test
+        if self.df_test is not None:
+            df_test = self.df_test
+        else:
+            df_test = None
+
         self.logger.info("[GREEN]- Processing missing values")
         feature_importances = self.get_feature_importances()
         # Step 1: Drop columns based on missingness and feature importance
@@ -650,6 +674,8 @@ class AutoML_Preprocess:
         X_train = X_train.drop(columns=cols_to_drop)
         X_val = X_val.drop(columns=cols_to_drop, errors="ignore")
         X_test = X_test.drop(columns=cols_to_drop, errors="ignore")
+        if df_test is not None:
+            df_test = df_test.drop(columns=cols_to_drop, errors="ignore")
 
         # Update feature importance dict accordingly
         feature_importances = {
@@ -756,8 +782,10 @@ class AutoML_Preprocess:
         self.X_train = apply_imputers(X_train)
         self.X_val = apply_imputers(X_val)
         self.X_test = apply_imputers(X_test)
+        if self.df_test is not None:
+            self.df_test = apply_imputers(df_test)
 
-    def convert_column_to_boolean(self, column_name) -> bool:
+    def convert_column_to_boolean(self, column_name, is_target=False) -> bool:
         def is_boolean_series(series):
             # Check for boolean strings (case insensitive)
             str_vals = series.dropna().astype(str).str.lower().unique()
@@ -773,7 +801,11 @@ class AutoML_Preprocess:
 
             return condition_str or condition_num
 
-        if is_boolean_series(self.X_train[column_name]):
+        if not is_target:
+            cur_series = self.X_train[column_name]
+        else:
+            cur_series = self.y_train
+        if is_boolean_series(cur_series):
             # Convert the column in all datasets
             def to_bool(series):
                 # If string values
@@ -783,9 +815,18 @@ class AutoML_Preprocess:
                 else:
                     return series.astype(bool)
 
-            self.X_train[column_name] = to_bool(self.X_train[column_name])
-            self.X_val[column_name] = to_bool(self.X_val[column_name])
-            self.X_test[column_name] = to_bool(self.X_test[column_name])
+            if not is_target:
+                self.X_train[column_name] = to_bool(self.X_train[column_name])
+                self.X_val[column_name] = to_bool(self.X_val[column_name])
+                self.X_test[column_name] = to_bool(self.X_test[column_name])
+                if self.df_test is not None:
+                    self.df_test[column_name] = to_bool(
+                        self.df_test[column_name]
+                    )
+            else:
+                self.y_train = to_bool(self.y_train)
+                self.y_val = to_bool(self.y_val)
+                self.y_test = to_bool(self.y_test)
             self.logger.debug(
                 f"[GREEN] - Column '{column_name}' converted to boolean."
             )
@@ -793,12 +834,13 @@ class AutoML_Preprocess:
         else:
             return False
 
-    def convert_column_to_category(self, column_name) -> bool:
+    def convert_column_to_category(self, column_name, is_target=False) -> bool:
         convert = False
-        col = self.X_train[column_name]
-        max_unique = min(
-            20, max(10, int(0.01 * len(self.X_train[column_name])))
-        )
+        if not is_target:
+            col = self.X_train[column_name]
+        else:
+            col = self.y_train
+        max_unique = min(20, max(10, int(0.01 * len(col))))
         # Remove missing values for uniqueness check
         unique_vals = col.dropna().unique()
 
@@ -820,11 +862,23 @@ class AutoML_Preprocess:
                 # integer dtype or others
                 convert = True
         if convert:
-            self.X_train[column_name] = col.astype("category")
-            self.X_test[column_name] = self.X_test[column_name].astype(
-                "category"
-            )
-            self.X_val[column_name] = self.X_val[column_name].astype("category")
+            if not is_target:
+                self.X_train[column_name] = col.astype("category")
+                self.X_test[column_name] = self.X_test[column_name].astype(
+                    "category"
+                )
+                self.X_val[column_name] = self.X_val[column_name].astype(
+                    "category"
+                )
+                if self.df_test is not None:
+                    self.df_test[column_name] = self.df_test[
+                        column_name
+                    ].astype("category")
+            else:
+                self.y_train = col.astype("category")
+                self.y_test = self.y_test.astype("category")
+                self.y_val = self.y_val.astype("category")
+
             self.logger.debug(
                 f"[GREEN] - Column '{column_name}' converted to category."
             )
@@ -854,8 +908,11 @@ class AutoML_Preprocess:
         # If any non-null value failed conversion (NaN after to_numeric), then not all numeric strings
         return numeric_converted.notna().all()
 
-    def convert_column_to_string(self, column_name) -> bool:
-        col = self.X_train[column_name]
+    def convert_column_to_string(self, column_name, is_target=False) -> bool:
+        if not is_target:
+            col = self.X_train[column_name]
+        else:
+            col = self.y_train
 
         # If column is already numeric, no need to convert to string
         if is_numeric_dtype(col):
@@ -866,43 +923,74 @@ class AutoML_Preprocess:
             return False
 
         # Otherwise, convert to string dtype
-        self.X_train[column_name] = col.astype("string")
-        self.X_test[column_name] = self.X_test[column_name].astype("string")
-        self.X_val[column_name] = self.X_val[column_name].astype("string")
+        if not is_target:
+            self.X_train[column_name] = col.astype("string")
+            self.X_test[column_name] = self.X_test[column_name].astype("string")
+            self.X_val[column_name] = self.X_val[column_name].astype("string")
+            if self.df_test is not None:
+                self.df_test[column_name] = self.df_test[column_name].astype(
+                    "string"
+                )
+        else:
+            self.y_train = col.astype("string")
+            self.y_test = self.y_test.astype("string")
+            self.y_val = self.y_val.astype("string")
         self.logger.debug(
             f"[GREEN] - Column '{column_name}' converted to string."
         )
         return True
 
-    def convert_column_to_integer(self, column_name) -> bool:
-        col = self.X_train[column_name]
+    def convert_column_to_integer(self, column_name, is_target=False) -> bool:
+        if not is_target:
+            col = self.X_train[column_name]
+        else:
+            col = self.y_train
         if self.is_numeric_string_series(col):
             col = col.astype("float64")
         if col.apply(float.is_integer).all():
-            self.X_train[column_name] = col.astype("int64")
-            self.X_test[column_name] = self.X_test[column_name].astype("int64")
-            self.X_val[column_name] = self.X_val[column_name].astype("int64")
-            # self.logger.debug(
-            #     f"[GREEN] - Column '{column_name}' converted to integer."
-            # )
+            if not is_target:
+                self.X_train[column_name] = col.astype("int64")
+                self.X_test[column_name] = self.X_test[column_name].astype(
+                    "int64"
+                )
+                self.X_val[column_name] = self.X_val[column_name].astype(
+                    "int64"
+                )
+                if self.df_test is not None:
+                    self.df_test[column_name] = self.df_test[
+                        column_name
+                    ].astype("int64")
+            else:
+                self.y_train = col.astype("int64")
+                self.y_test = self.y_test.astype("int64")
+                self.y_val = self.y_val.astype("int64")
             return True
-        else:
-            non_integers_mask = ~col.apply(float.is_integer)
-
-            # Filter and show those non-integer values
-            non_integer_values = col[non_integers_mask]
-
-            self.logger.debug(f"{column_name}: {non_integer_values}")
         return False
 
-    def convert_column_to_float(self, column_name) -> bool:
-        col = self.X_train[column_name]
+    def convert_column_to_float(self, column_name, is_target=False) -> bool:
+        if not is_target:
+            col = self.X_train[column_name]
+        else:
+            col = self.y_train[column_name]
         if self.is_numeric_string_series(col):
-            self.X_train[column_name] = col.astype("float64")
-            self.X_test[column_name] = self.X_test[column_name].astype(
-                "float64"
-            )
-            self.X_val[column_name] = self.X_val[column_name].astype("float64")
+            if not is_target:
+                self.X_train[column_name] = col.astype("float64")
+                self.X_test[column_name] = self.X_test[column_name].astype(
+                    "float64"
+                )
+                self.X_val[column_name] = self.X_val[column_name].astype(
+                    "float64"
+                )
+                if self.df_test is not None:
+                    self.df_test[column_name] = self.df_test[
+                        column_name
+                    ].astype("float64")
+            else:
+                self.y_train[column_name] = col.astype("float64")
+                self.y_test[column_name] = self.y_test[column_name].astype(
+                    "float64"
+                )
+                self.y_val = self.y_val.astype("float64")
             self.logger.debug(
                 f"[GREEN] - Column '{column_name}' converted to float."
             )
@@ -910,17 +998,17 @@ class AutoML_Preprocess:
         self.logger.error(f"Could not convert column {column_name}")
         return False
 
-    def update_column_type(self, column_name: str) -> None:
+    def update_column_type(self, column_name: str, is_target=False) -> None:
         # check if boolean
-        if self.convert_column_to_boolean(column_name):
+        if self.convert_column_to_boolean(column_name, is_target):
             return
-        if self.convert_column_to_category(column_name):
+        if self.convert_column_to_category(column_name, is_target):
             return
-        if self.convert_column_to_string(column_name):
+        if self.convert_column_to_string(column_name, is_target):
             return
-        if self.convert_column_to_integer(column_name):
+        if self.convert_column_to_integer(column_name, is_target):
             return
-        self.convert_column_to_float(column_name)
+        self.convert_column_to_float(column_name, is_target)
 
     def preprocess(self):
         project = self.title if self.title else "dataset"
@@ -989,6 +1077,8 @@ class AutoML_Preprocess:
         self.logger.info("[GREEN]- Updating column types.")
         for col in self.X_train.columns:
             self.update_column_type(col)
+        self.update_column_type(self.target, is_target=True)
+
         # 7 encoding
         # 8 normalizing/scaling
         # 9 dim. reduction
@@ -1019,5 +1109,5 @@ class AutoML_Preprocess:
         )
         self.eda.dict_description = self.dict_description
         self.eda.target = self.target
-        self.eda.df_test = None
+        self.eda.df_test = self.df_test
         self.eda.perform_eda(skip_load=True)
