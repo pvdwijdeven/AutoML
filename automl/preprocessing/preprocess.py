@@ -10,7 +10,13 @@ from pandas.api.types import is_numeric_dtype
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 from sklearn.impute import SimpleImputer
 from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import OneHotEncoder, OrdinalEncoder, LabelEncoder
+from sklearn.preprocessing import (
+    OneHotEncoder,
+    OrdinalEncoder,
+    LabelEncoder,
+    PowerTransformer,
+    StandardScaler,
+)
 import warnings
 
 
@@ -966,8 +972,8 @@ class AutoML_Preprocess:
             return
         if self.convert_column_to_string(column_name):
             return
-        if self.convert_column_to_integer(column_name):
-            return
+        # if self.convert_column_to_integer(column_name):
+        #     return
         self.convert_column_to_float(column_name)
 
     def auto_encode_features(self, max_unique_for_categorical=15):
@@ -1342,6 +1348,90 @@ class AutoML_Preprocess:
             if self.df_test is not None:
                 self.df_test.drop(columns=drop_cols, inplace=True)
 
+    def standardize_column(self, column_name, X_train, X_val, X_test, df_test):
+        """
+        Standardizes a single column to zero mean and unit variance.
+        Fits scaler on X_train[column_name] and applies to all three datasets.
+
+        Parameters:
+        - column_name: str, the column to standardize
+        - X_train, X_val, X_test: pandas DataFrames
+
+        Returns:
+        - X_train, X_val, X_test with the specified column standardized
+        """
+        scaler = StandardScaler()
+
+        # Fit scaler on train column (reshape to 2D)
+        train_col = X_train[[column_name]]
+        scaler.fit(train_col)
+
+        # Transform column in each dataset
+        X_train.loc[:, column_name] = scaler.transform(train_col)
+        X_val.loc[:, column_name] = scaler.transform(X_val[[column_name]])
+        X_test.loc[:, column_name] = scaler.transform(X_test[[column_name]])
+        if df_test is not None:
+            df_test.loc[:, column_name] = scaler.transform(
+                df_test[[column_name]]
+            )
+
+        return X_train, X_val, X_test, df_test
+
+    def normalize_columns(self, skewness_threshold=0.75):
+        self.logger.info("[GREEN]- Normalizing")
+        for column_name in self.X_train.columns:
+            if column_name in self.encoders:
+                # skip encoded columns
+                continue
+            skewness_value = self.X_train[column_name].skew()
+            if abs(skewness_value) > skewness_threshold:
+                pt = PowerTransformer(method="yeo-johnson", standardize=False)
+                # Fit on train column reshaped as 2D array
+                X_train_col = self.X_train[
+                    [column_name]
+                ]  # keeps DataFrame format for transform
+                pt.fit(X_train_col)
+
+                # Transform all three sets' column
+                self.X_train[column_name] = pt.transform(X_train_col)
+                self.X_val[column_name] = pt.transform(
+                    self.X_val[[column_name]]
+                )
+                self.X_test[column_name] = pt.transform(
+                    self.X_test[[column_name]]
+                )
+                if self.df_test is not None:
+                    self.df_test[column_name] = pt.transform(
+                        self.df_test[[column_name]]
+                    )
+                self.logger.debug(
+                    f"- Skewness found for {column_name}, yeo-johnson transormer applied"
+                )
+            scaler = StandardScaler()
+            train_col = self.X_train[[column_name]]
+            scaler.fit(train_col)
+
+            # Transform returns 2D array, extract to 1D to assign safely
+            self.X_train.loc[:, column_name] = (
+                scaler.transform(train_col).flatten().astype(np.float64)
+            )
+            self.X_val.loc[:, column_name] = (
+                scaler.transform(self.X_val[[column_name]])
+                .flatten()
+                .astype(np.float64)
+            )
+            self.X_test.loc[:, column_name] = (
+                scaler.transform(self.X_test[[column_name]])
+                .flatten()
+                .astype(np.float64)
+            )
+            if self.df_test is not None:
+                self.df_test.loc[:, column_name] = (
+                    scaler.transform(self.df_test[[column_name]])
+                    .flatten()
+                    .astype(np.float64)
+                )
+
     def preprocess(self):
         project = self.title if self.title else "dataset"
         self.logger.info(f"[MAGENTA]\nStarting preprocessing for {project}")
@@ -1412,8 +1502,9 @@ class AutoML_Preprocess:
         self.encode_targets()
         self.drop_strings()
         # 7 encoding
-        self.auto_encode_features()
+        self.encoders = self.auto_encode_features()
         # 8 normalizing/scaling
+        self.normalize_columns()
         # 9 dim. reduction
 
         self.logger.info(f"[MAGENTA]Done preprocessing for {project}")
