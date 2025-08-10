@@ -1,9 +1,10 @@
 import pandas as pd
 import plotly.express as px
 from library import infer_dtype
+from typing import Tuple
 
 
-def missing_data_summary(df):
+def missing_data_summary(df: pd.DataFrame) -> Tuple[int, str, str]:
     # Count of missing values per column
     missing_count = df.isnull().sum()
 
@@ -66,7 +67,7 @@ def missing_data_summary(df):
     return missing_count.sum(), column_info_html, general_info_html
 
 
-def plot_missingness_matrix(df, top_n=100) -> str:
+def plot_missingness_matrix(df: pd.DataFrame, top_n: int = 100) -> str:
     # Step 1: Select top N columns with the most missing values
     missing_counts = df.isnull().sum()
     missing_counts = missing_counts[missing_counts > 0]
@@ -112,7 +113,7 @@ def plot_missingness_matrix(df, top_n=100) -> str:
     )
 
 
-def plot_missing_correlation(df, top_n=100):
+def plot_missing_correlation(df: pd.DataFrame, top_n: int = 100) -> str:
 
     # Step 1: Create missing value indicator
     missing_df = df.isnull().astype(int)
@@ -148,7 +149,11 @@ def plot_missing_correlation(df, top_n=100):
     )
 
 
-def generate_missing_summary(df, drop_col_thresh=0.6, drop_row_thresh=0.05):
+def generate_missing_summary(
+    df: pd.DataFrame,
+    drop_col_thresh: float = 0.6,
+    drop_row_thresh: float = 0.05,
+) -> str:
     """
     Suggest how to handle missing values for each feature in a DataFrame,
     including imputation strategies even if imputation is not strictly recommended.
@@ -197,7 +202,11 @@ def generate_missing_summary(df, drop_col_thresh=0.6, drop_row_thresh=0.05):
 
         # 3. Recommend imputation strategy (always, per your request)
         if col_type in ["integer", "floating", "mixed-integer-float"]:
-            if skewness is not None and abs(skewness) > 1:
+            if (
+                skewness is not None
+                and isinstance(skewness, (int, float))
+                and abs(skewness) > 1
+            ):
                 strategy += "median imputation (skewed)"
             else:
                 strategy += "mean imputation"

@@ -6,8 +6,8 @@ import re
 import os
 
 
-def add_links_to_headers(html: str, target) -> str:
-    def replace_th(match):
+def add_links_to_headers(html: str, target: str) -> str:
+    def replace_th(match) -> str:
         col_name = match.group(1)
         if col_name == target:
             link = f'<a href="#{col_name.replace(" ", "-")}" onclick="showTab(2)" class="feature-link">{col_name}</a>'
@@ -20,7 +20,7 @@ def add_links_to_headers(html: str, target) -> str:
 
 
 def join_feature_links_with_linebreaks(
-    feature_links: list[str], max_line_length=90
+    feature_links: list[str], max_line_length: int = 90
 ) -> str:
     lines = []
     current_line = ""
@@ -53,9 +53,11 @@ def join_feature_links_with_linebreaks(
 
 
 def create_overview_table(
-    df: pd.DataFrame, target: str, target_type: str, logger=None
+    df: pd.DataFrame,
+    target: str,
+    target_type: str,
 ) -> str:
-    def percentage(value) -> str:
+    def percentage(value: float) -> str:
         return f"{value:.1%}"
 
     current_dir = os.path.dirname(os.path.abspath(__file__))  # automl/gui

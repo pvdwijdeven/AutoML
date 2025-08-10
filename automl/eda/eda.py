@@ -29,6 +29,7 @@ from datetime import datetime
 import importlib.util
 import sys
 import pathlib
+from typing import List, Dict, Optional, Any
 
 
 class AutoML_EDA:
@@ -82,9 +83,9 @@ class AutoML_EDA:
         title: str = "",
         target: str = "",
         description: str = "",
-        nogui=True,
+        nogui: bool = True,
         update_script: str = "",
-        logger: Logger | None = None,
+        logger: Optional[Logger] = None,
     ) -> None:
 
         self.report_file = report_file
@@ -105,7 +106,9 @@ class AutoML_EDA:
         else:
             self.logger = logger
 
-    def parse_column_descriptions_to_html(self, text):
+    def parse_column_descriptions_to_html(
+        self, text: List[str]
+    ) -> Dict[str, str]:
         result = {}
         current_column = None
         current_description = []
@@ -137,7 +140,7 @@ class AutoML_EDA:
 
         return result
 
-    def read_description(self, file_path):
+    def read_description(self, file_path: str) -> Dict[str, str]:
         self.logger.info(
             f"[BLUE]- Reading column descriptions from {file_path}"
         )
@@ -154,7 +157,7 @@ class AutoML_EDA:
             self.logger.error(f"Error reading {file_path}: {e}")
             return {}
 
-    def read_data(self, file_path) -> pd.DataFrame | None:
+    def read_data(self, file_path: str) -> Optional[pd.DataFrame]:
         self.logger.info(f"[BLUE]- Reading data from {file_path}")
         if not file_path:
             return None
@@ -170,16 +173,20 @@ class AutoML_EDA:
             self.logger.error(f"Error reading {file_path}: {e}")
             return None
 
-    def update_with_user_function(self, df, filepath):
+    def update_with_user_function(
+        self, df: pd.DataFrame, filepath: str
+    ) -> pd.DataFrame:
 
         database = "train" if df is self.df_train else "test"
         self.logger.info(f"[GREEN]- Applying user update to {database} dataset")
         # Ensure absolute path and module name
-        filepath = pathlib.Path(filepath).resolve()
-        module_name = filepath.stem  # e.g. "user_file"
+        abs_filepath = pathlib.Path(filepath).resolve()
+        module_name = abs_filepath.stem  # e.g. "user_file"
 
         # Load module from file
-        spec = importlib.util.spec_from_file_location(module_name, filepath)
+        spec = importlib.util.spec_from_file_location(
+            module_name, str(abs_filepath)
+        )
         assert spec is not None
         assert spec.loader is not None
         user_module = importlib.util.module_from_spec(spec)
@@ -189,12 +196,14 @@ class AutoML_EDA:
         # Get the function
         update_func = getattr(user_module, "update_df", None)
         if update_func is None:
-            raise AttributeError(f"No function 'update_df' found in {filepath}")
+            raise AttributeError(
+                f"No function 'update_df' found in {abs_filepath}"
+            )
 
         # Apply the function to the dataframe
         return update_func(df)
 
-    def analyse_column(self, column_name: str):
+    def analyse_column(self, column_name: str) -> Optional[Dict[str, Any]]:
 
         assert (
             self.df_train is not None
@@ -351,13 +360,16 @@ class AutoML_EDA:
     def load_data(self):
 
         self.df_train = self.read_data(self.file_train)
+        if self.df_train is None:
+            self.logger.error("Training data could not be loaded.")
+            return "Failed to load training data. EDA cannot proceed."
         if self.update_script != "":
             self.df_train = self.update_with_user_function(
                 self.df_train, self.update_script
             )
         if self.df_train is None:
-            self.logger.error("Training data could not be loaded.")
-            return "Failed to load training data. EDA cannot proceed."
+            self.logger.error("Training data could not be updated correctly.")
+            return "Failed to update training data. EDA cannot proceed."
         last_column = False
         if self.target == "":
             self.target = self.df_train.columns[-1]
@@ -397,7 +409,7 @@ class AutoML_EDA:
             self.dict_description = {}
         return ""
 
-    def perform_eda(self, skip_load=False) -> str:
+    def perform_eda(self, skip_load: bool = False) -> str:
         if not skip_load:
             project = self.title if self.title else "dataset"
             self.logger.info(
@@ -417,7 +429,6 @@ class AutoML_EDA:
             df=self.df_train,
             target=self.target,
             target_type=target_type,
-            logger=self.logger,
         )
         features_html = get_html_from_template("features.j2", self.column_info)
         self.logger.info("[GREEN]- Getting feature relations")

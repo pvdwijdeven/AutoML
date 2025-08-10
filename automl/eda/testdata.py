@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 import re
-from typing import Tuple
+from typing import Tuple, List
 from library import check_classification
 
 
@@ -172,7 +172,7 @@ def analyze_test_data(
 
     stats_df = pd.DataFrame(stats)
 
-    def highlight_shifts(row):
+    def highlight_shifts(row: pd.Series) -> List[str]:
         style = [""] * len(row)
         col_idx = list(row.index)
         if row["Mean Shift"]:
