@@ -1,5 +1,6 @@
 # internal imports
 from library import Logger, infer_dtype, check_classification
+from modelling import AutoML_Modeling
 from eda import AutoML_EDA
 
 # external imports
@@ -1875,7 +1876,17 @@ class AutoML_Preprocess:
         # 10 dim. reduction
 
         self.logger.info(f"[MAGENTA]Done preprocessing for {project}")
-        self.post_process_eda()
+        # self.post_process_eda()
+        self.model = AutoML_Modeling(
+            X_train=self.X_train,
+            X_val=self.X_val,
+            X_test=self.X_test,
+            y_train=self.y_train,
+            y_val=self.y_val,
+            y_test=self.y_test,
+            df_test=self.df_test,
+            logger=self.logger,
+        )
 
         self.X_train.to_csv(
             self.file_train.replace(".csv", "_prepro.csv"),
