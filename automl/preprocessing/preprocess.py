@@ -1484,6 +1484,7 @@ class AutoML_Preprocess:
             index=self.y_test.index,
             name=self.y_test.name,
         )
+        self.target_transformer = target_transformer
 
     def preprocess(self):
         project = self.title if self.title else "dataset"
