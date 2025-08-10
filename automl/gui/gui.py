@@ -216,7 +216,7 @@ class AutoMLFrame(wx.Frame):
             self.buttons_info["target"]["label"].SetLabel(title)
         dlg.Destroy()
 
-    def on_open_file(self, kind):
+    def on_open_file(self, kind: str):
         if kind == "decription":
             title = "column description file"
             wildcard = "description files (*.txt)|*.txt"
@@ -237,7 +237,7 @@ class AutoMLFrame(wx.Frame):
             path = file_dialog.GetPath()
             self.buttons_info[kind]["label"].SetLabel(f"{path}")
 
-    def on_select_output(self, kind):
+    def on_select_output(self, kind: str):
         with wx.FileDialog(
             self,
             f"Select {kind}",
@@ -304,9 +304,3 @@ class AutoMLFrame(wx.Frame):
         self.buttons_info["Startprepro"]["label"].SetLabel(result)
         if self.nogui:
             self.on_exit(event=None)
-
-    def make_placeholder_handler(self, index):
-
-        self.buttons_info[f"Button{index}"]["label"].SetLabel(
-            f"Button {index} clicked"
-        )
