@@ -3,7 +3,7 @@ from library import Logger
 from .models import models
 
 # external libraries
-from typing import Dict
+from typing import Dict, Optional
 import numpy as np
 import pandas as pd
 from sklearn.metrics import (
@@ -19,24 +19,25 @@ from sklearn.metrics import (
 
 
 class AutoML_Modeling:
+
     def __init__(
         self,
-        X_train,
-        X_val,
-        X_test,
-        y_train,
-        y_val,
-        y_test,
-        df_test,
-        logger: Logger | None = None,
+        X_train: pd.DataFrame,
+        X_val: pd.DataFrame,
+        X_test: pd.DataFrame,
+        y_train: pd.Series,
+        y_val: pd.Series,
+        y_test: pd.Series,
+        df_test: Optional[pd.DataFrame],
+        logger: Optional[Logger] = None,
     ) -> None:
-        self.X_train = X_train
-        self.X_val = X_val
-        self.X_test = X_test
-        self.y_train = y_train
-        self.y_val = y_val
-        self.y_test = y_test
-        self.df_test = df_test
+        self.X_train: pd.DataFrame = X_train
+        self.X_val: pd.DataFrame = X_val
+        self.X_test: pd.DataFrame = X_test
+        self.y_train: pd.Series = y_train
+        self.y_val: pd.Series = y_val
+        self.y_test: pd.Series = y_test
+        self.df_test: Optional[pd.DataFrame] = df_test
         if logger is None:
             self.logger = Logger(
                 level_console=Logger.INFO,
@@ -45,12 +46,12 @@ class AutoML_Modeling:
                 wx_handler=None,
             )
         else:
-            self.logger = logger
-        self.dataset_type = self.detect_dataset_type(self.y_train)
-        result = self.train_and_evaluate_models(
+            self.logger: Logger = logger
+        self.dataset_type: str = self.detect_dataset_type(target=self.y_train)
+        result: Dict[str, Dict[str, float]] = self.train_and_evaluate_models(
             dataset_type=self.dataset_type,
         )
-        self.logger.debug(result)
+        self.logger.debug(msg=result)
 
     def detect_dataset_type(
         self, target: pd.DataFrame | pd.Series | np.ndarray
@@ -76,16 +77,16 @@ class AutoML_Modeling:
         else:
             # If numpy array or list
             if target.ndim == 1:
-                target_df = pd.Series(target)
+                target_df = pd.Series(data=target)
             elif target.ndim == 2:
-                target_df = pd.DataFrame(target)
+                target_df = pd.DataFrame(data=target)
             else:
                 raise ValueError("Target must be 1D or 2D array-like")
 
         # Determine if multi-label (2D target)
         if isinstance(target_df, pd.DataFrame) and target_df.shape[1] > 1:
             # Check if binary indicators (0/1) in multiple columns -> multi-label classification
-            unique_vals = pd.unique(target_df.values.ravel())
+            unique_vals = pd.unique(values=target_df.values.ravel())
             if set(unique_vals).issubset({0, 1}):
                 return "multi_label_classification"
             else:
@@ -100,11 +101,13 @@ class AutoML_Modeling:
         )
 
         # Check if target is numeric
-        is_numeric = pd.api.types.is_numeric_dtype(target_series)
+        is_numeric: bool = pd.api.types.is_numeric_dtype(
+            arr_or_dtype=target_series
+        )
 
         # Get unique values
         unique_vals = target_series.dropna().unique()
-        n_unique = len(unique_vals)
+        n_unique: int = len(unique_vals)
 
         # Heuristic: if numeric with many unique values -> regression
         if is_numeric and n_unique > 20:
@@ -114,13 +117,15 @@ class AutoML_Modeling:
         # If only two unique classes
         if n_unique == 2:
             # Calculate the class distribution ratio
-            counts = target_series.value_counts(normalize=True)
+            counts: pd.Series[float] = target_series.value_counts(
+                normalize=True
+            )
 
             # Define threshold for "high imbalance" (e.g. minority class <= 5%)
             imbalance_threshold = 0.05
 
             # Check minority class proportion
-            minority_class_ratio = counts.min()
+            minority_class_ratio: float = counts.min()
 
             if minority_class_ratio <= imbalance_threshold:
                 return "imbalanced_binary_classification"
@@ -135,11 +140,11 @@ class AutoML_Modeling:
             return "multi_class_classification"
         else:
             # Numeric case:
-            unique_vals_sorted = np.sort(unique_vals)
-            diffs = np.diff(unique_vals_sorted)
+            unique_vals_sorted = np.sort(a=unique_vals)
+            diffs = np.diff(a=unique_vals_sorted)
             # Check if differences are all 1 and values are integers => ordinal (e.g. ratings)
-            if np.all(diffs == 1) and np.all(
-                unique_vals_sorted == unique_vals_sorted.astype(int)
+            if np.all(a=diffs == 1) and np.all(
+                a=unique_vals_sorted == unique_vals_sorted.astype(dtype=int)
             ):
                 # Assume ordinal regression if unique count between 3 and 20
                 if 3 <= n_unique <= 20:
@@ -175,23 +180,23 @@ class AutoML_Modeling:
             return {}
 
         for name, model in models[dataset_type].items():
-            self.logger.info(f"[GREEN]- Training on {name}")
+            self.logger.info(msg=f"[GREEN]- Training on {name}")
             model.fit(self.X_train, self.y_train)
             y_pred = model.predict(self.X_test)
-            self.logger.info(f"[GREEN]- Scoring on {name}")
+            self.logger.info(msg=f"[GREEN]- Scoring on {name}")
             # Choose metric depending on dataset type
             if dataset_type in (
                 "binary_classification",
                 "imbalanced_binary_classification",
             ):
                 # You can choose metrics as needed; here we use accuracy and F1 + AUC if possible
-                acc = accuracy_score(self.y_test, y_pred)
-                f1 = f1_score(self.y_test, y_pred)
+                acc = accuracy_score(y_true=self.y_test, y_pred=y_pred)
+                f1 = f1_score(y_true=self.y_test, y_pred=y_pred)
 
                 # Try to get predicted probabilities for AUC if supported
                 try:
                     y_proba = model.predict_proba(self.X_test)[:, 1]
-                    auc = roc_auc_score(self.y_test, y_proba)
+                    auc = roc_auc_score(y_true=self.y_test, y_score=y_proba)
                 except ValueError:
                     auc = None
 
@@ -202,29 +207,37 @@ class AutoML_Modeling:
                 }
 
             elif dataset_type == "multi_class_classification":
-                acc = accuracy_score(self.y_test, y_pred)
-                f1 = f1_score(self.y_test, y_pred, average="weighted")
+                acc = accuracy_score(y_true=self.y_test, y_pred=y_pred)
+                f1 = f1_score(
+                    y_true=self.y_test, y_pred=y_pred, average="weighted"
+                )
                 results[name] = {"accuracy": acc, "f1_score_weighted": f1}
 
             elif dataset_type == "multi_label_classification":
                 # For multi-label, use an appropriate metric such as average F1 per label
-                f1_macro = f1_score(self.y_test, y_pred, average="macro")
-                f1_micro = f1_score(self.y_test, y_pred, average="micro")
+                f1_macro = f1_score(
+                    y_true=self.y_test, y_pred=y_pred, average="macro"
+                )
+                f1_micro = f1_score(
+                    y_true=self.y_test, y_pred=y_pred, average="micro"
+                )
                 results[name] = {"f1_macro": f1_macro, "f1_micro": f1_micro}
 
             elif dataset_type == "ordinal_regression":
                 # Could treat as regression or classification; here treat as classification
-                acc = accuracy_score(self.y_test, y_pred)
+                acc = accuracy_score(y_true=self.y_test, y_pred=y_pred)
                 results[name] = {"accuracy": acc}
 
             elif dataset_type == "regression":
-                mse = mean_squared_error(self.y_test, y_pred)
-                r2 = r2_score(self.y_test, y_pred)
+                mse: float = mean_squared_error(
+                    y_true=self.y_test, y_pred=y_pred
+                )
+                r2: float = r2_score(y_true=self.y_test, y_pred=y_pred)
                 results[name] = {"mse": mse, "r2": r2}
 
             else:
                 # Fallback metric if unknown
-                mse = mean_squared_error(self.y_test, y_pred)
+                mse = mean_squared_error(y_true=self.y_test, y_pred=y_pred)
                 results[name] = {"mse": mse}
 
         return results

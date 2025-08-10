@@ -142,14 +142,14 @@ class AutoML_Preprocess:
             logger (Optional[Logger], optional): Logger instance for messages. If None,
                 a default logger is instantiated. Defaults to None.
         """
-        self.report_file = report_file
-        self.file_train = file_train
-        self.file_test = file_test
-        self.title = title
-        self.target = target
-        self.description = description
-        self.nogui = nogui
-        self.update_script = update_script
+        self.report_file: str = report_file
+        self.file_train: str = file_train
+        self.file_test: str = file_test
+        self.title: str = title
+        self.target: str = target
+        self.description: str = description
+        self.nogui: bool = nogui
+        self.update_script: str = update_script
         if logger is None:
             self.logger = Logger(
                 level_console=Logger.INFO,
@@ -158,7 +158,7 @@ class AutoML_Preprocess:
                 wx_handler=None,
             )
         else:
-            self.logger = logger
+            self.logger: Logger = logger
         self.eda = AutoML_EDA(
             report_file=self.report_file,
             file_train=self.file_train,
@@ -187,13 +187,13 @@ class AutoML_Preprocess:
         """
         assert self.eda.df_train is not None
 
-        y = self.eda.df_train[self.target]
-        X = self.eda.df_train.drop(columns=[self.target])
+        y: pd.Series = self.eda.df_train[self.target]
+        X: pd.DataFrame = self.eda.df_train.drop(columns=[self.target])
 
         # Determine if target is classification or regression
         # Simple heuristic: if target is numeric with many unique values, treat as regression
 
-        is_classification = check_classification(y)
+        is_classification: bool = check_classification(target=y)
 
         if is_classification:
             stratify_obj = y
@@ -1820,10 +1820,10 @@ class AutoML_Preprocess:
         # 3 drop duplicate and constant columns
         self.drop_duplicate_columns()
         self.drop_constant_columns()
-        skip_outliers = self.skip_outliers()
+        skip_outliers: bool = self.skip_outliers()
         if skip_outliers:
             self.logger.info(
-                "[GREEN]- Leaving outliers as is due to target type (imbalanced classification)"
+                msg="[GREEN]- Leaving outliers as is due to target type (imbalanced classification)"
             )
         else:
             # 4 decide to handle outliers before or after dealing with missing values
