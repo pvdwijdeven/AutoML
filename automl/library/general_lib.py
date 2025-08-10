@@ -3,6 +3,7 @@ from logging.handlers import RotatingFileHandler
 import wx
 import os
 import sys
+from typing import Optional
 
 
 class ColoredFormatter(logging.Formatter):
@@ -78,7 +79,7 @@ class WxTextRedirector:
 
 
 class SameLineStreamHandler(logging.StreamHandler):
-    def emit(self, record):
+    def emit(self, record: logging.LogRecord) -> None:
         try:
             msg = self.format(record)
 
@@ -99,7 +100,7 @@ class SameLineStreamHandler(logging.StreamHandler):
             self.handleError(record)
 
 
-def overwrite_last_line(text_ctrl, new_text):
+def overwrite_last_line(text_ctrl: wx.TextCtrl, new_text: str) -> None:
     content = text_ctrl.GetValue()
     lines = content.splitlines()
 
@@ -113,12 +114,12 @@ def overwrite_last_line(text_ctrl, new_text):
 
 
 class TextCtrlHandler(logging.Handler):
-    def __init__(self, text_ctrl):
+    def __init__(self, text_ctrl) -> None:
         super().__init__()
         self.text_ctrl = text_ctrl
         self.last_line_start = 0  # Track position of last line start
 
-    def emit(self, record):
+    def emit(self, record: logging.LogRecord) -> None:
         msg = self.format(record)
         sameline = "[SAMELINE]" in msg
         msg = msg.replace("[SAMELINE]", "")
@@ -132,7 +133,7 @@ class TextCtrlHandler(logging.Handler):
                     msg = msg.replace(f"[{color}]", "")
                     break
 
-        def update():
+        def update() -> None:
             self.text_ctrl.SetDefaultStyle(wx.TextAttr(msg_color))
 
             if sameline:
@@ -260,7 +261,7 @@ class Logger(logging.getLoggerClass()):
         level_file: int = logging.DEBUG,
         level_console: int = logging.INFO,
         filename: str = "my_log.log",
-        wx_handler=None,
+        wx_handler: Optional[TextCtrlHandler] = None,
     ) -> None:
         self.setLevel(level=level_file)
         if filename != "":

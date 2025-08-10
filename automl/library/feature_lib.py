@@ -282,7 +282,7 @@ def generate_feature_relations(
     return insights, num_features
 
 
-def analyze_target(df, target_col):
+def analyze_target(df: pd.DataFrame, target_col: str) -> List[str]:
     suggestions = []
     target = df[target_col]
     target_non_null = target.dropna()
@@ -377,7 +377,7 @@ def analyze_target(df, target_col):
     return suggestions
 
 
-def detect_outliers_iqr(series):
+def detect_outliers_iqr(series: pd.Series) -> Tuple[int, int, pd.Series]:
     q1 = series.quantile(0.25)
     q3 = series.quantile(0.75)
     iqr = q3 - q1
@@ -388,8 +388,8 @@ def detect_outliers_iqr(series):
 
 
 def analyze_boolean_column(
-    df: pd.DataFrame, column_name: str, sample_size=1000
-):
+    df: pd.DataFrame, column_name: str, sample_size: int = 1000
+) -> List[str]:
     # Reduce size for large datasets
     if len(df) > sample_size:
         df = df.sample(sample_size, random_state=42)
@@ -413,7 +413,7 @@ def analyze_boolean_column(
     return suggestions
 
 
-def safe_skew(values):
+def safe_skew(values: pd.Series) -> Optional[float]:
     values = pd.Series(values).dropna()
     if len(values) < 3:
         return np.nan
@@ -423,8 +423,8 @@ def safe_skew(values):
 
 
 def analyze_numeric_column(
-    df: pd.DataFrame, column_name: str, sample_size=10000
-) -> list[str]:
+    df: pd.DataFrame, column_name: str, sample_size: int = 10000
+) -> List[str]:
     suggestions = []
 
     if len(df) > sample_size:
@@ -482,7 +482,11 @@ def analyze_numeric_column(
         skewness_non_zero = safe_skew(non_zero_values)
         n_outliers, _, _ = detect_outliers_iqr(non_zero_values)
 
-        if abs(skewness_non_zero) > 1 and n_outliers > 0:
+        if (
+            skewness_non_zero is not None
+            and abs(skewness_non_zero) > 1
+            and n_outliers > 0
+        ):
             suggestions.append(
                 "Zero-inflated + skewed with outliers — consider splitting into binary 'has_value' + log1p-transformed non-zero part"
             )
@@ -497,7 +501,7 @@ def analyze_numeric_column(
     return suggestions
 
 
-def fig_to_base64(fig, alt_text):
+def fig_to_base64(fig, alt_text: str) -> str:
     """Convert a matplotlib figure to a base64-encoded HTML image."""
     buf = io.BytesIO()
     fig.savefig(buf, format="png", bbox_inches="tight", transparent=True)
@@ -508,8 +512,12 @@ def fig_to_base64(fig, alt_text):
 
 
 def generate_eda_plots(
-    df, column_name, inferred_type, target="", verbose=False
-):
+    df: pd.DataFrame,
+    column_name: str,
+    inferred_type: str,
+    target: str = "",
+    verbose: bool = False,
+) -> Dict[str, str]:
     MAX_ROWS = 5000
     TOP_CATEGORIES = 20
 
@@ -553,9 +561,7 @@ def generate_eda_plots(
 
     elif inferred_type in ["integer", "float"]:
         fig, ax = plt.subplots(figsize=(8, 4))
-        sns.histplot(
-            df_sampled[column_name].dropna(), bins=60, kde=False, ax=ax
-        )
+        sns.histplot(data=df_sampled, x=column_name, bins=60, kde=False, ax=ax)
         ax.set_title(f"Distribution of {column_name}")
         ax.set_xlabel(column_name)
         ax.set_ylabel("Frequency")
@@ -647,9 +653,9 @@ def generate_eda_plots(
 def analyze_string_column(
     df: pd.DataFrame,
     column_name: str,
-    top_n=5,
-    max_prefix_suffix_len=5,
-    delimiter_consistency_threshold=0.8,
+    top_n: int = 5,
+    max_prefix_suffix_len: int = 5,
+    delimiter_consistency_threshold: float = 0.8,
 ) -> list[str]:
     """
     Analyzes a string column and returns feature engineering suggestions.
@@ -803,7 +809,7 @@ def analyze_string_column(
     return suggestions
 
 
-def suggest_categorical_handling(entropy, cardinality):
+def suggest_categorical_handling(entropy: float, cardinality: int) -> str:
     """
     Suggests preprocessing strategy based on entropy and cardinality.
 
@@ -883,7 +889,9 @@ def analyze_categorical_column(df: pd.DataFrame, column_name: str) -> list[str]:
     top_freq = freq.iloc[0] if not freq.empty else 0
     entropy_value = scipy_entropy(value_counts, base=2)  # base-2: bits
     suggestions = []
-    suggestions.append(suggest_categorical_handling(entropy_value, n_unique))
+    suggestions.append(
+        suggest_categorical_handling(float(entropy_value), n_unique)
+    )
     # Cardinality-based suggestions
     if n_unique == 1:
         suggestions.append(

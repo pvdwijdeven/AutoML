@@ -54,7 +54,7 @@ class AutoMLFrame(wx.Frame):
             },
             "update_script": {
                 "text": "Open update script (.py)",
-                "function": lambda event: self.on_open_file("update"),
+                "function": lambda event: self.on_open_file("update_script"),
             },
             "ReportFile": {
                 "text": "Select report file (.html)",
@@ -217,10 +217,10 @@ class AutoMLFrame(wx.Frame):
         dlg.Destroy()
 
     def on_open_file(self, kind: str):
-        if kind == "decription":
+        if kind == "description":
             title = "column description file"
             wildcard = "description files (*.txt)|*.txt"
-        elif kind == "update":
+        elif kind == "update_script":
             title = "Update script file"
             wildcard = "Python files (*.py)|*.py"
         else:

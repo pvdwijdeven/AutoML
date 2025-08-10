@@ -9,18 +9,10 @@ from sklearn.feature_selection import (
 )
 from sklearn.preprocessing import LabelEncoder
 from .feature_lib import select_features_by_missingness
-
-# Sample data
-np.random.seed(0)
-df = pd.DataFrame(
-    {
-        "height": np.random.normal(170, 10, 100),
-        "weight": np.random.normal(65, 12, 100),
-    }
-)
+from typing import List, Dict, Any
 
 
-def get_frequency_table(df, column_name) -> str:
+def get_frequency_table(df: pd.DataFrame, column_name: str) -> str:
     frequency_data = df[column_name].value_counts().to_dict()
     if set(frequency_data.keys()) != {np.False_, np.True_}:
         frequency_data = {
@@ -58,7 +50,9 @@ def get_frequency_table(df, column_name) -> str:
     return frequency_table
 
 
-def get_html_from_template(template_file, context, plots=[]) -> str:
+def get_html_from_template(
+    template_file: str, context: Dict[str, Any], plots: List[str] = []
+) -> str:
     current_dir = os.path.dirname(os.path.abspath(__file__))  # automl/gui
     automl_dir = os.path.dirname(current_dir)  # automl
     templates_dir = os.path.join(automl_dir, "templates")  # automl/templates
