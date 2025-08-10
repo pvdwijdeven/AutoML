@@ -20,6 +20,36 @@ from sklearn.preprocessing import (
 import warnings
 
 
+class TargetTransformer:
+    def __init__(self):
+        self.pt = PowerTransformer(
+            method="yeo-johnson", standardize=False
+        )  # transform skewness only
+        self.scaler = StandardScaler()  # scale transformed target
+
+    def fit(self, y_train):
+        # Reshape y_train to 2D for sklearn transformers
+        y_train_reshaped = y_train.values.reshape(-1, 1)
+
+        # Fit power transformer and transform y_train
+        y_transformed = self.pt.fit_transform(y_train_reshaped)
+
+        # Fit scaler on power transformed target
+        self.scaler.fit(y_transformed)
+        return self
+
+    def transform(self, y):
+        y_reshaped = y.values.reshape(-1, 1)
+        y_transformed = self.pt.transform(y_reshaped)
+        y_scaled = self.scaler.transform(y_transformed)
+        return y_scaled.flatten()
+
+    def inverse_transform(self, y_scaled):
+        y_transformed = self.scaler.inverse_transform(y_scaled.reshape(-1, 1))
+        y_original = self.pt.inverse_transform(y_transformed)
+        return y_original.flatten()
+
+
 class AutoML_Preprocess:
     def __init__(
         self,
@@ -1432,6 +1462,29 @@ class AutoML_Preprocess:
                     .astype(np.float64)
                 )
 
+    def standardize_target(self):
+
+        # 1. Fit transformer on training target
+        target_transformer = TargetTransformer()
+        target_transformer.fit(self.y_train)
+
+        # 2. Transform target in train, val, test sets
+        self.y_train = pd.Series(
+            target_transformer.transform(self.y_train),
+            index=self.y_train.index,
+            name=self.y_train.name,
+        )
+        self.y_val = pd.Series(
+            target_transformer.transform(self.y_val),
+            index=self.y_val.index,
+            name=self.y_val.name,
+        )
+        self.y_test = pd.Series(
+            target_transformer.transform(self.y_test),
+            index=self.y_test.index,
+            name=self.y_test.name,
+        )
+
     def preprocess(self):
         project = self.title if self.title else "dataset"
         self.logger.info(f"[MAGENTA]\nStarting preprocessing for {project}")
@@ -1484,7 +1537,6 @@ class AutoML_Preprocess:
         if num_missing > 0:
             self.preprocess_missing_values()
         else:
-
             self.logger.info("[GREEN]- No missing values to be processed.")
         # 5a handle outliers after dealing with missing values
         if not skip_outliers and num_missing > 0:
@@ -1505,7 +1557,10 @@ class AutoML_Preprocess:
         self.encoders = self.auto_encode_features()
         # 8 normalizing/scaling
         self.normalize_columns()
-        # 9 dim. reduction
+        # 9 normalize target
+        if not check_classification(self.y_train):
+            self.standardize_target()
+        # 10 dim. reduction
 
         self.logger.info(f"[MAGENTA]Done preprocessing for {project}")
         self.post_process_eda()
