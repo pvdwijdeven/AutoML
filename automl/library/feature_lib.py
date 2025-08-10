@@ -2,7 +2,7 @@ import pandas as pd
 import re
 from collections import Counter
 from scipy.stats import skew
-from library import infer_dtype
+from library import infer_dtype, Logger
 import numpy as np
 from sklearn.feature_selection import (
     mutual_info_classif,
@@ -10,7 +10,7 @@ from sklearn.feature_selection import (
 )
 from sklearn.preprocessing import LabelEncoder
 import warnings
-from typing import List
+from typing import List, Optional, Tuple, Dict
 from scipy.stats import entropy as scipy_entropy
 import seaborn as sns
 import matplotlib.pyplot as plt
@@ -31,6 +31,70 @@ mpl.rcParams.update(
         "axes.titlecolor": "tab:blue",
     }
 )
+
+
+def pandas_to_numpy(
+    X: pd.DataFrame, y: Optional[pd.Series] = None
+) -> Tuple[np.ndarray, Optional[np.ndarray], Dict[str, List[str]]]:
+    """
+    Convert pandas DataFrame X and optional target y to numpy arrays,
+    preserving metadata needed to revert back later.
+
+    Parameters:
+    - X: pd.DataFrame with features
+    - y: pd.Series or pd.DataFrame or None
+
+    Returns:
+    - X_array: np.ndarray with feature data
+    - y_array: np.ndarray or None with target data
+    - metadata: dict containing 'columns' (list), and if y given, 'y_index' and 'y_name'
+    """
+    # Convert features
+    X_array = X.to_numpy()
+
+    metadata = {"columns": list(X.columns)}
+
+    if y is not None:
+        y_array = y.to_numpy()
+        metadata["y_index"] = list(y.index) if hasattr(y, "index") else []
+        if hasattr(y, "name") and y.name is not None:
+            metadata["y_name"] = [str(y.name)]
+        else:
+            metadata["y_name"] = []
+        return X_array, y_array, metadata
+    else:
+        return X_array, None, metadata
+
+
+def numpy_to_pandas(
+    X_array: np.ndarray,
+    columns: List[str],
+    y_array: Optional[np.ndarray] = None,
+    y_index: Optional[pd.Index] = None,
+    y_name: Optional[str] = None,
+) -> Tuple[pd.DataFrame, Optional[pd.Series]]:
+    """
+    Convert numpy arrays back to pandas DataFrame and optional Series
+    using preserved metadata.
+
+    Parameters:
+    - X_array: np.ndarray with feature data
+    - columns: list of column names for features
+    - y_array: np.ndarray or None with target data
+    - y_index: index for target (pandas Index or None)
+    - y_name: name for target column (str or None)
+
+    Returns:
+    - X: pd.DataFrame with columns as specified
+    - y: pd.Series with index and name if y_array is not None, else None
+    """
+    X = pd.DataFrame(X_array, columns=columns)
+
+    if y_array is not None:
+        y = pd.Series(y_array.flatten(), index=y_index, name=y_name)
+        return X, y
+    else:
+        return X, None
 
 
 def check_classification(target: pd.Series, no_strings=False) -> bool:
@@ -99,12 +163,12 @@ def select_features_by_missingness(
 
 def generate_feature_relations(
     df,
-    target="",
-    dict_descriptors={},
-    max_features=100,
-    max_samples=10000,
-    logger=None,
-):
+    target: Optional[str] = "",
+    dict_descriptors: Dict[str, str] = {},
+    max_features: int = 100,
+    max_samples: int = 10000,
+    logger: Optional[Logger] = None,
+) -> Tuple[Dict[str, Dict[str, str]], int]:
 
     warnings.filterwarnings("ignore")
 

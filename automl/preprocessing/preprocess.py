@@ -17,40 +17,103 @@ from sklearn.preprocessing import (
     PowerTransformer,
     StandardScaler,
 )
+from typing import List, Tuple, Optional, Self, Literal
 import warnings
 
 
 class TargetTransformer:
-    def __init__(self):
-        self.pt = PowerTransformer(
+    """
+    Transforms the target variable using Yeo-Johnson power transform (to reduce skewness)
+    followed by standard scaling (zero mean, unit variance). Supports inverse transformation.
+
+    Attributes:
+        pt (PowerTransformer): PowerTransformer instance using Yeo-Johnson method.
+        scaler (StandardScaler): StandardScaler instance to scale the transformed target.
+    """
+
+    def __init__(self) -> None:
+        """
+        Initializes the TargetTransformer with PowerTransformer and StandardScaler.
+        """
+        self.pt: PowerTransformer = PowerTransformer(
             method="yeo-johnson", standardize=False
-        )  # transform skewness only
-        self.scaler = StandardScaler()  # scale transformed target
+        )
+        self.scaler: StandardScaler = StandardScaler()
 
-    def fit(self, y_train):
-        # Reshape y_train to 2D for sklearn transformers
-        y_train_reshaped = y_train.values.reshape(-1, 1)
+    def fit(self, y_train: pd.Series | np.ndarray) -> Self:
+        """
+        Fits the power transformer and scaler on the training target data.
 
-        # Fit power transformer and transform y_train
+        Args:
+            y_train (pd.Series | np.ndarray): Training target values.
+
+        Returns:
+            Self: The fitted transformer instance.
+        """
+        if isinstance(y_train, np.ndarray):
+            y_train_reshaped = y_train.reshape(-1, 1)
+        else:
+            y_train_reshaped = np.asarray(y_train).reshape(-1, 1)
+
         y_transformed = self.pt.fit_transform(y_train_reshaped)
-
-        # Fit scaler on power transformed target
         self.scaler.fit(y_transformed)
         return self
 
-    def transform(self, y):
-        y_reshaped = y.values.reshape(-1, 1)
+    def transform(self, y: pd.Series | np.ndarray) -> np.ndarray:
+        """
+        Transforms the target data using the fitted power transformer and scaler.
+
+        Args:
+            y (pd.Series | np.ndarray): Target values to transform.
+
+        Returns:
+            np.ndarray: Transformed and scaled target data as 1D array.
+        """
+        if isinstance(y, np.ndarray):
+            y_reshaped = y.reshape(-1, 1)
+        else:
+            y_reshaped = np.asarray(y).reshape(-1, 1)
         y_transformed = self.pt.transform(y_reshaped)
         y_scaled = self.scaler.transform(y_transformed)
         return y_scaled.flatten()
 
-    def inverse_transform(self, y_scaled):
+    def inverse_transform(self, y_scaled: pd.Series | np.ndarray) -> np.ndarray:
+        """
+        Inverse transforms scaled target data back to the original scale.
+
+        Args:
+            y_scaled (pd.Series | np.ndarray): Scaled target values.
+
+        Returns:
+            np.ndarray: Original scale target values as 1D array.
+        """
+        if isinstance(y_scaled, pd.Series):
+            y_scaled = np.asanyarray(y_scaled)
         y_transformed = self.scaler.inverse_transform(y_scaled.reshape(-1, 1))
         y_original = self.pt.inverse_transform(y_transformed)
         return y_original.flatten()
 
 
 class AutoML_Preprocess:
+    """
+    Class that manages the preprocessing pipeline for an Automated Machine Learning application,
+    including data loading, cleaning, splitting, missing value imputation, outlier handling,
+    encoding, normalization, and target transformation.
+
+    Attributes:
+        report_file (str): Path for the preprocessing report.
+        file_train (str): Path to the training data CSV file.
+        file_test (str): Path to the optional test data CSV file.
+        title (str): Title or project name.
+        target (str): Name of target variable column.
+        description (str): Description of the dataset/project.
+        nogui (bool): Flag to indicate if GUI should be disabled.
+        update_script (str): Path to a script to update.
+        logger (Optional[Logger]): Logger instance.
+        eda (AutoML_EDA): Exploratory Data Analysis instance.
+        Others: Various attributes used in preprocessing pipeline.
+    """
+
     def __init__(
         self,
         report_file: str,
@@ -59,11 +122,25 @@ class AutoML_Preprocess:
         title: str = "",
         target: str = "",
         description: str = "",
-        nogui=True,
+        nogui: bool = True,
         update_script: str = "",
-        logger: Logger | None = None,
+        logger: Optional[Logger] = None,
     ) -> None:
+        """
+        Initializes the preprocessing pipeline with configuration and sets up logging and EDA.
 
+        Args:
+            report_file (str): Path to save the EDA report.
+            file_train (str): Path to training dataset CSV.
+            file_test (str, optional): Path to test dataset CSV. Defaults to "".
+            title (str, optional): Project or dataset title. Defaults to "".
+            target (str, optional): Target variable column name. Defaults to "".
+            description (str, optional): Dataset/project description. Defaults to "".
+            nogui (bool, optional): If True, disables GUI elements. Defaults to True.
+            update_script (str, optional): Path to update script. Defaults to "".
+            logger (Optional[Logger], optional): Logger instance for messages. If None,
+                a default logger is instantiated. Defaults to None.
+        """
         self.report_file = report_file
         self.file_train = file_train
         self.file_test = file_test
@@ -93,7 +170,20 @@ class AutoML_Preprocess:
             logger=self.logger,
         )
 
-    def split_train_test_val(self):
+    def split_train_test_val(self) -> None:
+        """
+        Splits the original training data into training, validation, and test sets
+        with proportions approximately 80% train, 10% validation, 10% test.
+
+        The split is stratified based on target type:
+        - If classification, stratify on target labels.
+        - If regression, stratify by target quantile bins.
+
+        Sets the following attributes:
+            - self.X_train, self.X_val, self.X_test
+            - self.y_train, self.y_val, self.y_test
+            - self.df_test (optional test dataset)
+        """
         assert self.eda.df_train is not None
 
         y = self.eda.df_train[self.target]
@@ -162,7 +252,11 @@ class AutoML_Preprocess:
             f"[GREEN]- Split train/test/validation 80%/10%/10% ({self.X_train.shape[0]}/{self.X_test.shape[0]}/{self.X_val.shape[0]} rows)"
         )
 
-    def drop_duplicate_rows(self):
+    def drop_duplicate_rows(self) -> None:
+        """
+        Removes duplicate rows from the original training dataframe `self.eda.df_train`.
+        Logs the number of duplicates dropped and their indices.
+        """
         assert self.eda.df_train is not None
         num_rows_before = self.eda.df_train.shape[0]
 
@@ -185,7 +279,14 @@ class AutoML_Preprocess:
         else:
             self.logger.info("[GREEN]- Duplicate rows to be dropped: None")
 
-    def drop_duplicate_columns(self):
+    def drop_duplicate_columns(self) -> None:
+        """
+        Identifies and removes duplicate columns in the training features `self.X_train`
+        by comparing hash sums of each column. Drops the duplicate columns from all
+        datasets (train, validation, test, and optional test set).
+
+        Logs the list of dropped columns or 'None' if no duplicates were found.
+        """
         # Step 1: Compute hash sum per column to detect duplicates
         hashes = self.X_train.apply(
             lambda col: pd.util.hash_pandas_object(col, index=False).sum()
@@ -211,7 +312,14 @@ class AutoML_Preprocess:
                 columns=duplicate_columns, errors="ignore"
             )
 
-    def drop_constant_columns(self):
+    def drop_constant_columns(self) -> None:
+        """
+        Detects columns in training features `self.X_train` with constant values
+        (only one unique value) and drops them from all datasets (train, val, test,
+        and optional test set).
+
+        Logs which columns were dropped or 'None' if none were found.
+        """
         # Vectorized approach: find columns where number of unique values is 1
         nunique_per_col = self.X_train.nunique()
         constant_columns = nunique_per_col[nunique_per_col == 1].index.tolist()
@@ -233,21 +341,26 @@ class AutoML_Preprocess:
 
     def decide_outlier_imputation_order(
         self,
-        column,
-        missing_threshold=0.1,
-        extreme_outlier_factor=2.0,
-    ):
+        column: pd.Series,
+        missing_threshold: float = 0.1,
+        extreme_outlier_factor: float = 2.0,
+    ) -> Literal["after_imputation"] | Literal["before_imputation"]:
         """
-        Decide whether to handle outliers before or after missing value imputation for a given column.
+        Decide whether outliers in a specific column should be handled before or after
+        missing value imputation.
 
-        Parameters:
-            column (pd.Series): The column data (with missing values).
-            get_threshold_method (callable): Function that returns 'iqr' or 'zscore' for the column.
-            missing_threshold (float): Proportion of missing values to consider "high missingness".
-            extreme_outlier_factor (float): Factor to amplify threshold bounds for detecting "extreme" outliers.
+        The decision is based on:
+            - Presence of extreme outliers.
+            - Proportion of outliers relative to missing data.
+            - Distribution shape estimated by IQR or Z-score methods.
+
+        Args:
+            column (pd.Series): Column data including missing values.
+            missing_threshold (float): Missing value proportion threshold to consider low/high.
+            extreme_outlier_factor (float): Factor to enlarge thresholds for extreme outliers.
 
         Returns:
-            str: 'before_imputation' or 'after_imputation'
+            str: 'before_imputation' or 'after_imputation' indicating outlier handling timing.
         """
         data = column.dropna()
         total_count = len(column)
@@ -311,17 +424,21 @@ class AutoML_Preprocess:
         # Otherwise, handle outliers after imputation
         return "after_imputation"
 
-    def get_threshold_method(self, column, max_sample_size=5000):
+    def get_threshold_method(
+        self, column: pd.Series, max_sample_size: int = 5000
+    ) -> Literal["iqr"] | Literal["zscore"]:
         """
-        Decide the outlier detection method for a single column (pandas Series) based on Shapiro-Wilk test,
-        but only if sample size <= max_sample_size. Otherwise defaults to 'iqr'.
+        Determine the appropriate statistical method to detect outliers for a specific
+        column. Uses the Shapiro-Wilk test for normality on sample sizes within
+        the `max_sample_size` limit.
 
-        Parameters:
-            column (pd.Series): The data column to test.
-            max_sample_size (int): Maximum allowed size to run Shapiro-Wilk. Defaults to 5000.
+        Args:
+            column (pd.Series): Data column for normality test.
+            max_sample_size (int): Maximum size to run Shapiro-Wilk test.
 
         Returns:
-            str: 'zscore' if data approximately normal and sample size <= max_sample_size, 'iqr' otherwise.
+            str: 'zscore' if data is approximately normal and sample size is manageable;
+                'iqr' otherwise.
         """
         # Drop NaN values before normality test
         data = column.dropna()
@@ -339,25 +456,30 @@ class AutoML_Preprocess:
 
     def decide_outlier_handling_method(
         self,
-        column,
-        min_large_dataset=1000,
-        max_drop_outlier_pct=0.05,
-        missing_threshold=0.1,
-        extreme_outlier_factor=2.0,
-    ):
+        column: pd.Series,
+        min_large_dataset: int = 1000,
+        max_drop_outlier_pct: float = 0.05,
+        missing_threshold: float = 0.1,
+        extreme_outlier_factor: float = 2.0,
+    ) -> Literal["impute"] | Literal["cap"] | Literal["drop"]:
         """
-        Decide how to handle outliers in a single column: 'drop', 'cap', or 'impute'.
+        Decide how to treat outliers in a given column: drop rows, cap values, or impute.
 
-        Parameters:
-            column (pd.Series): Column data (with missing values).
-            get_threshold_method (callable): Function returning 'iqr' or 'zscore' for the column.
-            min_large_dataset (int): Threshold for dataset size to be considered large.
-            max_drop_outlier_pct (float): Maximum % of outliers allowed to safely drop rows.
-            missing_threshold (float): Threshold for missing value proportion considered high.
-            extreme_outlier_factor (float): Multiplier to identify extreme outliers.
+        Logic depends on:
+            - Dataset size.
+            - Percent of outlier values.
+            - Missing data proportion.
+            - Presence of extreme outliers.
+
+        Args:
+            column (pd.Series): Column data with potential outliers.
+            min_large_dataset (int): Dataset size for "large" classification.
+            max_drop_outlier_pct (float): Max % outliers allowed for safe row dropping.
+            missing_threshold (float): Threshold for high missingness to favor imputation.
+            extreme_outlier_factor (float): Multiplier for extreme outlier detection.
 
         Returns:
-            str: One of 'drop', 'cap', or 'impute'.
+            str: One of 'drop', 'cap', or 'impute' indicating chosen outlier handling method.
         """
         data = column.dropna()
         n = len(data)
@@ -428,16 +550,18 @@ class AutoML_Preprocess:
         # 4. Default fallback to cap
         return "cap"
 
-    def is_continuous_feature(self, column, unique_value_threshold=10):
+    def is_continuous_feature(
+        self, column: pd.Series, unique_value_threshold: int = 10
+    ) -> bool:
         """
-        Heuristic to recognize if a column is continuous numeric or categorical/count-like without domain knowledge.
+        Heuristic to determine if a feature/column is continuous numeric or categorical/count.
 
-        Parameters:
-            column (pd.Series): The column to check.
-            unique_value_threshold (int): Max unique values allowed to consider as categorical/count.
+        Args:
+            column (pd.Series): Column to analyze.
+            unique_value_threshold (int): Max unique values allowed to consider non-continuous.
 
         Returns:
-            bool: True if considered continuous numeric feature; False if likely categorical/count.
+            bool: True if column is continuous numeric feature, False if categorical or count-like.
         """
         # If non-numeric dtype (object, category), treat as categorical
         infer_type = infer_dtype(column)
@@ -456,15 +580,24 @@ class AutoML_Preprocess:
         return True
 
     def handle_outliers(
-        self, columns, before_or_after, method="", threshold_method=""
-    ):
+        self,
+        columns: List[str],
+        before_or_after: str,
+        method: str = "",
+        threshold_method: str = "",
+    ) -> None:
         """
-        Automatically detect and handle outliers in self.X_train, and apply
-        consistent changes to self.X_val and self.X_test.
+        Detects and handles outliers on specified columns of the training dataset.
+        Applies same transformations consistently on validation, test, and optional test datasets.
+
+        Supported methods: 'drop' (drop rows), 'cap' (clip values), 'impute' (median imputation).
+        Supports threshold methods: 'iqr' or 'zscore'.
 
         Args:
-            method: str, one of ['drop', 'cap', 'impute']
-            threshold_method: str, one of ['iqr', 'zscore']
+            columns (List[str]): Columns to handle outliers on.
+            before_or_after (str): Description of whether handling is before or after imputation.
+            method (str): Optional explicit method for handling outliers; if empty auto-decides.
+            threshold_method (str): Optional choice of threshold method; if empty auto-decides.
         """
         self.logger.info(f"[GREEN]- Handling outliers {before_or_after}")
         X_train = self.X_train.copy()
@@ -587,6 +720,17 @@ class AutoML_Preprocess:
             self.df_test = df_test
 
     def skip_outliers(self) -> bool:
+        """
+        Decide whether to skip outlier handling based on target distribution.
+
+        This heuristic checks for imbalanced classification problems by
+        examining the number of unique classes in the target and the frequency
+        of the rarest classes.
+
+        Returns:
+            bool: True if outlier handling should be skipped due to imbalanced classes,
+                False otherwise.
+        """
         target_col = self.y_train
         unique_classes = target_col.unique()
         total_samples = len(target_col)
@@ -597,7 +741,16 @@ class AutoML_Preprocess:
                     return True
         return False
 
-    def get_feature_importances(self):
+    def get_feature_importances(self) -> dict[str, np.ndarray]:
+        """
+        Compute feature importances using a Random Forest model fit on encoded training data.
+
+        Encodes categorical features using OrdinalEncoder, fits a classifier or regressor
+        based on the target type, and returns feature importance scores.
+
+        Returns:
+            dict[str, np.ndarray]: Dictionary mapping feature names to importance scores.
+        """
         X_train_enc = self.X_train.copy()
 
         # Identify categorical columns by dtype inference
@@ -633,25 +786,26 @@ class AutoML_Preprocess:
 
     def preprocess_missing_values(
         self,
-        col_importance_thresh=0.01,
-        col_missing_thresh=0.5,
-        row_missing_thresh=0.05,
-        max_row_drop_frac=0.1,
-        skew_thresh=0.5,
-    ):
+        col_importance_thresh: float = 0.01,
+        col_missing_thresh: float = 0.5,
+        row_missing_thresh: float = 0.05,
+        max_row_drop_frac: float = 0.1,
+        skew_thresh: float = 0.5,
+    ) -> None:
         """
-        Handles missing values by deciding to drop or impute based on X_train.
-        Applies the same transformations to X_val and X_test.
+        Handle missing values by selectively dropping columns or rows, and imputing values.
 
-        Parameters:
-        - X_train, X_val, X_test: pd.DataFrame inputs
-        - col_missing_thresh: fraction missing above which to drop the column
-        - row_missing_thresh: fraction missing per row below which to drop rows
-        - skew_thresh: absolute skewness above which a numerical feature is considered skewed
-        - cat_cols: list of categorical column names (if None, inferred by dtype)
+        - Drops columns with missing values above `col_missing_thresh` and low feature importance.
+        - Drops rows with weighted missingness above `row_missing_thresh` if fraction dropped <= `max_row_drop_frac`.
+        - Imputes missing values in numerical columns using mean or median imputation based on skewness.
+        - Imputes missing values in categorical columns using most frequent values.
 
-        Returns:
-        - X_train_processed, X_val_processed, X_test_processed (pd.DataFrame)
+        Args:
+            col_importance_thresh (float): Threshold for feature importance under which columns may be dropped if missing.
+            col_missing_thresh (float): Fraction of missing values in a column above which to consider dropping the column.
+            row_missing_thresh (float): Weighted fraction of missing values per row above which to consider dropping the row.
+            max_row_drop_frac (float): Maximum allowable fraction of rows to drop in missing value handling.
+            skew_thresh (float): Threshold for absolute skewness to switch between mean and median imputation in numeric columns.
         """
 
         X_train = self.X_train
@@ -816,8 +970,21 @@ class AutoML_Preprocess:
         if self.df_test is not None:
             self.df_test = apply_imputers(df_test)
 
-    def convert_column_to_boolean(self, column_name) -> bool:
-        def is_boolean_series(series):
+    def convert_column_to_boolean(self, column_name: str) -> bool:
+        """
+        Attempt to convert a column to a boolean 0/1 integer type.
+
+        Recognizes columns that contain only boolean literals ('true', 'false')
+        or numeric 0/1 values and converts them to integer 0/1 for all data splits.
+
+        Args:
+            column_name (str): The name of the column to convert.
+
+        Returns:
+            bool: True if conversion was successful, False otherwise.
+        """
+
+        def is_boolean_series(series: pd.Series) -> bool:
             # Check for boolean strings (case insensitive)
             str_vals = series.dropna().astype(str).str.lower().unique()
             bool_str_vals = {"true", "false"}
@@ -836,7 +1003,7 @@ class AutoML_Preprocess:
 
         if is_boolean_series(cur_series):
             # Convert the column in all datasets
-            def to_bool(series):
+            def to_bool(series: pd.Series) -> pd.Series:
                 # If string values
                 if series.dtype == object or series.dtype.name == "string":
                     return series.astype(str).str.lower() == "true"
@@ -865,7 +1032,22 @@ class AutoML_Preprocess:
         else:
             return False
 
-    def convert_column_to_category(self, column_name) -> bool:
+    def convert_column_to_category(self, column_name: str) -> bool:
+        """
+        Convert a column to pandas category type if it qualifies as categorical.
+
+        Criteria:
+        - Non-numeric columns with fewer unique values than a dynamic threshold.
+        - Numeric columns which contain integer-like values with low cardinality.
+
+        Converts the column in all splits (train, val, test, optional test).
+
+        Args:
+            column_name (str): The name of the column to convert.
+
+        Returns:
+            bool: True if converted, False otherwise.
+        """
         convert = False
         col = self.X_train[column_name]
 
@@ -907,11 +1089,18 @@ class AutoML_Preprocess:
         else:
             return False
 
-    def is_numeric_string_series(self, series):
-        # Check if all non-null values can be converted to numbers
-        # This allows int, float, scientific notation, negative sign, decimals
-        # Return True if all non-null values are strings representing numbers
+    def is_numeric_string_series(self, series: pd.Series) -> bool:
+        """
+        Check if a pandas Series of strings represents numeric values for all non-null entries.
 
+        Uses pandas `to_numeric` with error coercion to detect if all entries can be converted.
+
+        Args:
+            series (pd.Series): Series to check.
+
+        Returns:
+            bool: True if all non-null values are numeric strings, False otherwise.
+        """
         # Drop missing values first
         s = series.dropna()
 
@@ -927,10 +1116,20 @@ class AutoML_Preprocess:
         numeric_converted = pd.to_numeric(s_str, errors="coerce")
 
         # If any non-null value failed conversion (NaN after to_numeric), then not all numeric strings
-        return numeric_converted.notna().all()
+        return bool(numeric_converted.notna().all())
 
-    def convert_column_to_string(self, column_name) -> bool:
+    def convert_column_to_string(self, column_name: str) -> bool:
+        """
+        Convert a column to pandas 'string' dtype if it is not numeric or numeric strings.
 
+        Does nothing if column is numeric or numeric strings to avoid incorrect conversions.
+
+        Args:
+            column_name (str): The name of the column to convert.
+
+        Returns:
+            bool: True if converted to string, False otherwise.
+        """
         col = self.X_train[column_name]
 
         # If column is already numeric, no need to convert to string
@@ -955,8 +1154,18 @@ class AutoML_Preprocess:
         )
         return True
 
-    def convert_column_to_integer(self, column_name) -> bool:
+    def convert_column_to_integer(self, column_name: str) -> bool:
+        """
+        Convert a column to integer dtype if all values are integer-like.
 
+        Converts numeric strings to float first if needed, then to int64 if all values are whole numbers.
+
+        Args:
+            column_name (str): The name of the column to convert.
+
+        Returns:
+            bool: True if conversion is done, False otherwise.
+        """
         col = self.X_train[column_name]
 
         if self.is_numeric_string_series(col):
@@ -972,8 +1181,16 @@ class AutoML_Preprocess:
                 )
         return False
 
-    def convert_column_to_float(self, column_name) -> bool:
+    def convert_column_to_float(self, column_name: str) -> bool:
+        """
+        Convert a column to float64 dtype if the column contains numeric strings.
 
+        Args:
+            column_name (str): The name of the column to convert.
+
+        Returns:
+            bool: True if conversion is successful, False otherwise.
+        """
         col = self.X_train[column_name]
 
         if self.is_numeric_string_series(col):
@@ -995,6 +1212,18 @@ class AutoML_Preprocess:
         return False
 
     def update_column_type(self, column_name: str) -> None:
+        """
+        Update the data type of a single column by attempting conversions in sequence.
+
+        Conversion attempts in order:
+            - Boolean (0/1 integer)
+            - Category (pandas category)
+            - String (pandas string)
+            - Float64 numeric
+
+        Args:
+            column_name (str): The column to update.
+        """
         # check if boolean
         if self.convert_column_to_boolean(column_name):
             return
@@ -1006,7 +1235,26 @@ class AutoML_Preprocess:
         #     return
         self.convert_column_to_float(column_name)
 
-    def auto_encode_features(self, max_unique_for_categorical=15):
+    def auto_encode_features(
+        self, max_unique_for_categorical: int = 15
+    ) -> dict[str, OneHotEncoder | OrdinalEncoder]:
+        """
+        Automatically encode categorical features in training, validation, test, and optional test datasets.
+
+        Encoding schemes:
+            - Boolean columns converted to int (0/1).
+            - Categorical dtype or object columns encoded with OneHotEncoder (drop='first', handle_unknown='ignore').
+            - Numeric columns with low unique values:
+                * Encoded with OrdinalEncoder if target mean monotonically varies with feature.
+                * Otherwise with OneHotEncoder.
+            - Continuous numeric columns left unchanged.
+
+        Args:
+            max_unique_for_categorical (int): Maximum unique values in a numeric column to consider encoding as categorical.
+
+        Returns:
+            dict[str, OneHotEncoder | OrdinalEncoder]: Mapping from column name to its encoder used.
+        """
         # suppress warnings during encoding when new categories are found in val/test/df_test
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
@@ -1337,7 +1585,15 @@ class AutoML_Preprocess:
             self.df_test = transformed_df_test
         return encoders
 
-    def encode_targets(self):
+    def encode_targets(self) -> None:
+        """
+        Encode the target variables (y_train, y_val, y_test) if they are non-numeric.
+
+        Uses LabelEncoder to convert string targets to numeric labels.
+        Converts boolean targets to integers.
+
+        No operation if targets are already numeric.
+        """
         le = LabelEncoder()
         if not pd.api.types.is_numeric_dtype(self.y_train):
             # Fit on y_train
@@ -1363,7 +1619,13 @@ class AutoML_Preprocess:
             self.y_test = self.y_test.astype(int)
             self.y_val = self.y_val.astype(int)
 
-    def drop_strings(self):
+    def drop_strings(self) -> None:
+        """
+        Drop any feature columns in training, validation, test, and optional test datasets
+        that are detected as string dtype.
+
+        This is often done to remove unprocessable text columns before modeling.
+        """
         # Identify columns with string dtype (including object dtype with strings)
         drop_cols = [
             col
@@ -1378,17 +1640,30 @@ class AutoML_Preprocess:
             if self.df_test is not None:
                 self.df_test.drop(columns=drop_cols, inplace=True)
 
-    def standardize_column(self, column_name, X_train, X_val, X_test, df_test):
+    def standardize_column(
+        self,
+        column_name: str,
+        X_train: pd.DataFrame,
+        X_val: pd.DataFrame,
+        X_test: pd.DataFrame,
+        df_test: Optional[pd.DataFrame],
+    ) -> Tuple[
+        pd.DataFrame, pd.DataFrame, pd.DataFrame, Optional[pd.DataFrame]
+    ]:
         """
-        Standardizes a single column to zero mean and unit variance.
-        Fits scaler on X_train[column_name] and applies to all three datasets.
+        Standardize a single column to zero mean and unit variance across train, val, test, and optional test sets.
 
-        Parameters:
-        - column_name: str, the column to standardize
-        - X_train, X_val, X_test: pandas DataFrames
+        Fits StandardScaler on the training column, then applies the same transformation to all sets.
+
+        Args:
+            column_name (str): The column to standardize.
+            X_train (pd.DataFrame): Training features.
+            X_val (pd.DataFrame): Validation features.
+            X_test (pd.DataFrame): Test features.
+            df_test (Optional[pd.DataFrame]): Optional external test set.
 
         Returns:
-        - X_train, X_val, X_test with the specified column standardized
+            Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, Optional[pd.DataFrame]]: Transformed datasets.
         """
         scaler = StandardScaler()
 
@@ -1407,7 +1682,16 @@ class AutoML_Preprocess:
 
         return X_train, X_val, X_test, df_test
 
-    def normalize_columns(self, skewness_threshold=0.75):
+    def normalize_columns(self, skewness_threshold: float = 0.75) -> None:
+        """
+        Apply power transform (Yeo-Johnson) to skewed numeric columns and standard scale all numeric columns.
+
+        Columns with absolute skewness higher than `skewness_threshold` are transformed.
+        Scaling is fit on training set and applied to validation, test, and optional test.
+
+        Args:
+            skewness_threshold (float): Skewness level beyond which to apply Yeo-Johnson transform.
+        """
         self.logger.info("[GREEN]- Normalizing")
         for column_name in self.X_train.columns:
             if column_name in self.encoders:
@@ -1462,8 +1746,13 @@ class AutoML_Preprocess:
                     .astype(np.float64)
                 )
 
-    def standardize_target(self):
+    def standardize_target(self) -> None:
+        """
+        Fit a TargetTransformer using Yeo-Johnson transform and standard scaling on y_train,
+        then transform y_train, y_val, and y_test targets correspondingly.
 
+        Stores the target_transformer object for later inverse transformations if needed.
+        """
         # 1. Fit transformer on training target
         target_transformer = TargetTransformer()
         target_transformer.fit(self.y_train)
@@ -1486,7 +1775,29 @@ class AutoML_Preprocess:
         )
         self.target_transformer = target_transformer
 
-    def preprocess(self):
+    def preprocess(self) -> str:
+        """
+        Run the entire preprocessing pipeline:
+
+        1. Load data from files.
+        2. Drop duplicate rows.
+        3. Split data into training, validation and test sets (80/10/10).
+        4. Drop duplicate and constant columns.
+        5. Optionally handle outliers before missing value imputation.
+        6. Handle missing values by dropping and imputing.
+        7. Optionally handle outliers after missing value imputation.
+        8. Update column data types to best guesses.
+        9. Encode target variables.
+        10. Drop string columns.
+        11. Auto-encode features.
+        12. Normalize and scale features.
+        13. Normalize target variable if regression.
+        14. Save preprocessed train dataset to CSV.
+        15. Post-process EDA reports for preprocessed dataset.
+
+        Returns:
+            str: Status message after preprocessing finishes or error message.
+        """
         project = self.title if self.title else "dataset"
         self.logger.info(f"[MAGENTA]\nStarting preprocessing for {project}")
         result = self.eda.load_data()
@@ -1572,7 +1883,7 @@ class AutoML_Preprocess:
         )
         return "Done! So far...."
 
-    def post_process_eda(self):
+    def post_process_eda(self) -> None:
         self.eda = AutoML_EDA(
             report_file=self.report_file,
             file_train=self.file_train,
@@ -1584,6 +1895,14 @@ class AutoML_Preprocess:
             update_script=self.update_script,
             logger=self.logger,
         )
+        """
+        Regenerate the exploratory data analysis (EDA) object for the preprocessed train data.
+
+        This updates the EDA report file path to indicate preprocessed data,
+        copies over dataset description and target information.
+
+        Does not reload data from file but works on preprocessed datasets in memory.
+        """
         self.eda.df_train = pd.concat([self.X_train, self.y_train], axis=1)
         self.eda.report_file = self.eda.report_file.replace(
             ".html", "-prepro.html"
