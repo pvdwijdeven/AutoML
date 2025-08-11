@@ -1,9 +1,14 @@
-import pandas as pd
-
+# internal imports
 from library import Logger
-from .prepro_lib import drop_duplicate_rows
+from .general import (
+    drop_duplicate_rows,
+    drop_duplicate_columns,
+    drop_constant_columns,
+)
+from .outliers import skip_outliers, decide_outlier_imputation_order
 
-
+# external imports
+import pandas as pd
 from typing import Optional, Dict, List, Any
 
 
@@ -49,21 +54,44 @@ class AutoML_Preprocess:
         else:
             self.logger: Logger = logger
 
-    def preprocess(self):
+    def preprocess(
+        self,
+    ) -> tuple[pd.DataFrame, pd.Series, pd.DataFrame, pd.Series | None]:
+
+        self.step_outputs: Dict[str, Dict[str, Any]] = {}
+
         self.steps: List[Dict[str, Any]] = [
             {
-                "name": "Drop duplicate rows",
+                "name": "drop_duplicate_rows",
                 "params": None,
                 "function": drop_duplicate_rows,
                 "target_aware": True,
             },
-            # {
-            #     "name": "drop_missing_targets",
-            #     "params": None,
-            #     "function": drop_missing_targets,
-            #     "target_aware": True,
-            # },
-            # more steps...
+            {
+                "name": "drop_duplicate_columns",
+                "params": None,
+                "function": drop_duplicate_columns,
+                "target_aware": False,
+            },
+            {
+                "name": "drop_constant_columns",
+                "params": None,
+                "function": drop_constant_columns,
+                "target_aware": False,
+            },
+            {
+                "name": "skipping_outliers",
+                "params": None,
+                "function": skip_outliers,
+                "target_aware": True,
+            },
+            {
+                "name": "outlier_imputation_order",
+                "params": None,
+                "function": decide_outlier_imputation_order,
+                "target_aware": True,
+                "config": {"step_outputs": self.step_outputs},
+            },
         ]
 
         for step in self.steps:
@@ -75,6 +103,9 @@ class AutoML_Preprocess:
                 logger=self.logger,
                 **step.get("config", {}),
             )
+            self.step_outputs[step["name"]] = step["params"]
+
+        self.logger.debug(msg=self.step_outputs)
 
         for step in self.steps:
             self.X_test, self.y_test, _ = step["function"](
