@@ -1,6 +1,6 @@
 # automl/preprocessing/__init__.py
 
-from .preprocess import AutoML_Preprocess
+from .preprocess_old import AutoML_Preprocess
 
 
 __all__ = [
