@@ -644,9 +644,6 @@ class AutoML_Preprocess:
                     )
                 else:
                     cur_method = method
-                self.logger.debug(
-                    f"{before_or_after}: {outliers_train.sum()} outliers found in {col}, threshold method: {cur_threshold_method}, outlier method: {cur_method}"
-                )
                 if outliers_train.sum() == 0:
                     continue
                 if cur_method == "drop":
@@ -1410,9 +1407,7 @@ class AutoML_Preprocess:
         #     return
         self.convert_column_to_float(column_name)
 
-    def auto_encode_features(
-        self, max_unique_for_categorical: int = 15
-    ) -> dict[str, OneHotEncoder | OrdinalEncoder]:
+    def auto_encode_features(self, max_unique_for_categorical: int = 15):
         """
         Automatically encode categorical features in training, validation, test, and optional test datasets.
 
@@ -1443,7 +1438,6 @@ class AutoML_Preprocess:
             df = self.X_train.copy()
 
             for col in df.columns:
-                self.logger.debug(f"{col}")
                 col_data = df[col]
                 unique_vals = col_data.nunique()
                 dtype = col_data.dtype
@@ -1462,7 +1456,9 @@ class AutoML_Preprocess:
 
                 # Category dtype: nominal categorical -> OneHotEncoder with handle_unknown='ignore'
                 elif isinstance(dtype, pd.CategoricalDtype):
-                    self.logger.debug(f"{col}: OneHotEncoder")
+                    self.logger.debug(
+                        f"[GREEN]- Applying OneHotEncoder on column '{col}'"
+                    )
                     encoder = OneHotEncoder(
                         drop="first",
                         sparse_output=False,
@@ -1517,7 +1513,9 @@ class AutoML_Preprocess:
 
                 # String/object dtype: treat as nominal categorical with OneHotEncoder and handle_unknown='ignore'
                 elif pd.api.types.is_object_dtype(dtype):
-                    self.logger.debug(f"{col}: OneHotEncoder")
+                    self.logger.debug(
+                        f"[GREEN]- Applying OneHotEncoder on column '{col}'"
+                    )
                     temp_cat = col_data.astype("category")
                     encoder = OneHotEncoder(
                         drop="first",
@@ -1616,7 +1614,7 @@ class AutoML_Preprocess:
                                         )
                                     )
                                 self.logger.debug(
-                                    f"{col}: OrdinalEncoder with unknown category handling"
+                                    f"[GREEN]- Applying OrdinalEncoder with unknown category handling on column '{col}'"
                                 )
                                 encoders[col] = encoder
                             else:
@@ -1683,7 +1681,7 @@ class AutoML_Preprocess:
                                         ).join(encoded_df_test_df)
                                     )
                                 self.logger.debug(
-                                    f"{col}: OneHotEncoder with unknown category handling"
+                                    f"[GREEN]- Applying OneHotEncoder with unknown category handling on column {col}"
                                 )
                                 encoders[col] = encoder
                         else:
@@ -1746,19 +1744,22 @@ class AutoML_Preprocess:
                                     columns=[col]
                                 ).join(encoded_df_test_df)
                             self.logger.debug(
-                                f"{col}: OneHotEncoder with unknown category handling"
+                                f"[GREEN]- Applying OneHotEncoder with unknown category handling on column '{col}'"
                             )
                             encoders[col] = encoder
                     else:
                         # Leave continuous numeric unchanged
                         pass
-
+        self.added_columns = list(
+            set(transformed_train.columns) - set(self.X_train.columns)
+        )
         self.X_train = transformed_train
         self.X_val = transformed_val
         self.X_test = transformed_test
         if self.df_test is not None and transformed_df_test is not None:
             self.df_test = transformed_df_test
-        return encoders
+
+        self.encoders = encoders
 
     def encode_targets(self) -> None:
         """
@@ -1869,7 +1870,7 @@ class AutoML_Preprocess:
         """
         self.logger.info("[GREEN]- Normalizing")
         for column_name in self.X_train.columns:
-            if column_name in self.encoders:
+            if column_name in self.added_columns:
                 # skip encoded columns
                 continue
             skewness_value = self.X_train[column_name].skew()
@@ -2032,7 +2033,7 @@ class AutoML_Preprocess:
         self.encode_targets()
         self.drop_strings()
         # 7 encoding
-        self.encoders = self.auto_encode_features()
+        self.auto_encode_features()
         self.drop_constant_columns()
         # 8 normalizing/scaling
         num_missing = self.X_train.isna().sum().sum()

@@ -404,7 +404,6 @@ class AutoML_EDA:
                 self.target = new_target
         if self.description != "":
             self.dict_description = self.read_description(self.description)
-            self.logger.debug(self.dict_description)
         else:
             self.dict_description = {}
         return ""
