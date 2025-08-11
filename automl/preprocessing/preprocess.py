@@ -9,7 +9,8 @@ import numpy as np
 import pandas as pd
 from pandas.api.types import is_numeric_dtype
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
-from sklearn.impute import SimpleImputer
+from sklearn.impute import SimpleImputer, KNNImputer
+from sklearn.metrics import mean_squared_error
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import (
     OneHotEncoder,
@@ -18,6 +19,7 @@ from sklearn.preprocessing import (
     PowerTransformer,
     StandardScaler,
 )
+from time import time
 from typing import List, Tuple, Optional, Self, Literal
 import warnings
 
@@ -785,6 +787,152 @@ class AutoML_Preprocess:
         importances = dict(zip(X_train_enc.columns, model.feature_importances_))
         return importances
 
+    def decide_knn_imputation(self, column: str) -> bool:
+        """
+        Decide if kNN imputation is suitable for the specified column of self.X_train.
+        Returns True if conditions met, False otherwise.
+        """
+
+        zero_var_cols = []
+        for col in self.X_train.columns:
+            # Only consider numeric columns since variance for strings is not defined
+            if pd.api.types.is_numeric_dtype(self.X_train[col]):
+                # Drop NA before variance calc to avoid errors
+                if self.X_train[col].dropna().nunique() <= 1:
+                    zero_var_cols.append(col)
+
+        col_data = self.X_train[column]
+        total_len = len(col_data)
+
+        # 1. Check missingness proportion
+        missing_ratio = col_data.isna().mean()
+        if missing_ratio < 0.05 or missing_ratio > 0.30:
+            # Missingness too low or too high
+            return False
+
+        # 2. Check dataset size
+        if total_len < 200:
+            return False
+
+        # 3. Check for correlated features with absolute Pearson correlation > 0.3
+        # Only consider rows without missing values in column and other features
+        not_null_idx = col_data.dropna().index
+        if len(not_null_idx) < 50:
+            # Not enough complete data for correlation calculation
+            return False
+
+        X_no_missing = self.X_train.loc[not_null_idx].drop(columns=[column])
+        target_no_missing = col_data.loc[not_null_idx]
+
+        if X_no_missing.empty:
+            # No other features to correlate with
+            return False
+
+        var_threshold = 1e-3  # something slightly below your lowest variance
+        non_constant_cols = [
+            col
+            for col in X_no_missing
+            if X_no_missing[col].var() > var_threshold
+        ]
+        corr_series = (
+            X_no_missing[non_constant_cols].corrwith(target_no_missing).abs()
+        )
+        # Keep only numeric correlations (drop NaNs)
+        corr_series = corr_series.dropna()
+
+        if corr_series.empty or all(corr_series < 0.25):
+            # No sufficiently correlated features
+            return False
+
+        # 4. Cross-validate imputation quality
+
+        # Prepare data for imputation: We will simulate missingness on part of existing non-missing data
+        col_non_missing = col_data.dropna()
+        if len(col_non_missing) < 100:
+            # Not enough data to simulate missingness robustly
+            return False
+
+        # Randomly mask 10% of known values in the column
+        np.random.seed(42)
+        mask_indices = np.random.choice(
+            col_non_missing.index,
+            size=int(0.1 * len(col_non_missing)),
+            replace=False,
+        )
+
+        col_simulated = col_data.copy()
+        col_simulated.loc[mask_indices] = np.nan
+
+        # Create DataFrame for imputation (other features as is)
+        X_for_impute = self.X_train.copy()
+        X_for_impute[column] = col_simulated
+
+        # Mean imputation baseline on the column only
+        mean_imputer = SimpleImputer(strategy="mean")
+        col_mean_imputed = mean_imputer.fit_transform(
+            X_for_impute[[column]]
+        ).ravel()
+
+        # kNN imputation (neighbors=5 default)
+        imputer = KNNImputer(n_neighbors=5)
+        # kNN uses all columns, so impute full DataFrame
+        start_time = time()
+        X_knn_imputed = imputer.fit_transform(X_for_impute)
+        elapsed_time = time() - start_time
+        col_knn_imputed = X_knn_imputed[:, X_for_impute.columns.get_loc(column)]
+
+        # Calculate RMSE of imputation only on masked indices (where we know true values)
+        true_values = col_data.loc[mask_indices]
+
+        # Get integer positional indices for proper NumPy indexing
+        mask_pos = X_for_impute.index.get_indexer(mask_indices)
+
+        mean_rmse = np.sqrt(
+            mean_squared_error(true_values, col_mean_imputed[mask_pos])
+        )
+        knn_rmse = np.sqrt(
+            mean_squared_error(true_values, col_knn_imputed[mask_pos])
+        )
+        # 5. Evaluate improvement and computational cost
+        if knn_rmse < 0.9 * mean_rmse and elapsed_time < 10:
+            return True
+        else:
+            return False
+
+    def impute_only_col(self, col: str) -> None:
+        """
+        Imputes only the specified column 'col' in self.X_train using kNN imputation based on the
+        other columns available. Does not change missing values in other columns.
+
+        Replaces missing values in self.X_train[col] in place.
+        """
+        # Store original column with missing values
+        col_data = self.X_train[[col]]
+
+        # Keep other columns unchanged for kNN features
+        other_cols = self.X_train.drop(columns=[col])
+
+        # Combine other columns and column to impute into a temporary DataFrame
+        # to leverage kNN imputation using all other available info
+        temp_df = other_cols.copy()
+        temp_df[col] = col_data
+
+        # Initialize KNNImputer with an appropriate number of neighbors
+        imputer = KNNImputer(n_neighbors=5)
+
+        # Fit and transform the temp_df: this imputes missing values considering neighbors
+        imputed_array = imputer.fit_transform(temp_df)
+
+        # imputed_array is a numpy array; find the imputed column index
+        col_index = temp_df.columns.get_loc(col)
+
+        # Extract imputed values for the target column
+        imputed_col_values = imputed_array[:, col_index]
+
+        # Replace only the missing entries in original column with imputed values
+        missing_mask = self.X_train[col].isna()
+        self.X_train.loc[missing_mask, col] = imputed_col_values[missing_mask]
+
     def preprocess_missing_values(
         self,
         col_importance_thresh: float = 0.01,
@@ -792,6 +940,7 @@ class AutoML_Preprocess:
         row_missing_thresh: float = 0.05,
         max_row_drop_frac: float = 0.1,
         skew_thresh: float = 0.5,
+        categorical_only: bool = False,
     ) -> None:
         """
         Handle missing values by selectively dropping columns or rows, and imputing values.
@@ -812,163 +961,188 @@ class AutoML_Preprocess:
         X_train = self.X_train
         X_val = self.X_val
         X_test = self.X_test
-        if self.df_test is not None:
-            df_test = self.df_test
-        else:
-            df_test = None
+        df_test = self.df_test if self.df_test is not None else None
 
         self.logger.info("[GREEN]- Processing missing values")
         feature_importances = self.get_feature_importances()
-        # Step 1: Drop columns based on missingness and feature importance
-
-        # Compute missingness per column
+        # Dropping columns (unchanged)
         missing_per_col = X_train.isna().mean()
-
-        # Filter feature_importances to existing columns
+        missing_per_col_dict = X_train.isna().sum().to_dict()
+        cols_done = [
+            col
+            for col in missing_per_col_dict
+            if missing_per_col_dict[col] == 0
+        ]
         feature_importances = {
             k: v for k, v in feature_importances.items() if k in X_train.columns
         }
-
-        # Normalize importance scores to sum to 1 (avoid zero sum)
         total_imp = sum(feature_importances.values())
-        if total_imp == 0:
-            norm_importances = {
-                k: 1 / len(feature_importances) for k in feature_importances
-            }
-        else:
-            norm_importances = {
-                k: v / total_imp for k, v in feature_importances.items()
-            }
+        norm_importances = (
+            {k: 1 / len(feature_importances) for k in feature_importances}
+            if total_imp == 0
+            else {k: v / total_imp for k, v in feature_importances.items()}
+        )
 
-        # Decide which columns to drop:
-        cols_to_drop = []
-        for col in X_train.columns:
-            missingness = missing_per_col[col]
-            importance = norm_importances.get(col, 0)
-            # Drop column if missingness > threshold and importance < threshold
-            if (
-                missingness > col_missing_thresh
-                and importance < col_importance_thresh
-            ):
-                cols_to_drop.append(col)
-        if cols_to_drop != []:
+        cols_to_drop = [
+            col
+            for col in X_train.columns
+            if missing_per_col[col] > col_missing_thresh
+            and norm_importances.get(col, 0) < col_importance_thresh
+        ]
+
+        if cols_to_drop:
             for col in cols_to_drop:
                 self.logger.debug(
                     f"[GREEN]  - Dropping {col} because of too much missing values"
                 )
-        # Drop selected columns from all datasets
         X_train = X_train.drop(columns=cols_to_drop)
         X_val = X_val.drop(columns=cols_to_drop, errors="ignore")
         X_test = X_test.drop(columns=cols_to_drop, errors="ignore")
         if df_test is not None:
             df_test = df_test.drop(columns=cols_to_drop, errors="ignore")
 
-        # Update feature importance dict accordingly
         feature_importances = {
             k: v
             for k, v in feature_importances.items()
             if k not in cols_to_drop
         }
 
-        # Step 2: Drop rows based on weighted missingness and feature importance
-
-        # Create missing mask for X_train (boolean DataFrame)
+        # Dropping rows (unchanged)
         missing_mask = X_train.isna()
-
-        # Assign weights to missing values based on feature importance
         weights = pd.DataFrame(0, index=X_train.index, columns=X_train.columns)
         for col in X_train.columns:
             weights[col] = missing_mask[col].astype(
                 float
             ) * norm_importances.get(col, 0)
-
-        # Weighted missingness sum per row
         weighted_missing_per_row = weights.sum(axis=1)
-
-        # Identify rows exceeding missingness threshold
         rows_to_drop = weighted_missing_per_row[
             weighted_missing_per_row > row_missing_thresh
         ].index
-
         fraction_rows_to_drop = len(rows_to_drop) / len(X_train)
-
-        # Drop rows only if fraction is within allowable max
         if fraction_rows_to_drop <= max_row_drop_frac:
             X_train = X_train.drop(index=rows_to_drop)
             self.logger.debug(
                 f"[GREEN]  - Dropped {len(rows_to_drop)} rows because of missing values."
             )
         else:
-            # No rows dropped; keep all for imputation
             rows_to_drop = pd.Index([])
+        if not categorical_only:
+            # Step to decide kNN columns
+            knn_cols = []
+            for col in X_train.columns:
+                if col not in cols_done:
+                    if self.decide_knn_imputation(column=col):
+                        knn_cols.append(col)
+            if knn_cols:
+                self.logger.debug(
+                    f"[GREEN]  - Columns selected for KNN imputation: {knn_cols}"
+                )
+        else:
+            knn_cols = []
 
-        # Step 3: Identify categorical columns
-        cat_cols = []
-        num_cols = []
+        # Determine categorical and numerical columns
+        cat_cols, num_cols = [], []
         for col in X_train.columns:
-            if infer_dtype(X_train[col]) in [
-                "string",
-                "category",
-                "boolean",
-                "object",
-            ]:
-                cat_cols.append(col)
-            else:
-                num_cols.append(col)
+            if col not in cols_done:
+                dtype_infer = infer_dtype(X_train[col])
+                if dtype_infer in ["string", "category", "boolean", "object"]:
+                    cat_cols.append(col)
+                else:
+                    num_cols.append(col)
 
-        # Step 4: Compute skewness on numerical cols
-        skewness = X_train[num_cols].skew().abs()
-
-        # Prepare imputers dict to hold imputers for each type
+        # Remove KNN columns from mean/median imputers since they will be handled separately
+        cat_cols = [col for col in cat_cols if col not in knn_cols]
+        # Prepare imputers dict to hold fitted imputers for each type
         imputers = {}
+        if not categorical_only:
+            num_cols = [col for col in num_cols if col not in knn_cols]
+            # Skewness on numerical columns excluding kNN columns
+            skewness = (
+                X_train[num_cols].skew().abs()
+                if num_cols
+                else pd.Series(dtype=float)
+            )
 
-        # Numerical - split by skewness
-        num_cols_low_skew = skewness[skewness <= skew_thresh].index.tolist()
-        num_cols_high_skew = skewness[skewness > skew_thresh].index.tolist()
+            # Numerical low skew mean imputer
+            num_cols_low_skew = (
+                skewness[skewness <= skew_thresh].index.tolist()
+                if not skewness.empty
+                else []
+            )
+            if num_cols_low_skew:
+                imp_mean = SimpleImputer(strategy="mean")
+                imp_mean.fit(X_train[num_cols_low_skew])
+                imputers["num_mean"] = (imp_mean, num_cols_low_skew)
+                for col in num_cols_low_skew:
+                    self.logger.debug(
+                        f"[GREEN]  - Imputing missing values with 'mean'(low skew numeric) for column {col}"
+                    )
 
-        # Imputer for numerical low skew with mean
-        if num_cols_low_skew:
-            imp_mean = SimpleImputer(strategy="mean")
-            imp_mean.fit(X_train[num_cols_low_skew])
-            imputers["num_mean"] = (imp_mean, num_cols_low_skew)
-            for col in num_cols_low_skew:
-                self.logger.debug(
-                    f"[GREEN]  - Imputing missing values with 'mean'(low skewness numeric) for column {col}"
-                )
+            # Numerical high skew median imputer
+            num_cols_high_skew = (
+                skewness[skewness > skew_thresh].index.tolist()
+                if not skewness.empty
+                else []
+            )
+            if num_cols_high_skew:
+                imp_median = SimpleImputer(strategy="median")
+                imp_median.fit(X_train[num_cols_high_skew])
+                imputers["num_median"] = (imp_median, num_cols_high_skew)
+                for col in num_cols_high_skew:
+                    self.logger.debug(
+                        f"[GREEN]  - Imputing missing values with 'median'(high skew numeric) for column {col}"
+                    )
 
-        # Imputer for numerical high skew with median
-        if num_cols_high_skew:
-            imp_median = SimpleImputer(strategy="median")
-            imp_median.fit(X_train[num_cols_high_skew])
-            imputers["num_median"] = (imp_median, num_cols_high_skew)
-            for col in num_cols_high_skew:
-                self.logger.debug(
-                    f"[GREEN]  - Imputing missing values with 'median'(high skewness numeric) for column {col}"
-                )
-
-        # Imputer for categorical with mode (most frequent)
+        # Categorical mode imputer
         if cat_cols:
             imp_mode = SimpleImputer(strategy="most_frequent")
             imp_mode.fit(X_train[cat_cols])
             imputers["cat_mode"] = (imp_mode, cat_cols)
-            for col in num_cols_high_skew:
+            for col in cat_cols:
                 self.logger.debug(
                     f"[GREEN]  - Imputing missing values with 'mode'(category) for column {col}"
                 )
 
-        # Define a helper function to apply imputers consistently
+        # KNN imputer on knn_cols (if any)
+        if not categorical_only and knn_cols:
+            # KNN imputer requires all features as context; use all columns except dropped and rows dropped
+            # Fit on full dataset columns (without dropped columns)
+            knn_imputer = KNNImputer(n_neighbors=5)
+            knn_imputer.fit(
+                X_train
+            )  # fit on all features for neighbor distances
+            imputers["knn"] = (knn_imputer, knn_cols)
+            for col in knn_cols:
+                self.logger.debug(
+                    f"[GREEN]  - Imputing missing values with 'KNN' for column {col}"
+                )
+
+        # Helper function to apply imputers
         def apply_imputers(X):
             X = X.copy()
             for imp, cols in imputers.values():
                 if cols:
-                    X[cols] = imp.transform(X[cols])
+                    try:
+                        if isinstance(imp, KNNImputer):
+                            # Only replace knn_cols subset after full transform
+                            # transform entire dataframe to impute knn_cols correctly
+                            imputed_full = imp.transform(X)
+                            for col in cols:
+                                idx = X.columns.get_loc(col)
+                                X[col] = imputed_full[:, idx]
+                        else:
+                            X[cols] = imp.transform(X[cols])
+                    except Exception as e:
+                        self.logger.warning(
+                            f"[YELLOW] - Imputer failed on columns {cols}: {e}"
+                        )
             return X
 
-        # Apply imputers to train/val/test
+        # Apply imputers to all splits
         self.X_train = apply_imputers(X_train)
         self.X_val = apply_imputers(X_val)
         self.X_test = apply_imputers(X_test)
-        if self.df_test is not None:
+        if df_test is not None:
             self.df_test = apply_imputers(df_test)
 
     def convert_column_to_boolean(self, column_name: str) -> bool:
@@ -1631,7 +1805,7 @@ class AutoML_Preprocess:
         drop_cols = [
             col
             for col in self.X_train.columns
-            if pd.api.types.is_string_dtype(self.X_train[col])
+            if self.X_train[col].dtype == "string"
         ]
         self.logger.debug(f"[GREEN]- dropping {drop_cols} as they are strings")
         if drop_cols:
@@ -1848,10 +2022,23 @@ class AutoML_Preprocess:
         # 5 missing values
         num_missing = self.X_train.isna().sum().sum()
         if num_missing > 0:
-            self.preprocess_missing_values()
+            self.preprocess_missing_values(categorical_only=True)
         else:
             self.logger.info("[GREEN]- No missing values to be processed.")
-        # 5a handle outliers after dealing with missing values
+        # 6 update column types
+        self.logger.info("[GREEN]- Updating column types.")
+        for col in self.X_train.columns:
+            self.update_column_type(column_name=col)
+        self.encode_targets()
+        self.drop_strings()
+        # 7 encoding
+        self.encoders = self.auto_encode_features()
+        self.drop_constant_columns()
+        # 8 normalizing/scaling
+        num_missing = self.X_train.isna().sum().sum()
+        if num_missing > 0:
+            self.preprocess_missing_values(categorical_only=False)
+        # 8a handle outliers after dealing with missing values
         if not skip_outliers and num_missing > 0:
             self.handle_outliers(
                 columns=self.X_train.select_dtypes(include=[np.number]).columns,
@@ -1859,16 +2046,6 @@ class AutoML_Preprocess:
                 method="",
                 threshold_method="",
             )
-
-        # 6 update column types
-        self.logger.info("[GREEN]- Updating column types.")
-        for col in self.X_train.columns:
-            self.update_column_type(col)
-        self.encode_targets()
-        self.drop_strings()
-        # 7 encoding
-        self.encoders = self.auto_encode_features()
-        # 8 normalizing/scaling
         self.normalize_columns()
         # 9 normalize target
         if not check_classification(self.y_train):
