@@ -5,7 +5,11 @@ from .general import (
     drop_duplicate_columns,
     drop_constant_columns,
 )
-from .outliers import skip_outliers, decide_outlier_imputation_order
+from .outliers import (
+    skip_outliers,
+    decide_outlier_imputation_order,
+    handle_outliers,
+)
 
 # external imports
 import pandas as pd
@@ -91,6 +95,21 @@ class AutoML_Preprocess:
                 "function": decide_outlier_imputation_order,
                 "target_aware": True,
                 "config": {"step_outputs": self.step_outputs},
+            },
+            {
+                "name": "handle_outliers",
+                "params": None,
+                "function": handle_outliers,
+                "target_aware": True,
+                "config": {"before": True, "step_outputs": self.step_outputs},
+            },
+            # TODO missing values here
+            {
+                "name": "handle_outliers",
+                "params": None,
+                "function": handle_outliers,
+                "target_aware": True,
+                "config": {"before": False, "step_outputs": self.step_outputs},
             },
         ]
 

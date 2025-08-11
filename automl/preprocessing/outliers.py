@@ -2,7 +2,7 @@ from library import Logger
 
 import numpy as np
 import pandas as pd
-from typing import Optional, Tuple, Dict, Any, Literal
+from typing import Optional, Tuple, Dict, Any, Literal, List
 from scipy.stats import shapiro
 
 
@@ -307,20 +307,20 @@ def handle_outliers(
     """
     if fit:
         logger.info(
-            f"[GREEN]- Handling outliers {'before missing values' if before else 'after missing values'} imputation"
+            msg=f"[GREEN]- Handling outliers {'before missing values' if before else 'after missing values'} imputation"
         )
         X_train = X.copy()
-        current_cols = []
-        to_find = "before_missing_values" if before else "after_missing_values"
-        for col, value in step_outputs["outlier_imputation_order"][
-            "before_after"
-        ]:
+        current_cols: List[str] = []
+        to_find: str = "before_imputation" if before else "after_imputation"
+        before_or_after = step_outputs["outlier_imputation_order"][
+            "before_or_after"
+        ]
+        for col, value in before_or_after.items():
             if value == to_find:
                 current_cols.append(col)
-        outlier_columns = {}
+        outlier_columns: Dict[str, Any] = {}
 
-        for col in X_train[current_cols]:
-            assert isinstance(col, str)
+        for col in X_train[current_cols].columns:
             cur_threshold_method = get_threshold_method(column=X_train[col])
             if cur_threshold_method == "iqr":
                 Q1 = X_train[col].quantile(0.25)
@@ -388,7 +388,7 @@ def handle_outliers(
                 )
         return X_train, y, {"outlier_columns": outlier_columns}
     else:
-        for col, value in step_params["outlier_columns"]:
+        for col, value in step_params["outlier_columns"].items():
             lower_bound = value["lower_bound"]
             upper_bound = value["upper_bound"]
             outliers_train = (X[col] < lower_bound) | (X[col] > upper_bound)

@@ -7,7 +7,11 @@ from .general import (
     drop_duplicate_columns,
     drop_constant_columns,
 )
-from .outliers import skip_outliers, decide_outlier_imputation_order
+from .outliers import (
+    skip_outliers,
+    decide_outlier_imputation_order,
+    handle_outliers,
+)
 
 __all__: list[str] = [
     "AutoML_Preprocess_old",
@@ -17,4 +21,5 @@ __all__: list[str] = [
     "drop_constant_columns",
     "skip_outliers",
     "decide_outlier_imputation_order",
+    "handle_outliers",
 ]
