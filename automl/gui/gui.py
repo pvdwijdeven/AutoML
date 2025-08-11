@@ -1,6 +1,6 @@
 import wx
 from eda import AutoML_EDA
-from preprocessing import AutoML_Preprocess
+from modelling import AutoML_Modeling
 from pathlib import Path
 from library import Logger, TextCtrlHandler, WxTextRedirector
 import logging
@@ -64,10 +64,10 @@ class AutoMLFrame(wx.Frame):
                 "text": "Start EDA",
                 "function": lambda event: self.on_start_eda(),
             },
-            "Startprepro": {
-                "text": "Start preprocessing",
-                "function": lambda event: self.on_start_prepro(),
-            },
+            # "Startprepro": {
+            #     "text": "Start preprocessing",
+            #     "function": lambda event: self.on_start_prepro(),
+            # },
             "title": {
                 "text": "Title for EDA Report",
                 "function": lambda event: self.on_get_title(),
@@ -192,8 +192,8 @@ class AutoMLFrame(wx.Frame):
             self.Show()
         if args.EDA:
             self.on_start_eda()
-        if args.prepro:
-            self.on_start_prepro()
+        # if args.prepro:
+        #     self.on_start_prepro()
 
     def on_exit(self, event):
         self.Close()
@@ -274,33 +274,40 @@ class AutoMLFrame(wx.Frame):
             ].GetLabel(),
         )
         result = current_EDA.perform_eda()
+
         self.buttons_info["StartEDA"]["label"].SetLabel(result)
-        if self.nogui:
-            self.on_exit(event=None)
-
-    def on_start_prepro(self):
-        thread = threading.Thread(target=self.actual_prepro)
-        thread.start()
-
-    def actual_prepro(self):
-        # Placeholder for EDA functionality
-        self.buttons_info["Startprepro"]["label"].SetLabel(
-            "preprocessing started"
-        )
-        current_prepro = AutoML_Preprocess(
-            report_file=self.buttons_info["ReportFile"]["label"].GetLabel(),
-            file_train=self.buttons_info["training"]["label"].GetLabel(),
-            file_test=self.buttons_info["test"]["label"].GetLabel(),
-            title=self.buttons_info["title"]["label"].GetLabel(),
-            target=self.buttons_info["target"]["label"].GetLabel(),
-            description=self.buttons_info["description"]["label"].GetLabel(),
-            nogui=self.nogui,
-            update_script=self.buttons_info["update_script"][
-                "label"
-            ].GetLabel(),
+        assert current_EDA.df_train is not None
+        self.mymodels = AutoML_Modeling(
+            target=current_EDA.target,
+            X_train=current_EDA.df_train,
             logger=self.logger,
         )
-        result = current_prepro.preprocess()
-        self.buttons_info["Startprepro"]["label"].SetLabel(result)
         if self.nogui:
             self.on_exit(event=None)
+
+    # def on_start_prepro(self):
+    #     thread = threading.Thread(target=self.actual_prepro)
+    #     thread.start()
+
+    # def actual_prepro(self):
+    #     # Placeholder for EDA functionality
+    #     self.buttons_info["Startprepro"]["label"].SetLabel(
+    #         "preprocessing started"
+    #     )
+    #     current_prepro = AutoML_Preprocess_old(
+    #         report_file=self.buttons_info["ReportFile"]["label"].GetLabel(),
+    #         file_train=self.buttons_info["training"]["label"].GetLabel(),
+    #         file_test=self.buttons_info["test"]["label"].GetLabel(),
+    #         title=self.buttons_info["title"]["label"].GetLabel(),
+    #         target=self.buttons_info["target"]["label"].GetLabel(),
+    #         description=self.buttons_info["description"]["label"].GetLabel(),
+    #         nogui=self.nogui,
+    #         update_script=self.buttons_info["update_script"][
+    #             "label"
+    #         ].GetLabel(),
+    #         logger=self.logger,
+    #     )
+    #     result = current_prepro.preprocess()
+    #     self.buttons_info["Startprepro"]["label"].SetLabel(result)
+    #     if self.nogui:
+    #         self.on_exit(event=None)

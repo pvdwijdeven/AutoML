@@ -1,10 +1,9 @@
 # internal libraries
-from preprocessing import AutoML_Preprocess
 from library import Logger
 from .models import models
 
 # external libraries
-from typing import Dict, Optional, Any
+from typing import Dict, Optional
 import numpy as np
 import pandas as pd
 from sklearn.metrics import (
@@ -14,29 +13,31 @@ from sklearn.metrics import (
     mean_squared_error,
     r2_score,
 )
-from sklearn.model_selection import train_test_split, KFold
 
 
-class AutoML_Modeling:
+# For regression, populate models dict with regressors (LinearRegression, RFRegressor, etc)
+
+
+class AutoML_Modeling_old:
 
     def __init__(
         self,
-        target: str,
         X_train: pd.DataFrame,
-        y_train: Optional[pd.Series] = None,
+        X_val: pd.DataFrame,
+        X_test: pd.DataFrame,
+        y_train: pd.Series,
+        y_val: pd.Series,
+        y_test: pd.Series,
+        df_test: Optional[pd.DataFrame],
         logger: Optional[Logger] = None,
     ) -> None:
-        if y_train is None:
-            if target not in X_train.columns:
-                raise ValueError(
-                    f"Target column '{target}' not found in X_train"
-                )
-            y_train = X_train[target]
-            X_train = X_train.drop(target, axis=1)
-
-        self.target: str = target
         self.X_train: pd.DataFrame = X_train
+        self.X_val: pd.DataFrame = X_val
+        self.X_test: pd.DataFrame = X_test
         self.y_train: pd.Series = y_train
+        self.y_val: pd.Series = y_val
+        self.y_test: pd.Series = y_test
+        self.df_test: Optional[pd.DataFrame] = df_test
         if logger is None:
             self.logger = Logger(
                 level_console=Logger.INFO,
@@ -47,7 +48,10 @@ class AutoML_Modeling:
         else:
             self.logger: Logger = logger
         self.dataset_type: str = self.detect_dataset_type(target=self.y_train)
-        self.train_test_kfold_loop()
+        result: Dict[str, Dict[str, float]] = self.train_and_evaluate_models(
+            dataset_type=self.dataset_type,
+        )
+        self.logger.debug(msg=result)
 
     def detect_dataset_type(
         self, target: pd.DataFrame | pd.Series | np.ndarray
@@ -237,60 +241,3 @@ class AutoML_Modeling:
                 results[name] = {"mse": mse}
 
         return results
-
-    def train_test_kfold_loop(
-        self, test_size=0.2, random_state=42, n_splits=5, shuffle=True
-    ):
-
-        self.X_train_full: pd.DataFrame = self.X_train.copy()
-        self.y_train_full: pd.Series[Any] = self.y_train.copy()
-
-        # First, split into train and test sets
-        self.X_train_val, self.X_test, self.y_train_val, self.y_test = (
-            train_test_split(
-                self.X_train_full,
-                self.y_train_full,
-                test_size=test_size,
-                random_state=random_state,
-                shuffle=shuffle,
-            )
-        )
-
-        # Initialize KFold on training data only
-        kf = KFold(
-            n_splits=n_splits, shuffle=shuffle, random_state=random_state
-        )
-
-        # Loop over K folds
-        for _fold_idx, (train_index, val_index) in enumerate(
-            kf.split(self.X_train_val)
-        ):
-            # Split train and validation sets for this fold
-            self.X_train = self.X_train_val.iloc[train_index].reset_index(
-                drop=True
-            )
-            self.y_train = self.y_train_val.iloc[train_index].reset_index(
-                drop=True
-            )
-            self.X_test = self.X_train_val.iloc[val_index].reset_index(
-                drop=True
-            )
-            self.y_test = self.y_train_val.iloc[val_index].reset_index(
-                drop=True
-            )
-            cur_prepro = AutoML_Preprocess(
-                X_train=self.X_train,
-                y_train=self.y_train,
-                X_test=self.X_test,
-                y_test=self.y_test,
-                logger=self.logger,
-            )
-            self.X_train, self.y_train, self.X_test, self.y_test = (
-                cur_prepro.preprocess()
-            )
-            result: Dict[str, Dict[str, float]] = (
-                self.train_and_evaluate_models(
-                    dataset_type=self.dataset_type,
-                )
-            )
-            self.logger.debug(msg=result)

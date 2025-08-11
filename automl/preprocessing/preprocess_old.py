@@ -1,6 +1,6 @@
 # internal imports
 from library import Logger, infer_dtype, check_classification
-from modelling import AutoML_Modeling
+from modelling import AutoML_Modeling_old
 from eda import AutoML_EDA
 
 # external imports
@@ -97,7 +97,7 @@ class TargetTransformer:
         return y_original.flatten()
 
 
-class AutoML_Preprocess:
+class AutoML_Preprocess_old:
     """
     Class that manages the preprocessing pipeline for an Automated Machine Learning application,
     including data loading, cleaning, splitting, missing value imputation, outlier handling,
@@ -2055,7 +2055,7 @@ class AutoML_Preprocess:
 
         self.logger.info(f"[MAGENTA]Done preprocessing for {project}")
         # self.post_process_eda()
-        self.model = AutoML_Modeling(
+        self.model = AutoML_Modeling_old(
             X_train=self.X_train,
             X_val=self.X_val,
             X_test=self.X_test,
