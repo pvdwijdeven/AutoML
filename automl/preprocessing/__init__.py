@@ -15,7 +15,7 @@ from .outliers import (
 )
 from .encoding import auto_encode_features, encode_target
 from .missing import handle_missing_values_num, handle_missing_values_cat
-
+from .standardizing import normalize_columns
 
 __all__: list[str] = [
     "AutoML_Preprocess_old",
@@ -31,4 +31,5 @@ __all__: list[str] = [
     "auto_encode_features",
     "encode_target",
     "drop_strings",
+    "normalize_columns",
 ]

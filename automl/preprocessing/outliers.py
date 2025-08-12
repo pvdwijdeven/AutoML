@@ -317,6 +317,7 @@ def handle_outliers(
         ]
         for col, value in before_or_after.items():
             if value == to_find:
+                # remove columns that are already solved by encoding
                 if col in X_train.columns:
                     current_cols.append(col)
         outlier_columns: Dict[str, Any] = {}

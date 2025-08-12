@@ -13,6 +13,7 @@ from .outliers import (
 )
 from .encoding import auto_encode_features, encode_target
 from .missing import handle_missing_values_cat, handle_missing_values_num
+from .standardizing import normalize_columns
 
 # external imports
 import pandas as pd
@@ -150,6 +151,13 @@ class AutoML_Preprocess:
                 "function": handle_outliers,
                 "target_aware": True,
                 "config": {"before": False, "step_outputs": self.step_outputs},
+            },
+            {
+                "name": "normalize_columns",
+                "params": None,
+                "function": normalize_columns,
+                "target_aware": True,
+                "config": {"step_outputs": self.step_outputs},
             },
         ]
         size = {}
