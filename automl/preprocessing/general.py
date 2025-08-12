@@ -4,6 +4,33 @@ import pandas as pd
 from typing import Optional, Tuple, Dict, Any
 
 
+def drop_strings(
+    X: pd.DataFrame,
+    y: Optional[pd.Series] = None,
+    *,
+    fit: bool,
+    step_params: Dict[str, Any] = {},
+    target_aware: bool = True,
+    logger: Logger,
+) -> Tuple[pd.DataFrame, Optional[pd.Series], Optional[Dict[str, Any]]]:
+    """
+    Drop any feature columns in training, validation, test, and optional test datasets
+    that are detected as string dtype.
+
+    This is often done to remove unprocessable text columns before modeling.
+    """
+    # Identify columns with string dtype (including object dtype with strings)
+    if fit:
+        drop_cols = [col for col in X.columns if X[col].dtype == "string"]
+        logger.debug(f"[GREEN]- dropping {drop_cols} as they are strings")
+        step_params["drop_cols"] = drop_cols
+        return X, y, step_params
+    else:
+        drop_cols = step_params["drop_cols"]
+        X.drop(columns=drop_cols, inplace=True)
+        return X, y, step_params
+
+
 def drop_duplicate_rows(
     X: pd.DataFrame,
     y: Optional[pd.Series] = None,

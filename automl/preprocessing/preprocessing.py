@@ -4,12 +4,15 @@ from .general import (
     drop_duplicate_rows,
     drop_duplicate_columns,
     drop_constant_columns,
+    drop_strings,
 )
 from .outliers import (
     skip_outliers,
     decide_outlier_imputation_order,
     handle_outliers,
 )
+from .encoding import auto_encode_features, encode_target
+from .missing import handle_missing_values
 
 # external imports
 import pandas as pd
@@ -103,13 +106,48 @@ class AutoML_Preprocess:
                 "target_aware": True,
                 "config": {"before": True, "step_outputs": self.step_outputs},
             },
-            # TODO missing values here
+            {
+                "name": "handle_missing_values",
+                "params": None,
+                "function": handle_missing_values,
+                "target_aware": True,
+                "config": {
+                    "categorical_only": True,
+                },
+            },
             {
                 "name": "handle_outliers",
                 "params": None,
                 "function": handle_outliers,
                 "target_aware": True,
                 "config": {"before": False, "step_outputs": self.step_outputs},
+            },
+            {
+                "name": "encode_target",
+                "params": None,
+                "function": encode_target,
+                "target_aware": True,
+            },
+            {
+                "name": "drop_strings",
+                "params": None,
+                "function": drop_strings,
+                "target_aware": True,
+            },
+            {
+                "name": "auto_encode_features",
+                "params": None,
+                "function": auto_encode_features,
+                "target_aware": False,
+            },
+            {
+                "name": "handle_missing_values",
+                "params": None,
+                "function": handle_missing_values,
+                "target_aware": True,
+                "config": {
+                    "categorical_only": False,
+                },
             },
         ]
 

@@ -6,12 +6,16 @@ from .general import (
     drop_duplicate_rows,
     drop_duplicate_columns,
     drop_constant_columns,
+    drop_strings,
 )
 from .outliers import (
     skip_outliers,
     decide_outlier_imputation_order,
     handle_outliers,
 )
+from .encoding import auto_encode_features, encode_target
+from .missing import handle_missing_values
+
 
 __all__: list[str] = [
     "AutoML_Preprocess_old",
@@ -22,4 +26,8 @@ __all__: list[str] = [
     "skip_outliers",
     "decide_outlier_imputation_order",
     "handle_outliers",
+    "handle_missing_values",
+    "auto_encode_features",
+    "encode_target",
+    "drop_strings",
 ]
