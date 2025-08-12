@@ -52,9 +52,11 @@ def automl(*args):
         "--report_file", help="filename for report file (.html)"
     )
     parser.add_argument(
+        "--output_file", help="filename for output file (.html)"
+    )
+    parser.add_argument(
         "--logger_file", help="filename for logger file (.log)", default=""
     )
-    parser.add_argument("--output_file", help="filename for output file (.csv)")
     args = parser.parse_args()
     args.project_root = Path(__file__).resolve().parent
     app = wx.App(False)

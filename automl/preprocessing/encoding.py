@@ -1,26 +1,20 @@
 # internal imports
-from library import Logger, infer_dtype, check_classification
-from modelling import AutoML_Modeling_old
-from eda import AutoML_EDA
+from library import Logger
+
 
 # external imports
-from scipy.stats import shapiro
+
 import numpy as np
 import pandas as pd
-from pandas.api.types import is_numeric_dtype
-from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
-from sklearn.impute import SimpleImputer, KNNImputer
-from sklearn.metrics import mean_squared_error
-from sklearn.model_selection import train_test_split
+
+
 from sklearn.preprocessing import (
     OneHotEncoder,
     OrdinalEncoder,
     LabelEncoder,
-    PowerTransformer,
-    StandardScaler,
 )
-from time import time
-from typing import List, Tuple, Optional, Self, Literal, Dict, Any
+
+from typing import Tuple, Optional, Dict, Any
 import warnings
 
 
@@ -265,7 +259,6 @@ def auto_encode_features(
             drop_cols = []
             transformed_X = X.copy()
             for col, encoder in encoders.items():
-
                 if isinstance(encoder, OrdinalEncoder):
                     col_data = transformed_X[col]
                     transformed_X[[col]] = encoder.fit_transform(

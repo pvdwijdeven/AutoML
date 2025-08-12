@@ -2,6 +2,7 @@
 from preprocessing import AutoML_Preprocess
 from library import Logger
 from .models import models
+from .scoring import write_to_output
 
 # external libraries
 from typing import Dict, Optional, Any
@@ -15,6 +16,8 @@ from sklearn.metrics import (
     r2_score,
 )
 from sklearn.model_selection import train_test_split, KFold
+from math import sqrt
+import os
 
 
 class AutoML_Modeling:
@@ -24,6 +27,7 @@ class AutoML_Modeling:
         target: str,
         X_train: pd.DataFrame,
         y_train: Optional[pd.Series] = None,
+        output_file: str = "",
         logger: Optional[Logger] = None,
     ) -> None:
         if y_train is None:
@@ -37,6 +41,7 @@ class AutoML_Modeling:
         self.target: str = target
         self.X_train: pd.DataFrame = X_train
         self.y_train: pd.Series = y_train
+        self.output_file: str = output_file
         if logger is None:
             self.logger = Logger(
                 level_console=Logger.INFO,
@@ -159,7 +164,7 @@ class AutoML_Modeling:
         return "unknown"
 
     def train_and_evaluate_models(
-        self, dataset_type: str
+        self, dataset_type: str, save_file: str = ""
     ) -> Dict[str, Dict[str, float]]:
         """
         Train and evaluate a dictionary of models.
@@ -179,6 +184,20 @@ class AutoML_Modeling:
             self.logger.info(msg=f"[GREEN]- Training on {name}")
             model.fit(self.X_train, self.y_train)
             y_pred = model.predict(self.X_test)
+            if save_file != "":
+                df_out = pd.concat(
+                    [
+                        self.X_test.reset_index(drop=True),
+                        pd.Series(self.y_test, name="y_test").reset_index(
+                            drop=True
+                        ),
+                        pd.Series(y_pred, name="y_pred").reset_index(drop=True),
+                    ],
+                    axis=1,
+                )
+
+                # Save to CSV (or any other format)
+                df_out.to_csv(save_file, index=False)
             self.logger.info(msg=f"[GREEN]- Scoring on {name}")
             # Choose metric depending on dataset type
             if dataset_type in (
@@ -225,11 +244,27 @@ class AutoML_Modeling:
                 results[name] = {"accuracy": acc}
 
             elif dataset_type == "regression":
+                epsilon = (
+                    1e-15  # small number to avoid log(0), change if needed
+                )
+                lrmse: float = sqrt(
+                    mean_squared_error(
+                        y_true=np.log(self.y_test + epsilon),
+                        y_pred=np.log(np.maximum(y_pred, epsilon)),
+                    ),
+                )
+
                 mse: float = mean_squared_error(
                     y_true=self.y_test, y_pred=y_pred
                 )
+                rmse: float = sqrt(mse)
                 r2: float = r2_score(y_true=self.y_test, y_pred=y_pred)
-                results[name] = {"mse": mse, "r2": r2}
+                results[name] = {
+                    "lrmse": lrmse,
+                    "rmse": rmse,
+                    "mse": mse,
+                    "r2": r2,
+                }
 
             else:
                 # Fallback metric if unknown
@@ -260,11 +295,14 @@ class AutoML_Modeling:
         kf = KFold(
             n_splits=n_splits, shuffle=shuffle, random_state=random_state
         )
-
+        total_result = {}
         # Loop over K folds
-        for _fold_idx, (train_index, val_index) in enumerate(
+        for fold_idx, (train_index, val_index) in enumerate(
             kf.split(self.X_train_val)
         ):
+            self.logger.info(
+                f"[MAGENTA]Testing run {fold_idx + 1} of {n_splits}"
+            )
             # Split train and validation sets for this fold
             self.X_train = self.X_train_val.iloc[train_index].reset_index(
                 drop=True
@@ -291,6 +329,15 @@ class AutoML_Modeling:
             result: Dict[str, Dict[str, float]] = (
                 self.train_and_evaluate_models(
                     dataset_type=self.dataset_type,
+                    save_file=self.output_file.replace("html", "csv")
+                    .replace(
+                        "result",
+                        f"fold{fold_idx}",
+                    )
+                    .replace("export", "export/csv"),
                 )
             )
-            self.logger.debug(msg=result)
+            total_result[fold_idx] = result
+        self.logger.debug(msg=total_result)
+        os.makedirs(os.path.dirname(self.output_file), exist_ok=True)
+        write_to_output(self.output_file, total_result)

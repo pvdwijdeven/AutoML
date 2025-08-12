@@ -6,7 +6,7 @@ from typing import Optional, Tuple, Dict, Any
 
 def drop_strings(
     X: pd.DataFrame,
-    y: Optional[pd.Series] = None,
+    y: pd.Series,
     *,
     fit: bool,
     step_params: Dict[str, Any] = {},
@@ -21,7 +21,13 @@ def drop_strings(
     """
     # Identify columns with string dtype (including object dtype with strings)
     if fit:
-        drop_cols = [col for col in X.columns if X[col].dtype == "string"]
+        drop_cols = []
+        max_unique = min(20, max(10, int(0.01 * len(y))))
+        for col in X.columns:
+            if X[col].dtype in ["string", "category", "object"]:
+                if len(X[col].unique()) > max_unique:
+                    drop_cols.append(col)
+        X.drop(columns=drop_cols, inplace=True)
         logger.debug(f"[GREEN]- dropping {drop_cols} as they are strings")
         step_params["drop_cols"] = drop_cols
         return X, y, step_params
@@ -61,14 +67,14 @@ def drop_duplicate_rows(
             y_clean: pd.Series | None = y
         num_rows_after: int = X.shape[0]
         if num_rows_after < num_rows_before:
-            logger.info(
+            logger.debug(
                 msg=f"[GREEN]- Duplicate rows to be dropped: {num_rows_before - num_rows_after}"
             )
             logger.debug(
                 msg=f"[GREEN]  Dropped rows with indices: {dropped_indices}"
             )
         else:
-            logger.info(msg="[GREEN]- Duplicate rows to be dropped: None")
+            logger.debug(msg="[GREEN]- Duplicate rows to be dropped: None")
         return X_clean, y_clean, step_params
     else:
         return X, y, step_params
@@ -102,7 +108,7 @@ def drop_duplicate_columns(
         X = X.drop(columns=duplicate_columns)
         step_params = {"duplicate_columns": duplicate_columns}
         # Log the duplicate columns (if any)
-        logger.info(
+        logger.debug(
             msg=f"[GREEN]- Duplicate columns to be dropped: {list(duplicate_columns) if len(duplicate_columns) > 0 else 'None'}"
         )
     else:
@@ -133,7 +139,7 @@ def drop_constant_columns(
             nunique_per_col == 1
         ].index.tolist()
 
-        logger.info(
+        logger.debug(
             f"[GREEN]- Constant columns to be dropped: {constant_columns if len(constant_columns) > 0 else 'None'}"
         )
 

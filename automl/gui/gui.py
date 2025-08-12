@@ -73,7 +73,7 @@ class AutoMLFrame(wx.Frame):
                 "function": lambda event: self.on_get_title(),
             },
             "OutputFile": {
-                "text": "Select Output csv File",
+                "text": "Select Output html File",
                 "function": lambda event: self.on_select_output("OutputFile"),
             },
         }
@@ -243,7 +243,7 @@ class AutoMLFrame(wx.Frame):
             f"Select {kind}",
             wildcard=(
                 "CSV files (*.csv)|*.csv"
-                if kind == "OutputFile"
+                if kind == "csv_file"
                 else "HTML files (*.html)|*.html"
             ),
             style=wx.FD_SAVE | wx.FD_OVERWRITE_PROMPT,
@@ -280,6 +280,7 @@ class AutoMLFrame(wx.Frame):
         self.mymodels = AutoML_Modeling(
             target=current_EDA.target,
             X_train=current_EDA.df_train,
+            output_file=self.buttons_info["OutputFile"]["label"].GetLabel(),
             logger=self.logger,
         )
         if self.nogui:

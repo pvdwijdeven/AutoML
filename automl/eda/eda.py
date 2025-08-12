@@ -564,6 +564,7 @@ class AutoML_EDA:
         )
 
         # Save to file
+        os.makedirs(os.path.dirname(self.report_file), exist_ok=True)
         with open(self.report_file, "w", encoding="utf-8") as f:
             f.write(output_html)
         self.logger.info("[BLUE]EDA report saved to %s", self.report_file)

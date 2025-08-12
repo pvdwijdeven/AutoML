@@ -14,7 +14,7 @@ from .outliers import (
     handle_outliers,
 )
 from .encoding import auto_encode_features, encode_target
-from .missing import handle_missing_values
+from .missing import handle_missing_values_num, handle_missing_values_cat
 
 
 __all__: list[str] = [
@@ -26,7 +26,8 @@ __all__: list[str] = [
     "skip_outliers",
     "decide_outlier_imputation_order",
     "handle_outliers",
-    "handle_missing_values",
+    "handle_missing_values_cat",
+    "handle_missing_values_num",
     "auto_encode_features",
     "encode_target",
     "drop_strings",

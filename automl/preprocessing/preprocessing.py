@@ -12,7 +12,7 @@ from .outliers import (
     handle_outliers,
 )
 from .encoding import auto_encode_features, encode_target
-from .missing import handle_missing_values
+from .missing import handle_missing_values_cat, handle_missing_values_num
 
 # external imports
 import pandas as pd
@@ -100,27 +100,21 @@ class AutoML_Preprocess:
                 "config": {"step_outputs": self.step_outputs},
             },
             {
-                "name": "handle_outliers",
+                "name": "handle_outliers_before",
                 "params": None,
                 "function": handle_outliers,
                 "target_aware": True,
                 "config": {"before": True, "step_outputs": self.step_outputs},
             },
             {
-                "name": "handle_missing_values",
+                "name": "handle_missing_values_cat",
                 "params": None,
-                "function": handle_missing_values,
+                "function": handle_missing_values_cat,
                 "target_aware": True,
                 "config": {
                     "categorical_only": True,
+                    "step_outputs": self.step_outputs,
                 },
-            },
-            {
-                "name": "handle_outliers",
-                "params": None,
-                "function": handle_outliers,
-                "target_aware": True,
-                "config": {"before": False, "step_outputs": self.step_outputs},
             },
             {
                 "name": "encode_target",
@@ -141,17 +135,26 @@ class AutoML_Preprocess:
                 "target_aware": False,
             },
             {
-                "name": "handle_missing_values",
+                "name": "handle_missing_values_num",
                 "params": None,
-                "function": handle_missing_values,
+                "function": handle_missing_values_num,
                 "target_aware": True,
                 "config": {
                     "categorical_only": False,
+                    "step_outputs": self.step_outputs,
                 },
             },
+            {
+                "name": "handle_outliers_after",
+                "params": None,
+                "function": handle_outliers,
+                "target_aware": True,
+                "config": {"before": False, "step_outputs": self.step_outputs},
+            },
         ]
-
+        size = {}
         for step in self.steps:
+            self.logger.info(msg=f"[ORANGE]- training/fitting: {step["name"]}")
             self.X_train, self.y_train, step["params"] = step["function"](
                 self.X_train,
                 self.y_train,
@@ -160,16 +163,18 @@ class AutoML_Preprocess:
                 logger=self.logger,
                 **step.get("config", {}),
             )
+            size[step["name"]] = self.X_train.shape
             self.step_outputs[step["name"]] = step["params"]
 
         self.logger.debug(msg=self.step_outputs)
 
         for step in self.steps:
+            self.logger.info(msg=f"[YELLOW]- transforming: {step["name"]}")
             self.X_test, self.y_test, _ = step["function"](
                 self.X_test,
                 self.y_test,
                 fit=False,
-                step_params=step["params"],
+                step_params=self.step_outputs[step["name"]],
                 target_aware=step["target_aware"],
                 logger=self.logger,
                 **step.get("config", {}),
