@@ -11,9 +11,10 @@ def skip_outliers(
     y: pd.Series,
     *,
     fit: bool,
-    step_params: Dict[str, Any] = {},
+    step_params: Dict[str, Any],
     target_aware: bool = True,
     logger: Logger,
+    step_outputs: Dict[str, Any],
 ) -> Tuple[pd.DataFrame, Optional[pd.Series], Optional[Dict[str, Any]]]:
     """
     Decide whether to skip outlier handling based on target distribution.
@@ -70,15 +71,15 @@ def get_threshold_method(
         return "iqr"
 
 
-def decide_outlier_imputation_order(
+def outlier_imputation_order(
     X: pd.DataFrame,
     y: pd.Series,
     *,
     fit: bool,
-    step_params: Dict[str, Any] = {},
+    step_params: Dict[str, Any],
     target_aware: bool = True,
     logger: Logger,
-    step_outputs: Dict[str, Any] = {},
+    step_outputs: Dict[str, Any],
     missing_threshold: float = 0.1,
     extreme_outlier_factor: float = 2.0,
 ) -> Tuple[pd.DataFrame, Optional[pd.Series], Optional[Dict[str, Any]]]:
@@ -99,7 +100,7 @@ def decide_outlier_imputation_order(
     Returns:
         str: 'before_imputation' or 'after_imputation' indicating outlier handling timing.
     """
-    if fit or not step_outputs["skipping_outliers"]["skip_outliers"]:
+    if fit or not step_outputs["skip_outliers"]["skip_outliers"]:
         before_or_after = {}
         for columnname in X.columns:
             column = X[columnname].copy()
@@ -179,9 +180,7 @@ def decide_outlier_imputation_order(
             y,
             {
                 "before_or_after": before_or_after,
-                "skip_outliers": step_outputs["skipping_outliers"][
-                    "skip_outliers"
-                ],
+                "skip_outliers": step_outputs["skip_outliers"]["skip_outliers"],
             },
         )
     else:
@@ -286,10 +285,10 @@ def handle_outliers(
     y: pd.Series,
     *,
     fit: bool,
-    step_params: Dict[str, Any] = {},
+    step_params: Dict[str, Any],
     target_aware: bool = True,
     logger: Logger,
-    step_outputs: Dict[str, Any] = {},
+    step_outputs: Dict[str, Any],
     before: bool = True,
 ) -> Tuple[pd.DataFrame, Optional[pd.Series], Optional[Dict[str, Any]]]:
     """
@@ -306,6 +305,7 @@ def handle_outliers(
         threshold_method (str): Optional choice of threshold method; if empty auto-decides.
     """
     if fit:
+
         logger.debug(
             msg=f"[GREEN]- Handling outliers {'before missing values' if before else 'after missing values'} imputation"
         )

@@ -23,10 +23,10 @@ def encode_target(
     y: pd.Series,
     *,
     fit: bool,
-    step_params: Dict[str, Any] = {},
+    step_params: Dict[str, Any],
     target_aware: bool = True,
     logger: Logger,
-    step_outputs: Dict[str, Any] = {},
+    step_outputs: Dict[str, Any],
 ) -> Tuple[pd.DataFrame, Optional[pd.Series], Optional[Dict[str, Any]]]:
     """
     Encode the target variables (y_train, y_val, y_test) if they are non-numeric.
@@ -71,10 +71,10 @@ def auto_encode_features(
     y: pd.Series,
     *,
     fit: bool,
-    step_params: Dict[str, Any] = {},
+    step_params: Dict[str, Any],
     target_aware: bool = True,
     logger: Logger,
-    step_outputs: Dict[str, Any] = {},
+    step_outputs: Dict[str, Any],
     max_unique_for_categorical: int = 15,
 ) -> Tuple[pd.DataFrame, Optional[pd.Series], Optional[Dict[str, Any]]]:
     """

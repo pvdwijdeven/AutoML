@@ -8,7 +8,7 @@ from .general import (
 )
 from .outliers import (
     skip_outliers,
-    decide_outlier_imputation_order,
+    outlier_imputation_order,
     handle_outliers,
 )
 from .encoding import auto_encode_features, encode_target
@@ -66,8 +66,6 @@ class AutoML_Preprocess:
         self,
     ) -> tuple[pd.DataFrame, pd.Series, pd.DataFrame, pd.Series | None]:
 
-        self.step_outputs: Dict[str, Dict[str, Any]] = {}
-
         self.steps: List[Dict[str, Any]] = [
             {
                 "name": "drop_duplicate_rows",
@@ -88,7 +86,7 @@ class AutoML_Preprocess:
                 "target_aware": False,
             },
             {
-                "name": "skipping_outliers",
+                "name": "skip_outliers",
                 "params": None,
                 "function": skip_outliers,
                 "target_aware": True,
@@ -96,16 +94,15 @@ class AutoML_Preprocess:
             {
                 "name": "outlier_imputation_order",
                 "params": None,
-                "function": decide_outlier_imputation_order,
+                "function": outlier_imputation_order,
                 "target_aware": True,
-                "config": {"step_outputs": self.step_outputs},
             },
             {
                 "name": "handle_outliers_before",
                 "params": None,
                 "function": handle_outliers,
                 "target_aware": True,
-                "config": {"before": True, "step_outputs": self.step_outputs},
+                "config": {"before": True},
             },
             {
                 "name": "handle_missing_values_cat",
@@ -114,7 +111,6 @@ class AutoML_Preprocess:
                 "target_aware": True,
                 "config": {
                     "categorical_only": True,
-                    "step_outputs": self.step_outputs,
                 },
             },
             {
@@ -142,7 +138,6 @@ class AutoML_Preprocess:
                 "target_aware": True,
                 "config": {
                     "categorical_only": False,
-                    "step_outputs": self.step_outputs,
                 },
             },
             {
@@ -150,28 +145,30 @@ class AutoML_Preprocess:
                 "params": None,
                 "function": handle_outliers,
                 "target_aware": True,
-                "config": {"before": False, "step_outputs": self.step_outputs},
+                "config": {"before": False},
             },
             {
                 "name": "normalize_columns",
                 "params": None,
                 "function": normalize_columns,
                 "target_aware": True,
-                "config": {"step_outputs": self.step_outputs},
             },
         ]
-        size = {}
+
+        self.step_outputs: Dict[str, Dict[str, Any]] = {}
         for step in self.steps:
             self.logger.info(msg=f"[ORANGE]- training/fitting: {step["name"]}")
             self.X_train, self.y_train, step["params"] = step["function"](
                 self.X_train,
                 self.y_train,
                 fit=True,
+                step_params={},
                 target_aware=step["target_aware"],
                 logger=self.logger,
+                step_outputs=self.step_outputs.copy(),
                 **step.get("config", {}),
             )
-            size[step["name"]] = self.X_train.shape
+
             self.step_outputs[step["name"]] = step["params"]
 
         self.logger.debug(msg=self.step_outputs)
@@ -182,9 +179,10 @@ class AutoML_Preprocess:
                 self.X_test,
                 self.y_test,
                 fit=False,
-                step_params=self.step_outputs[step["name"]],
+                step_params=step["params"],
                 target_aware=step["target_aware"],
                 logger=self.logger,
+                step_outputs=self.step_outputs.copy(),
                 **step.get("config", {}),
             )
         return self.X_train, self.y_train, self.X_test, self.y_test

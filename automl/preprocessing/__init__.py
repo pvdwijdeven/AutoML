@@ -10,7 +10,7 @@ from .general import (
 )
 from .outliers import (
     skip_outliers,
-    decide_outlier_imputation_order,
+    outlier_imputation_order,
     handle_outliers,
 )
 from .encoding import auto_encode_features, encode_target
@@ -24,7 +24,7 @@ __all__: list[str] = [
     "drop_duplicate_columns",
     "drop_constant_columns",
     "skip_outliers",
-    "decide_outlier_imputation_order",
+    "outlier_imputation_order",
     "handle_outliers",
     "handle_missing_values_cat",
     "handle_missing_values_num",

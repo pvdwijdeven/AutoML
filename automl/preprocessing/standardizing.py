@@ -18,10 +18,10 @@ def normalize_columns(
     y: pd.Series,
     *,
     fit: bool,
-    step_params: Dict[str, Any] = {},
+    step_params: Dict[str, Any],
     target_aware: bool = True,
     logger: Logger,
-    step_outputs: Dict[str, Any] = {},
+    step_outputs: Dict[str, Any],
     skewness_threshold: float = 0.75,
 ) -> Tuple[pd.DataFrame, Optional[pd.Series], Optional[Dict[str, Any]]]:
     """
@@ -72,7 +72,7 @@ def normalize_columns(
             )
         return X, y, step_params
     else:
-        for column_name, scalers in step_params.items():
+        for column_name in step_params:
             if "pt" in step_params[column_name]:
                 pt = step_params[column_name]["pt"]
                 X_train_col = X[[column_name]]

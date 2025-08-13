@@ -9,9 +9,10 @@ def drop_strings(
     y: pd.Series,
     *,
     fit: bool,
-    step_params: Dict[str, Any] = {},
+    step_params: Dict[str, Any],
     target_aware: bool = True,
     logger: Logger,
+    step_outputs: Dict[str, Any],
 ) -> Tuple[pd.DataFrame, Optional[pd.Series], Optional[Dict[str, Any]]]:
     """
     Drop any feature columns in training, validation, test, and optional test datasets
@@ -42,9 +43,10 @@ def drop_duplicate_rows(
     y: Optional[pd.Series] = None,
     *,
     fit: bool,
-    step_params: Dict[str, Any] = {},
+    step_params: Dict[str, Any],
     target_aware: bool = True,
     logger: Logger,
+    step_outputs: Dict[str, Any],
 ) -> Tuple[pd.DataFrame, Optional[pd.Series], Optional[Dict[str, Any]]]:
     """
     Removes duplicate rows from the original training dataframe `self.eda.df_train`.
@@ -85,9 +87,10 @@ def drop_duplicate_columns(
     y: Optional[pd.Series] = None,
     *,
     fit: bool,
-    step_params: Dict[str, Any] = {},
+    step_params: Dict[str, Any],
     target_aware: bool = True,
     logger: Logger,
+    step_outputs: Dict[str, Any],
 ) -> Tuple[pd.DataFrame, Optional[pd.Series], Optional[Dict[str, Any]]]:
     """
     Identifies and removes duplicate columns in the training features `self.X_train`
@@ -121,9 +124,10 @@ def drop_constant_columns(
     y: Optional[pd.Series] = None,
     *,
     fit: bool,
-    step_params: Dict[str, Any] = {},
+    step_params: Dict[str, Any],
     target_aware: bool = True,
     logger: Logger,
+    step_outputs: Dict[str, Any],
 ) -> Tuple[pd.DataFrame, Optional[pd.Series], Optional[Dict[str, Any]]]:
     """
     Detects columns in training features `self.X_train` with constant values
