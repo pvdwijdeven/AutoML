@@ -13,7 +13,11 @@ from .outliers import (
 )
 from .encoding import auto_encode_features, encode_target
 from .missing import handle_missing_values_cat, handle_missing_values_num
-from .standardizing import normalize_columns
+from .standardizing import (
+    normalize_columns,
+    standardize_target,
+    TargetTransformer,
+)
 
 # external imports
 import pandas as pd
@@ -64,7 +68,13 @@ class AutoML_Preprocess:
 
     def preprocess(
         self,
-    ) -> tuple[pd.DataFrame, pd.Series, pd.DataFrame, pd.Series | None]:
+    ) -> tuple[
+        pd.DataFrame,
+        pd.Series,
+        pd.DataFrame,
+        Optional[pd.Series],
+        Optional[TargetTransformer],
+    ]:
 
         self.steps: List[Dict[str, Any]] = [
             {
@@ -148,6 +158,12 @@ class AutoML_Preprocess:
                 "config": {"before": False},
             },
             {
+                "name": "standardize_target",
+                "params": None,
+                "function": standardize_target,
+                "target_aware": True,
+            },
+            {
                 "name": "normalize_columns",
                 "params": None,
                 "function": normalize_columns,
@@ -157,7 +173,9 @@ class AutoML_Preprocess:
 
         self.step_outputs: Dict[str, Dict[str, Any]] = {}
         for step in self.steps:
-            self.logger.info(msg=f"[ORANGE]- training/fitting: {step["name"]}")
+            self.logger.info(
+                msg=f"[ORANGE]- fit/transform train: {step["name"]}"
+            )
             self.X_train, self.y_train, step["params"] = step["function"](
                 self.X_train,
                 self.y_train,
@@ -174,7 +192,7 @@ class AutoML_Preprocess:
         self.logger.debug(msg=self.step_outputs)
 
         for step in self.steps:
-            self.logger.info(msg=f"[YELLOW]- transforming: {step["name"]}")
+            self.logger.info(msg=f"[YELLOW]- transform test: {step["name"]}")
             self.X_test, self.y_test, _ = step["function"](
                 self.X_test,
                 self.y_test,
@@ -185,4 +203,14 @@ class AutoML_Preprocess:
                 step_outputs=self.step_outputs.copy(),
                 **step.get("config", {}),
             )
-        return self.X_train, self.y_train, self.X_test, self.y_test
+
+        self.target_transformer = self.step_outputs["standardize_target"][
+            "target_transformer"
+        ]
+        return (
+            self.X_train,
+            self.y_train,
+            self.X_test,
+            self.y_test,
+            self.target_transformer,
+        )

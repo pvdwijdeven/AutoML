@@ -10,7 +10,80 @@ from sklearn.preprocessing import (
     PowerTransformer,
     StandardScaler,
 )
-from typing import Tuple, Optional, Dict, Any
+from typing import Tuple, Optional, Dict, Any, Self
+
+
+class TargetTransformer:
+    """
+    Transforms the target variable using Yeo-Johnson power transform (to reduce skewness)
+    followed by standard scaling (zero mean, unit variance). Supports inverse transformation.
+
+    Attributes:
+        pt (PowerTransformer): PowerTransformer instance using Yeo-Johnson method.
+        scaler (StandardScaler): StandardScaler instance to scale the transformed target.
+    """
+
+    def __init__(self) -> None:
+        """
+        Initializes the TargetTransformer with PowerTransformer and StandardScaler.
+        """
+        self.pt: PowerTransformer = PowerTransformer(
+            method="yeo-johnson", standardize=False
+        )
+        self.scaler: StandardScaler = StandardScaler()
+
+    def fit(self, y_train: pd.Series | np.ndarray) -> Self:
+        """
+        Fits the power transformer and scaler on the training target data.
+
+        Args:
+            y_train (pd.Series | np.ndarray): Training target values.
+
+        Returns:
+            Self: The fitted transformer instance.
+        """
+        if isinstance(y_train, np.ndarray):
+            y_train_reshaped = y_train.reshape(-1, 1)
+        else:
+            y_train_reshaped = np.asarray(y_train).reshape(-1, 1)
+
+        y_transformed = self.pt.fit_transform(y_train_reshaped)
+        self.scaler.fit(y_transformed)
+        return self
+
+    def transform(self, y: pd.Series | np.ndarray) -> np.ndarray:
+        """
+        Transforms the target data using the fitted power transformer and scaler.
+
+        Args:
+            y (pd.Series | np.ndarray): Target values to transform.
+
+        Returns:
+            np.ndarray: Transformed and scaled target data as 1D array.
+        """
+        if isinstance(y, np.ndarray):
+            y_reshaped = y.reshape(-1, 1)
+        else:
+            y_reshaped = np.asarray(y).reshape(-1, 1)
+        y_transformed = self.pt.transform(y_reshaped)
+        y_scaled = self.scaler.transform(y_transformed)
+        return y_scaled.flatten()
+
+    def inverse_transform(self, y_scaled: pd.Series | np.ndarray) -> np.ndarray:
+        """
+        Inverse transforms scaled target data back to the original scale.
+
+        Args:
+            y_scaled (pd.Series | np.ndarray): Scaled target values.
+
+        Returns:
+            np.ndarray: Original scale target values as 1D array.
+        """
+        if isinstance(y_scaled, pd.Series):
+            y_scaled = np.asanyarray(y_scaled)
+        y_transformed = self.scaler.inverse_transform(y_scaled.reshape(-1, 1))
+        y_original = self.pt.inverse_transform(y_transformed)
+        return y_original.flatten()
 
 
 def normalize_columns(
@@ -83,4 +156,47 @@ def normalize_columns(
                 X.loc[:, column_name] = (
                     scaler.transform(X_train_col).flatten().astype(np.float64)
                 )
+        return X, y, step_params
+
+
+def standardize_target(
+    X: pd.DataFrame,
+    y: pd.Series,
+    *,
+    fit: bool,
+    step_params: Dict[str, Any],
+    target_aware: bool = True,
+    logger: Logger,
+    step_outputs: Dict[str, Any],
+) -> Tuple[pd.DataFrame, Optional[pd.Series], Optional[Dict[str, Any]]]:
+    """
+    Fit a TargetTransformer using Yeo-Johnson transform and standard scaling on y_train,
+    then transform y_train, y_val, and y_test targets correspondingly.
+
+    Stores the target_transformer object for later inverse transformations if needed.
+    """
+    if fit:
+        if step_outputs["encode_target"]["transform"]:
+            # 1. Fit transformer on training target
+            target_transformer = TargetTransformer()
+            target_transformer.fit(y)
+
+            # 2. Transform target in train, val, test sets
+            y = pd.Series(
+                target_transformer.transform(y),
+                index=y.index,
+                name=y.name,
+            )
+            step_params["target_transformer"] = target_transformer
+        else:
+            step_params["target_transformer"] = None
+        return X, y, step_params
+    else:
+        # target_transformer = step_params["target_transformer"]
+        # if target_transformer is not None:
+        #     y = pd.Series(
+        #         target_transformer.transform(y),
+        #         index=y.index,
+        #         name=y.name,
+        #     )
         return X, y, step_params

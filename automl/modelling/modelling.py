@@ -5,6 +5,7 @@ from .models import models
 from .scoring import write_to_output
 
 # external libraries
+from time import perf_counter
 from typing import Dict, Optional, Any
 import numpy as np
 import pandas as pd
@@ -52,6 +53,7 @@ class AutoML_Modeling:
         else:
             self.logger: Logger = logger
         self.dataset_type: str = self.detect_dataset_type(target=self.y_train)
+        self.logger.warning(f"{self.dataset_type} found!")
         self.train_test_kfold_loop()
 
     def detect_dataset_type(
@@ -179,11 +181,30 @@ class AutoML_Modeling:
         results = {}
         if dataset_type not in models:
             return {}
+        if save_file != "":
+            df_out = pd.concat(
+                [
+                    self.X_test.reset_index(drop=True),
+                    pd.Series(self.y_test, name="y_test").reset_index(
+                        drop=True
+                    ),
+                    #     pd.Series(y_pred, name="y_pred").reset_index(drop=True),
+                ],
+                axis=1,
+            )
 
+            # Save to CSV (or any other format)
+            df_out.to_csv(save_file, index=False)
         for name, model in models[dataset_type].items():
             self.logger.info(msg=f"[GREEN]- Training on {name}")
+            start_time = perf_counter()
             model.fit(self.X_train, self.y_train)
             y_pred = model.predict(self.X_test)
+            end_time = perf_counter()
+            if self.target_transformer is not None:
+                y_pred = self.target_transformer.inverse_transform(
+                    y_scaled=y_pred
+                )
             if save_file != "":
                 df_out = pd.concat(
                     [
@@ -191,14 +212,10 @@ class AutoML_Modeling:
                         pd.Series(self.y_test, name="y_test").reset_index(
                             drop=True
                         ),
-                        pd.Series(y_pred, name="y_pred").reset_index(drop=True),
+                        #     pd.Series(y_pred, name="y_pred").reset_index(drop=True),
                     ],
                     axis=1,
                 )
-
-                # Save to CSV (or any other format)
-                df_out.to_csv(save_file, index=False)
-            self.logger.info(msg=f"[GREEN]- Scoring on {name}")
             # Choose metric depending on dataset type
             if dataset_type in (
                 "binary_classification",
@@ -219,6 +236,7 @@ class AutoML_Modeling:
                     "accuracy": acc,
                     "f1_score": f1,
                     "roc_auc": auc,
+                    "time": end_time - start_time,
                 }
 
             elif dataset_type == "multi_class_classification":
@@ -226,7 +244,11 @@ class AutoML_Modeling:
                 f1 = f1_score(
                     y_true=self.y_test, y_pred=y_pred, average="weighted"
                 )
-                results[name] = {"accuracy": acc, "f1_score_weighted": f1}
+                results[name] = {
+                    "accuracy": acc,
+                    "f1_score_weighted": f1,
+                    "time": end_time - start_time,
+                }
 
             elif dataset_type == "multi_label_classification":
                 # For multi-label, use an appropriate metric such as average F1 per label
@@ -236,12 +258,19 @@ class AutoML_Modeling:
                 f1_micro = f1_score(
                     y_true=self.y_test, y_pred=y_pred, average="micro"
                 )
-                results[name] = {"f1_macro": f1_macro, "f1_micro": f1_micro}
+                results[name] = {
+                    "f1_macro": f1_macro,
+                    "f1_micro": f1_micro,
+                    "time": end_time - start_time,
+                }
 
             elif dataset_type == "ordinal_regression":
                 # Could treat as regression or classification; here treat as classification
                 acc = accuracy_score(y_true=self.y_test, y_pred=y_pred)
-                results[name] = {"accuracy": acc}
+                results[name] = {
+                    "accuracy": acc,
+                    "time": end_time - start_time,
+                }
 
             elif dataset_type == "regression":
                 epsilon = (
@@ -264,17 +293,21 @@ class AutoML_Modeling:
                     "rmse": rmse,
                     "mse": mse,
                     "r2": r2,
+                    "time": end_time - start_time,
                 }
 
             else:
                 # Fallback metric if unknown
                 mse = mean_squared_error(y_true=self.y_test, y_pred=y_pred)
-                results[name] = {"mse": mse}
+                results[name] = {
+                    "mse": mse,
+                    "time": end_time - start_time,
+                }
 
         return results
 
     def train_test_kfold_loop(
-        self, test_size=0.2, random_state=42, n_splits=5, shuffle=True
+        self, test_size=0.2, random_state=42, n_splits=2, shuffle=True
     ):
 
         self.X_train_full: pd.DataFrame = self.X_train.copy()
@@ -323,9 +356,13 @@ class AutoML_Modeling:
                 y_test=self.y_test,
                 logger=self.logger,
             )
-            self.X_train, self.y_train, self.X_test, self.y_test = (
-                cur_prepro.preprocess()
-            )
+            (
+                self.X_train,
+                self.y_train,
+                self.X_test,
+                self.y_test,
+                self.target_transformer,
+            ) = cur_prepro.preprocess()
             result: Dict[str, Dict[str, float]] = (
                 self.train_and_evaluate_models(
                     dataset_type=self.dataset_type,
@@ -339,5 +376,8 @@ class AutoML_Modeling:
             )
             total_result[fold_idx] = result
         self.logger.debug(msg=total_result)
+        self.logger.info(
+            msg=f"[GREEN]- Writing report file to {self.output_file}"
+        )
         os.makedirs(os.path.dirname(self.output_file), exist_ok=True)
         write_to_output(self.output_file, total_result)

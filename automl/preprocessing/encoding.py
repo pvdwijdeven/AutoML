@@ -48,20 +48,30 @@ def encode_target(
                 name=y.name,
             )
             step_params["le"] = le
-        elif pd.api.types.is_bool_dtype(y):
-            y = y.astype(int)
+            step_params["transform"] = False
+            step_params["boolean"] = False
+        elif pd.api.types.is_bool_dtype(y) or set(y.dropna().unique()) <= {
+            0,
+            1,
+        }:
+            y = y.astype(dtype=int)
+            step_params["le"] = None
+            step_params["boolean"] = True
+            step_params["transform"] = False
+        else:
+            step_params["le"] = None
+            step_params["transform"] = True
+            step_params["boolean"] = False
         return X, y, step_params
     else:
-        if not pd.api.types.is_numeric_dtype(y):
+        if step_params["le"] is not None:
             le = step_params["le"]
-            # Transform y_train, y_test, y_val using the same encoder
             y = pd.Series(
                 le.transform(y),  # type: ignore
                 index=y.index,
                 name=y.name,
             )
-
-        elif pd.api.types.is_bool_dtype(y):
+        elif step_params["boolean"]:
             y = y.astype(int)
         return X, y, step_params
 
