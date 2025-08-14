@@ -105,7 +105,7 @@ def outlier_imputation_order(
         for columnname in X.columns:
             column = X[columnname].copy()
             if not pd.api.types.is_numeric_dtype(column):
-                before_or_after[columnname] = "no_imputation"
+                before_or_after[columnname] = "no_encoding"
                 continue
             data = column.dropna()
             total_count = len(column)
@@ -395,10 +395,7 @@ def handle_outliers(
             upper_bound = value["upper_bound"]
             outliers_train = (X[col] < lower_bound) | (X[col] > upper_bound)
             if value["method"] == "drop":
-                # Drop rows with outliers in train set
-                X = X.loc[~outliers_train]
-                # Also drop these rows in y_train if applicable
-                y = y.loc[X.index]
+                pass
             elif value["method"] == "cap":
                 X[col] = np.where(X[col] < lower_bound, lower_bound, X[col])
                 X[col] = np.where(X[col] > upper_bound, upper_bound, X[col])

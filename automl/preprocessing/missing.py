@@ -304,7 +304,7 @@ def handle_missing_values_cat(
         # Determine categorical and numerical columns
         cat_cols, num_cols = [], []
         for col in X_train.columns:
-            if col not in cols_done:
+            if col not in []:  # cols_done:
                 dtype_infer = infer_dtype(X_train[col])
                 if dtype_infer in ["string", "category", "boolean", "object"]:
                     cat_cols.append(col)
@@ -377,8 +377,6 @@ def handle_missing_values_cat(
                 logger.debug(
                     f"[GREEN]  - Imputing missing values with 'KNN' for column {col}"
                 )
-
-        # Apply imputers to all splits
         X = apply_imputers(X_train, imputers)
         step_params["imputers"] = imputers
         return X, y, step_params
@@ -529,7 +527,7 @@ def handle_missing_values_num(
         # Determine categorical and numerical columns
         cat_cols, num_cols = [], []
         for col in X_train.columns:
-            if col not in cols_done:
+            if col not in []:
                 dtype_infer = infer_dtype(X_train[col])
                 if dtype_infer in ["string", "category", "boolean", "object"]:
                     cat_cols.append(col)

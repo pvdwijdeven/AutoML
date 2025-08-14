@@ -49,7 +49,7 @@ class AutoML_Preprocess:
         X_train: pd.DataFrame,
         y_train: pd.Series,
         X_test: pd.DataFrame,
-        y_test: pd.Series,
+        y_test: Optional[pd.Series],
         logger: Optional[Logger] = None,
     ) -> None:
         self.X_train: pd.DataFrame = X_train

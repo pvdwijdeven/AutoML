@@ -64,15 +64,16 @@ def encode_target(
             step_params["boolean"] = False
         return X, y, step_params
     else:
-        if step_params["le"] is not None:
-            le = step_params["le"]
-            y = pd.Series(
-                le.transform(y),  # type: ignore
-                index=y.index,
-                name=y.name,
-            )
-        elif step_params["boolean"]:
-            y = y.astype(int)
+        if y is not None:
+            if step_params["le"] is not None:
+                le = step_params["le"]
+                y = pd.Series(
+                    le.transform(y),  # type: ignore
+                    index=y.index,
+                    name=y.name,
+                )
+            elif step_params["boolean"]:
+                y = y.astype(int)
         return X, y, step_params
 
 

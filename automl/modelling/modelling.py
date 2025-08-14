@@ -26,6 +26,7 @@ class AutoML_Modeling:
         target: str,
         X_train: pd.DataFrame,
         y_train: Optional[pd.Series] = None,
+        df_test: Optional[pd.DataFrame] = None,
         output_file: str = "",
         logger: Optional[Logger] = None,
     ) -> None:
@@ -41,6 +42,7 @@ class AutoML_Modeling:
         self.X_val_train: pd.DataFrame = X_train
         self.y_val_train: pd.Series = y_train
         self.output_file: str = output_file
+        self.df_test = df_test
         if logger is None:
             self.logger = Logger(
                 level_console=Logger.INFO,
@@ -57,6 +59,8 @@ class AutoML_Modeling:
         model_name, score, model = self.train_test_kfold_loop()
         assert isinstance(model_name, str)
         self.internal_test(model_name=model_name, model=model)
+        if self.df_test is not None:
+            self.external_prediction(model_name=model_name, model=model)
 
     def detect_dataset_type(
         self, target: pd.DataFrame | pd.Series | np.ndarray
@@ -341,6 +345,7 @@ class AutoML_Modeling:
         return best_model_name, best_score, best_model
 
     def internal_test(self, model_name: str, model: Any):
+        assert isinstance(self.y_val_full, pd.Series)
         cur_prepro = AutoML_Preprocess(
             X_train=self.X_val_full,
             y_train=self.y_val_full,
@@ -367,3 +372,65 @@ class AutoML_Modeling:
             save_file="",
         )
         self.logger.warning(msg=result[model_name][self.scoring])
+
+    def external_prediction(self, model_name: str, model: Any):
+        assert self.df_test is not None
+        cur_prepro = AutoML_Preprocess(
+            X_train=self.X_full,
+            y_train=self.y_full,
+            X_test=self.df_test,
+            y_test=None,
+            logger=self.logger,
+        )
+        (
+            X,
+            y,
+            X_test,
+            _y_test,
+            self.target_transformer,
+        ) = cur_prepro.preprocess()
+
+        assert model is not None
+        assert isinstance(model_name, str)
+        model.fit(X, y)
+        y_pred = model.predict(X_test)
+        if self.target_transformer is not None:
+            y_pred = self.target_transformer.inverse_transform(y_scaled=y_pred)
+        # Check if self.y_full contains only True/False (case-insensitive)
+        if pd.api.types.is_object_dtype(
+            self.y_full
+        ) or pd.api.types.is_bool_dtype(self.y_full):
+            unique_vals = pd.Series(self.y_full).dropna().unique()
+            unique_str = set(str(val).lower() for val in unique_vals)
+            if unique_str.issubset({"true", "false"}):
+                # Determine the original casing for True/False in y_full
+                true_val = next(
+                    val for val in unique_vals if str(val).lower() == "true"
+                )
+                false_val = next(
+                    val for val in unique_vals if str(val).lower() == "false"
+                )
+                # Map y_pred 1/0 to the same casing as in y_full
+                y_pred = [
+                    true_val if pred == 1 else false_val for pred in y_pred
+                ]
+        # Combine the first column of self.df_test and y_pred into a new DataFrame
+        self.df_test.to_csv("IKBENHIER!.csv")
+        try:
+            output_df = pd.DataFrame(
+                {
+                    self.df_test.columns[0]: self.df_test.iloc[:, 0].values,
+                    self.target: y_pred,
+                }
+            )
+        except ValueError:
+            self.logger.error(
+                f"Size of y_pred: {len(y_pred)}, df_test: {self.df_test.shape}"
+            )
+            exit()
+        # Save as CSV
+        my_file = self.output_file.replace("html", "csv").replace(
+            "result", "submission"
+        )
+        # TODO get target back in original form
+        output_df.to_csv(my_file, index=False)

@@ -280,6 +280,7 @@ class AutoMLFrame(wx.Frame):
         self.mymodels = AutoML_Modeling(
             target=current_EDA.target,
             X_train=current_EDA.df_train,
+            df_test=current_EDA.df_test,
             output_file=self.buttons_info["OutputFile"]["label"].GetLabel(),
             logger=self.logger,
         )
