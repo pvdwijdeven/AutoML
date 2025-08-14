@@ -2,22 +2,20 @@
 from preprocessing import AutoML_Preprocess
 from library import Logger
 from .models import models
-from .scoring import write_to_output
+from .scoring import (
+    write_to_output,
+    summarize_results,
+    scoring_per_dataset_type,
+    get_score,
+)
 
 # external libraries
 from time import perf_counter
 from typing import Dict, Optional, Any
 import numpy as np
 import pandas as pd
-from sklearn.metrics import (
-    accuracy_score,
-    f1_score,
-    roc_auc_score,
-    mean_squared_error,
-    r2_score,
-)
+
 from sklearn.model_selection import train_test_split, KFold
-from math import sqrt
 import os
 
 
@@ -40,8 +38,8 @@ class AutoML_Modeling:
             X_train = X_train.drop(target, axis=1)
 
         self.target: str = target
-        self.X_train: pd.DataFrame = X_train
-        self.y_train: pd.Series = y_train
+        self.X_val_train: pd.DataFrame = X_train
+        self.y_val_train: pd.Series = y_train
         self.output_file: str = output_file
         if logger is None:
             self.logger = Logger(
@@ -52,9 +50,13 @@ class AutoML_Modeling:
             )
         else:
             self.logger: Logger = logger
-        self.dataset_type: str = self.detect_dataset_type(target=self.y_train)
+        self.dataset_type: str = self.detect_dataset_type(
+            target=self.y_val_train
+        )
         self.logger.warning(f"{self.dataset_type} found!")
-        self.train_test_kfold_loop()
+        model_name, score, model = self.train_test_kfold_loop()
+        assert isinstance(model_name, str)
+        self.internal_test(model_name=model_name, model=model)
 
     def detect_dataset_type(
         self, target: pd.DataFrame | pd.Series | np.ndarray
@@ -166,7 +168,14 @@ class AutoML_Modeling:
         return "unknown"
 
     def train_and_evaluate_models(
-        self, dataset_type: str, save_file: str = ""
+        self,
+        X_train,
+        y_train,
+        X_test,
+        y_test,
+        dataset_type: str,
+        model_dict: Dict[str, Any],
+        save_file: str = "",
     ) -> Dict[str, Dict[str, float]]:
         """
         Train and evaluate a dictionary of models.
@@ -184,10 +193,8 @@ class AutoML_Modeling:
         if save_file != "":
             df_out = pd.concat(
                 [
-                    self.X_test.reset_index(drop=True),
-                    pd.Series(self.y_test, name="y_test").reset_index(
-                        drop=True
-                    ),
+                    self.X_val_test.reset_index(drop=True),
+                    pd.Series(y_test, name="y_test").reset_index(drop=True),
                     #     pd.Series(y_pred, name="y_pred").reset_index(drop=True),
                 ],
                 axis=1,
@@ -195,11 +202,11 @@ class AutoML_Modeling:
 
             # Save to CSV (or any other format)
             df_out.to_csv(save_file, index=False)
-        for name, model in models[dataset_type].items():
+        for name, model in model_dict.items():
             self.logger.info(msg=f"[GREEN]- Training on {name}")
             start_time = perf_counter()
-            model.fit(self.X_train, self.y_train)
-            y_pred = model.predict(self.X_test)
+            model.fit(X_train, y_train)
+            y_pred = model.predict(X_test)
             end_time = perf_counter()
             if self.target_transformer is not None:
                 y_pred = self.target_transformer.inverse_transform(
@@ -208,120 +215,55 @@ class AutoML_Modeling:
             if save_file != "":
                 df_out = pd.concat(
                     [
-                        self.X_test.reset_index(drop=True),
-                        pd.Series(self.y_test, name="y_test").reset_index(
-                            drop=True
-                        ),
+                        X_test.reset_index(drop=True),
+                        pd.Series(y_test, name="y_test").reset_index(drop=True),
                         #     pd.Series(y_pred, name="y_pred").reset_index(drop=True),
                     ],
                     axis=1,
                 )
-            # Choose metric depending on dataset type
-            if dataset_type in (
-                "binary_classification",
-                "imbalanced_binary_classification",
-            ):
-                # You can choose metrics as needed; here we use accuracy and F1 + AUC if possible
-                acc = accuracy_score(y_true=self.y_test, y_pred=y_pred)
-                f1 = f1_score(y_true=self.y_test, y_pred=y_pred)
-
-                # Try to get predicted probabilities for AUC if supported
-                try:
-                    y_proba = model.predict_proba(self.X_test)[:, 1]
-                    auc = roc_auc_score(y_true=self.y_test, y_score=y_proba)
-                except ValueError:
-                    auc = None
-
-                results[name] = {
-                    "accuracy": acc,
-                    "f1_score": f1,
-                    "roc_auc": auc,
-                    "time": end_time - start_time,
-                }
-
-            elif dataset_type == "multi_class_classification":
-                acc = accuracy_score(y_true=self.y_test, y_pred=y_pred)
-                f1 = f1_score(
-                    y_true=self.y_test, y_pred=y_pred, average="weighted"
-                )
-                results[name] = {
-                    "accuracy": acc,
-                    "f1_score_weighted": f1,
-                    "time": end_time - start_time,
-                }
-
-            elif dataset_type == "multi_label_classification":
-                # For multi-label, use an appropriate metric such as average F1 per label
-                f1_macro = f1_score(
-                    y_true=self.y_test, y_pred=y_pred, average="macro"
-                )
-                f1_micro = f1_score(
-                    y_true=self.y_test, y_pred=y_pred, average="micro"
-                )
-                results[name] = {
-                    "f1_macro": f1_macro,
-                    "f1_micro": f1_micro,
-                    "time": end_time - start_time,
-                }
-
-            elif dataset_type == "ordinal_regression":
-                # Could treat as regression or classification; here treat as classification
-                acc = accuracy_score(y_true=self.y_test, y_pred=y_pred)
-                results[name] = {
-                    "accuracy": acc,
-                    "time": end_time - start_time,
-                }
-
-            elif dataset_type == "regression":
-                epsilon = (
-                    1e-15  # small number to avoid log(0), change if needed
-                )
-                lrmse: float = sqrt(
-                    mean_squared_error(
-                        y_true=np.log(self.y_test + epsilon),
-                        y_pred=np.log(np.maximum(y_pred, epsilon)),
-                    ),
-                )
-
-                mse: float = mean_squared_error(
-                    y_true=self.y_test, y_pred=y_pred
-                )
-                rmse: float = sqrt(mse)
-                r2: float = r2_score(y_true=self.y_test, y_pred=y_pred)
-                results[name] = {
-                    "lrmse": lrmse,
-                    "rmse": rmse,
-                    "mse": mse,
-                    "r2": r2,
-                    "time": end_time - start_time,
-                }
-
-            else:
-                # Fallback metric if unknown
-                mse = mean_squared_error(y_true=self.y_test, y_pred=y_pred)
-                results[name] = {
-                    "mse": mse,
-                    "time": end_time - start_time,
-                }
-
+            result = get_score(
+                dataset_type=self.dataset_type,
+                X_test=X_test,
+                y_test=y_test,
+                y_pred=y_pred,
+                model=model,
+                name=name,
+                end_time=end_time,
+                start_time=start_time,
+            )
+            results.setdefault(name, {}).update(result[name])
         return results
 
     def train_test_kfold_loop(
-        self, test_size=0.2, random_state=42, n_splits=2, shuffle=True
+        self, test_size=0.2, random_state=42, n_splits=5, shuffle=True
     ):
-
-        self.X_train_full: pd.DataFrame = self.X_train.copy()
-        self.y_train_full: pd.Series[Any] = self.y_train.copy()
+        """
+        X_full/y_full: complete dataset
+            - X_val_full/y_val_full: complete validation dataset (80% of X_full/y_full)
+                - Kfold 5x:
+                    - X_val_train/y_val_train: 80% of X_val_full
+                    - X_val_test/y_val_test: 20% of X_val_full
+            - X_final_test, y_final_test: complete test set against X_val_full (20% of X_full/y_full)
+            
+            X_val_train/y_val_train is used for selecting model and hypertuning it agains X_val_test and y_val_test
+            After selection, the X_val_full/y_val_full is used to train that model and test against X_final_test/y_final_test\
+        
+        """
+        self.X_full: pd.DataFrame = self.X_val_train.copy()
+        self.y_full: pd.Series[Any] = self.y_val_train.copy()
 
         # First, split into train and test sets
-        self.X_train_val, self.X_test, self.y_train_val, self.y_test = (
-            train_test_split(
-                self.X_train_full,
-                self.y_train_full,
-                test_size=test_size,
-                random_state=random_state,
-                shuffle=shuffle,
-            )
+        (
+            self.X_val_full,
+            self.X_final_test,
+            self.y_val_full,
+            self.y_final_test,
+        ) = train_test_split(
+            self.X_full,
+            self.y_full,
+            test_size=test_size,
+            random_state=random_state,
+            shuffle=shuffle,
         )
 
         # Initialize KFold on training data only
@@ -331,41 +273,46 @@ class AutoML_Modeling:
         total_result = {}
         # Loop over K folds
         for fold_idx, (train_index, val_index) in enumerate(
-            kf.split(self.X_train_val)
+            kf.split(self.X_val_full)
         ):
             self.logger.info(
                 f"[MAGENTA]Testing run {fold_idx + 1} of {n_splits}"
             )
             # Split train and validation sets for this fold
-            self.X_train = self.X_train_val.iloc[train_index].reset_index(
+            self.X_val_train = self.X_val_full.iloc[train_index].reset_index(
                 drop=True
             )
-            self.y_train = self.y_train_val.iloc[train_index].reset_index(
+            self.y_val_train = self.y_val_full.iloc[train_index].reset_index(
                 drop=True
             )
-            self.X_test = self.X_train_val.iloc[val_index].reset_index(
+            self.X_val_test = self.X_val_full.iloc[val_index].reset_index(
                 drop=True
             )
-            self.y_test = self.y_train_val.iloc[val_index].reset_index(
+            self.y_val_test = self.y_val_full.iloc[val_index].reset_index(
                 drop=True
             )
             cur_prepro = AutoML_Preprocess(
-                X_train=self.X_train,
-                y_train=self.y_train,
-                X_test=self.X_test,
-                y_test=self.y_test,
+                X_train=self.X_val_train,
+                y_train=self.y_val_train,
+                X_test=self.X_val_test,
+                y_test=self.y_val_test,
                 logger=self.logger,
             )
             (
-                self.X_train,
-                self.y_train,
-                self.X_test,
-                self.y_test,
+                self.X_val_train,
+                self.y_val_train,
+                self.X_val_test,
+                self.y_val_test,
                 self.target_transformer,
             ) = cur_prepro.preprocess()
             result: Dict[str, Dict[str, float]] = (
                 self.train_and_evaluate_models(
+                    X_train=self.X_val_train,
+                    y_train=self.y_val_train,
+                    X_test=self.X_val_test,
+                    y_test=self.y_val_test,
                     dataset_type=self.dataset_type,
+                    model_dict=models[self.dataset_type],
                     save_file=self.output_file.replace("html", "csv")
                     .replace(
                         "result",
@@ -379,5 +326,44 @@ class AutoML_Modeling:
         self.logger.info(
             msg=f"[GREEN]- Writing report file to {self.output_file}"
         )
+        self.scoring = scoring_per_dataset_type[self.dataset_type]
         os.makedirs(os.path.dirname(self.output_file), exist_ok=True)
-        write_to_output(self.output_file, total_result)
+        summary_df, best_model, best_model_name, best_score = summarize_results(
+            results_dict=total_result,
+            model_dict=models[self.dataset_type],
+            scoring=self.scoring,
+        )
+        self.logger.info(
+            f"[RED] best model: {best_model_name} - score: {best_score}"
+        )
+        self.logger.info(f"[RED]Best model class: {type(best_model).__name__}")
+        write_to_output(self.output_file, summary_df)
+        return best_model_name, best_score, best_model
+
+    def internal_test(self, model_name: str, model: Any):
+        cur_prepro = AutoML_Preprocess(
+            X_train=self.X_val_full,
+            y_train=self.y_val_full,
+            X_test=self.X_final_test,
+            y_test=self.y_final_test,
+            logger=self.logger,
+        )
+        (
+            self.X_val_full,
+            self.y_val_full,
+            self.X_final_test,
+            self.y_final_test,
+            self.target_transformer,
+        ) = cur_prepro.preprocess()
+        assert model is not None
+        assert isinstance(model_name, str)
+        result: Dict[str, Dict[str, float]] = self.train_and_evaluate_models(
+            X_train=self.X_val_full,
+            y_train=self.y_val_full,
+            X_test=self.X_final_test,
+            y_test=self.y_final_test,
+            dataset_type=self.dataset_type,
+            model_dict={model_name: model},
+            save_file="",
+        )
+        self.logger.warning(msg=result[model_name][self.scoring])
