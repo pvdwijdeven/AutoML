@@ -11,7 +11,7 @@ from .scoring import (
 
 # external libraries
 from time import perf_counter
-from typing import Dict, Optional, Any
+from typing import Dict, Optional, Any, List
 import numpy as np
 import pandas as pd
 
@@ -56,11 +56,11 @@ class AutoML_Modeling:
             target=self.y_val_train
         )
         self.logger.warning(f"{self.dataset_type} found!")
-        model_name, score, model = self.train_test_kfold_loop()
-        assert isinstance(model_name, str)
-        self.internal_test(model_name=model_name, model=model)
-        if self.df_test is not None:
-            self.external_prediction(model_name=model_name, model=model)
+        top_models = self.train_test_kfold_loop()
+        # assert isinstance(model_name, str)
+        # self.internal_test(model_name=model_name, model=model)
+        # if self.df_test is not None:
+        #     self.external_prediction(model_name=model_name, model=model)
 
     def detect_dataset_type(
         self, target: pd.DataFrame | pd.Series | np.ndarray
@@ -240,7 +240,7 @@ class AutoML_Modeling:
 
     def train_test_kfold_loop(
         self, test_size=0.2, random_state=42, n_splits=5, shuffle=True
-    ):
+    ) -> List[Dict[str, Any]]:
         """
         X_full/y_full: complete dataset
             - X_val_full/y_val_full: complete validation dataset (80% of X_full/y_full)
@@ -332,17 +332,19 @@ class AutoML_Modeling:
         )
         self.scoring = scoring_per_dataset_type[self.dataset_type]
         os.makedirs(os.path.dirname(self.output_file), exist_ok=True)
-        summary_df, best_model, best_model_name, best_score = summarize_results(
+        summary_df, top_models = summarize_results(
             results_dict=total_result,
             model_dict=models[self.dataset_type],
             scoring=self.scoring,
         )
-        self.logger.info(
-            f"[RED] best model: {best_model_name} - score: {best_score}"
+        df_top_models = pd.DataFrame(top_models)
+
+        write_to_output(
+            output_file=self.output_file,
+            summary_df=summary_df.reset_index(),
+            top_models=df_top_models,
         )
-        self.logger.info(f"[RED]Best model class: {type(best_model).__name__}")
-        write_to_output(self.output_file, summary_df)
-        return best_model_name, best_score, best_model
+        return top_models
 
     def internal_test(self, model_name: str, model: Any):
         assert isinstance(self.y_val_full, pd.Series)
@@ -415,7 +417,6 @@ class AutoML_Modeling:
                     true_val if pred == 1 else false_val for pred in y_pred
                 ]
         # Combine the first column of self.df_test and y_pred into a new DataFrame
-        self.df_test.to_csv("IKBENHIER!.csv")
         try:
             output_df = pd.DataFrame(
                 {
