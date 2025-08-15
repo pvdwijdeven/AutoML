@@ -56,11 +56,24 @@ class AutoML_Modeling:
             target=self.y_val_train
         )
         self.logger.warning(f"{self.dataset_type} found!")
-        top_models = self.train_test_kfold_loop()
+        top_models = self.train_test_kfold_loop(
+            dict_models=models[self.dataset_type],
+            output_file=self.output_file.replace("result", "model_selection"),
+        )
+        self.hyper_top_models(top_models=top_models)
         # assert isinstance(model_name, str)
         # self.internal_test(model_name=model_name, model=model)
         # if self.df_test is not None:
         #     self.external_prediction(model_name=model_name, model=model)
+
+    def hyper_top_models(self, top_models):
+
+        hyper_models = {}
+        _top_hyper_models = self.train_test_kfold_loop(
+            dict_models=hyper_models,
+            output_file=self.output_file.replace("result", "hyper"),
+        )
+        pass
 
     def detect_dataset_type(
         self, target: pd.DataFrame | pd.Series | np.ndarray
@@ -239,7 +252,13 @@ class AutoML_Modeling:
         return results
 
     def train_test_kfold_loop(
-        self, test_size=0.2, random_state=42, n_splits=5, shuffle=True
+        self,
+        dict_models,
+        output_file,
+        test_size=0.2,
+        random_state=42,
+        n_splits=5,
+        shuffle=True,
     ) -> List[Dict[str, Any]]:
         """
         X_full/y_full: complete dataset
@@ -316,7 +335,7 @@ class AutoML_Modeling:
                     X_test=self.X_val_test,
                     y_test=self.y_val_test,
                     dataset_type=self.dataset_type,
-                    model_dict=models[self.dataset_type],
+                    model_dict=dict_models,
                     save_file=self.output_file.replace("html", "csv")
                     .replace(
                         "result",
