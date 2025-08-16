@@ -18,65 +18,6 @@ from typing import Tuple, Optional, Dict, Any
 import warnings
 
 
-def encode_target(
-    X: pd.DataFrame,
-    y: pd.Series,
-    *,
-    fit: bool,
-    step_params: Dict[str, Any],
-    target_aware: bool = True,
-    logger: Logger,
-    step_outputs: Dict[str, Any],
-) -> Tuple[pd.DataFrame, Optional[pd.Series], Optional[Dict[str, Any]]]:
-    """
-    Encode the target variables (y_train, y_val, y_test) if they are non-numeric.
-
-    Uses LabelEncoder to convert string targets to numeric labels.
-    Converts boolean targets to integers.
-
-    No operation if targets are already numeric.
-    """
-    if fit:
-        le = LabelEncoder()
-        if not pd.api.types.is_numeric_dtype(y):
-            # Fit on y_train
-            le.fit(y)
-            # Transform y_train, y_test, y_val using the same encoder
-            y = pd.Series(
-                le.transform(y),  # type: ignore
-                index=y.index,
-                name=y.name,
-            )
-            step_params["le"] = le
-            step_params["transform"] = False
-            step_params["boolean"] = False
-        elif pd.api.types.is_bool_dtype(y) or set(y.dropna().unique()) <= {
-            0,
-            1,
-        }:
-            y = y.astype(dtype=int)
-            step_params["le"] = None
-            step_params["boolean"] = True
-            step_params["transform"] = False
-        else:
-            step_params["le"] = None
-            step_params["transform"] = True
-            step_params["boolean"] = False
-        return X, y, step_params
-    else:
-        if y is not None:
-            if step_params["le"] is not None:
-                le = step_params["le"]
-                y = pd.Series(
-                    le.transform(y),  # type: ignore
-                    index=y.index,
-                    name=y.name,
-                )
-            elif step_params["boolean"]:
-                y = y.astype(int)
-        return X, y, step_params
-
-
 def auto_encode_features(
     X: pd.DataFrame,
     y: pd.Series,

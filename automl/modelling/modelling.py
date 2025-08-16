@@ -1,5 +1,5 @@
 # internal libraries
-from preprocessing import AutoML_Preprocess
+from preprocessing import preprocess
 from library import Logger
 from .models import models
 from .scoring import (
@@ -39,8 +39,6 @@ class AutoML_Modeling:
             X_train = X_train.drop(target, axis=1)
 
         self.target: str = target
-        self.X_val_train: pd.DataFrame = X_train
-        self.y_val_train: pd.Series = y_train
         self.output_file: str = output_file
         self.df_test = df_test
         if logger is None:
@@ -52,9 +50,11 @@ class AutoML_Modeling:
             )
         else:
             self.logger: Logger = logger
-        self.dataset_type: str = self.detect_dataset_type(
-            target=self.y_val_train
+
+        self.X_val_train, self.y_val_train, meta_data = preprocess(
+            X=X_train, y=y_train, logger=self.logger
         )
+        self.dataset_type: str = str(meta_data["dataset_type"])
         self.logger.warning(f"{self.dataset_type} found!")
         top_models = self.train_test_kfold_loop(
             dict_models=models[self.dataset_type],
@@ -74,115 +74,6 @@ class AutoML_Modeling:
             output_file=self.output_file.replace("result", "hyper"),
         )
         pass
-
-    def detect_dataset_type(
-        self, target: pd.DataFrame | pd.Series | np.ndarray
-    ) -> str:
-        """
-        Detect dataset type based on the target variable.
-
-        Parameters:
-        - target: array-like (1D or 2D), target values for supervised learning.
-
-        Returns:
-        - str: dataset type among:
-        'binary_classification',
-        'multi_class_classification',
-        'multi_label_classification',
-        'ordinal_regression',
-        'regression'.
-        """
-
-        # Convert to pandas object for convenience
-        if isinstance(target, pd.DataFrame) or isinstance(target, pd.Series):
-            target_df = target
-        else:
-            # If numpy array or list
-            if target.ndim == 1:
-                target_df = pd.Series(data=target)
-            elif target.ndim == 2:
-                target_df = pd.DataFrame(data=target)
-            else:
-                raise ValueError("Target must be 1D or 2D array-like")
-
-        # Determine if multi-label (2D target)
-        if isinstance(target_df, pd.DataFrame) and target_df.shape[1] > 1:
-            # Check if binary indicators (0/1) in multiple columns -> multi-label classification
-            unique_vals = pd.unique(values=target_df.values.ravel())
-            if set(unique_vals).issubset({0, 1}):
-                return "multi_label_classification"
-            else:
-                # Otherwise it's more complicated but treat as multi-label
-                return "multi_label_classification"
-
-        # For 1D target (Series)
-        target_series = (
-            target_df
-            if isinstance(target_df, pd.Series)
-            else target_df.iloc[:, 0]
-        )
-
-        # Check if target is numeric
-        is_numeric: bool = pd.api.types.is_numeric_dtype(
-            arr_or_dtype=target_series
-        )
-
-        # Get unique values
-        unique_vals = target_series.dropna().unique()
-        n_unique: int = len(unique_vals)
-
-        # Heuristic: if numeric with many unique values -> regression
-        if is_numeric and n_unique > 20:
-            return "regression"
-
-        # Check if target is categorical (string or int categories)
-        # If only two unique classes
-        if n_unique == 2:
-            # Calculate the class distribution ratio
-            counts: pd.Series[float] = target_series.value_counts(
-                normalize=True
-            )
-
-            # Define threshold for "high imbalance" (e.g. minority class <= 5%)
-            imbalance_threshold = 0.05
-
-            # Check minority class proportion
-            minority_class_ratio: float = counts.min()
-
-            if minority_class_ratio <= imbalance_threshold:
-                return "imbalanced_binary_classification"
-            else:
-                return "binary_classification"
-
-        # More than two unique classes:
-        # If target is categorical or int but with ordered discrete small values,
-        # attempt to detect ordinal by checking if sorted unique_vals are numeric and contiguous
-        if not is_numeric:
-            # Non-numeric classes likely multi-class
-            return "multi_class_classification"
-        else:
-            # Numeric case:
-            unique_vals_sorted = np.sort(a=unique_vals)
-            diffs = np.diff(a=unique_vals_sorted)
-            # Check if differences are all 1 and values are integers => ordinal (e.g. ratings)
-            if np.all(a=diffs == 1) and np.all(
-                a=unique_vals_sorted == unique_vals_sorted.astype(dtype=int)
-            ):
-                # Assume ordinal regression if unique count between 3 and 20
-                if 3 <= n_unique <= 20:
-                    return "ordinal_regression"
-                else:
-                    return "multi_class_classification"
-            else:
-                # Otherwise treat as multi-class classification if discrete numeric classes
-                if n_unique <= 20:
-                    return "multi_class_classification"
-                else:
-                    # If numeric with many unique classes but less than 20 (caught above regression >20)
-                    return "multi_class_classification"
-
-        # Fallback (should not get here)
-        return "unknown"
 
     def train_and_evaluate_models(
         self,

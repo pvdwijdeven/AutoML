@@ -6,40 +6,6 @@ from typing import Optional, Tuple, Dict, Any, Literal, List
 from scipy.stats import shapiro
 
 
-def skip_outliers(
-    X: pd.DataFrame,
-    y: pd.Series,
-    *,
-    fit: bool,
-    step_params: Dict[str, Any],
-    target_aware: bool = True,
-    logger: Logger,
-    step_outputs: Dict[str, Any],
-) -> Tuple[pd.DataFrame, Optional[pd.Series], Optional[Dict[str, Any]]]:
-    """
-    Decide whether to skip outlier handling based on target distribution.
-
-    This heuristic checks for imbalanced classification problems by
-    examining the number of unique classes in the target and the frequency
-    of the rarest classes.
-
-    Returns:
-        bool: True if outlier handling should be skipped due to imbalanced classes,
-            False otherwise.
-    """
-    if fit:
-        unique_classes = y.unique()
-        total_samples = len(y)
-        if len(unique_classes) <= 5:
-            for cls in unique_classes:
-                freq = (y == cls).sum() / total_samples
-                if freq < 0.01:
-                    return X, y, {"skip_outliers": True}
-        return X, y, {"skip_outliers": False}
-    else:
-        return X, y, step_params
-
-
 def get_threshold_method(
     column: pd.Series, max_sample_size: int = 5000
 ) -> Literal["iqr"] | Literal["zscore"]:
@@ -77,7 +43,7 @@ def outlier_imputation_order(
     *,
     fit: bool,
     step_params: Dict[str, Any],
-    target_aware: bool = True,
+    target_aware: bool = False,
     logger: Logger,
     step_outputs: Dict[str, Any],
     missing_threshold: float = 0.1,
@@ -286,7 +252,7 @@ def handle_outliers(
     *,
     fit: bool,
     step_params: Dict[str, Any],
-    target_aware: bool = True,
+    target_aware: bool = False,
     logger: Logger,
     step_outputs: Dict[str, Any],
     before: bool = True,
