@@ -47,6 +47,9 @@ def encode_target(target: pd.Series) -> tuple[pd.Series, Dict[str, Any]]:
     meta_data = {
         "encoder": le,
         "description": "Target has been encoded with LabelEncoder",
+        "conversion": {
+            label: idx for idx, label in enumerate(iterable=le.classes_)
+        },
     }
     return y_encoded, meta_data
 
@@ -91,6 +94,9 @@ class TargetTransformer:
             method="yeo-johnson", standardize=False
         )
         self.scaler: StandardScaler = StandardScaler()
+
+    def __repr__(self):
+        return "TargetTransformer()"
 
     def fit(self, y_train: pd.Series | np.ndarray) -> Self:
         """

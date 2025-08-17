@@ -2,30 +2,48 @@ from library import Logger
 
 import pandas as pd
 import numpy as np
-from typing import Optional, Tuple, Dict, Any
+from typing import Optional, Tuple, Dict, Any, Union
 
 
-def detect_dataset_type(target: pd.DataFrame | pd.Series | np.ndarray) -> str:
+def detect_dataset_type(
+    target: Union[pd.DataFrame, pd.Series, np.ndarray],
+) -> str:
     """
-    Detect dataset type based on the target variable.
+    Detect the type of supervised learning problem based on the characteristics of the target variable.
 
-    Parameters:
-    - target: array-like (1D or 2D), target values for supervised learning.
+    The function inspects the target (labels) and categorizes it into one of:
+    - "multi_label_classification": when target is a DataFrame with multiple binary columns.
+    - "regression": when numeric with many unique values (> 20).
+    - "imbalanced_binary_classification": when binary with high imbalance (minority class <= 5%).
+    - "binary_classification": when binary and reasonably balanced.
+    - "multi_class_classification": when categorical or numeric with few discrete levels.
+    - "ordinal_regression": when integer-valued, contiguous classes, between 3 and 20 categories.
+    - "unknown": fallback if none of the above matches.
 
-    Returns:
-    - str: dataset type among:
-    'binary_classification',
-    'multi_class_classification',
-    'multi_label_classification',
-    'ordinal_regression',
-    'regression'.
+    Parameters
+    ----------
+    target : Union[pd.DataFrame, pd.Series, np.ndarray]
+        The target variable(s). Can be a DataFrame (multi-output),
+        a Series (single-output), or a NumPy ndarray.
+
+    Returns
+    -------
+    str
+        The detected dataset type. One of:
+        [
+            "multi_label_classification",
+            "regression",
+            "imbalanced_binary_classification",
+            "binary_classification",
+            "multi_class_classification",
+            "ordinal_regression",
+            "unknown",
+        ]
     """
-
     # Convert to pandas object for convenience
-    if isinstance(target, pd.DataFrame) or isinstance(target, pd.Series):
+    if isinstance(target, (pd.DataFrame, pd.Series)):
         target_df = target
-    else:
-        # If numpy array or list
+    else:  # Handle NumPy array
         if target.ndim == 1:
             target_df = pd.Series(data=target)
         elif target.ndim == 2:
@@ -33,101 +51,86 @@ def detect_dataset_type(target: pd.DataFrame | pd.Series | np.ndarray) -> str:
         else:
             raise ValueError("Target must be 1D or 2D array-like")
 
-    # Determine if multi-label (2D target)
+    # Multi-label case: DataFrame with multiple columns
     if isinstance(target_df, pd.DataFrame) and target_df.shape[1] > 1:
-        # Check if binary indicators (0/1) in multiple columns -> multi-label classification
-        unique_vals = pd.unique(values=target_df.values.ravel())
+        unique_vals = pd.unique(target_df.values.ravel())
         if set(unique_vals).issubset({0, 1}):
             return "multi_label_classification"
-        else:
-            # Otherwise it's more complicated but treat as multi-label
-            return "multi_label_classification"
+        return "multi_label_classification"
 
-    # For 1D target (Series)
+    # 1D case: Series
     target_series = (
         target_df if isinstance(target_df, pd.Series) else target_df.iloc[:, 0]
     )
+    is_numeric = pd.api.types.is_numeric_dtype(target_series)
 
-    # Check if target is numeric
-    is_numeric: bool = pd.api.types.is_numeric_dtype(arr_or_dtype=target_series)
-
-    # Get unique values
     unique_vals = target_series.dropna().unique()
-    n_unique: int = len(unique_vals)
+    n_unique = len(unique_vals)
 
-    # Heuristic: if numeric with many unique values -> regression
+    # Numeric continuous => regression
     if is_numeric and n_unique > 20:
         return "regression"
 
-    # Check if target is categorical (string or int categories)
-    # If only two unique classes
+    # Binary classification
     if n_unique == 2:
-        # Calculate the class distribution ratio
-        counts: pd.Series[float] = target_series.value_counts(normalize=True)
-
-        # Define threshold for "high imbalance" (e.g. minority class <= 5%)
+        counts = target_series.value_counts(normalize=True)
         imbalance_threshold = 0.05
+        minority_ratio = counts.min()
+        return (
+            "imbalanced_binary_classification"
+            if minority_ratio <= imbalance_threshold
+            else "binary_classification"
+        )
 
-        # Check minority class proportion
-        minority_class_ratio: float = counts.min()
-
-        if minority_class_ratio <= imbalance_threshold:
-            return "imbalanced_binary_classification"
-        else:
-            return "binary_classification"
-
-    # More than two unique classes:
-    # If target is categorical or int but with ordered discrete small values,
-    # attempt to detect ordinal by checking if sorted unique_vals are numeric and contiguous
+    # Multi-class or ordinal case
     if not is_numeric:
-        # Non-numeric classes likely multi-class
         return "multi_class_classification"
-    else:
-        # Numeric case:
-        unique_vals_sorted = np.sort(a=unique_vals)
-        diffs = np.diff(a=unique_vals_sorted)
-        # Check if differences are all 1 and values are integers => ordinal (e.g. ratings)
-        if np.all(a=diffs == 1) and np.all(
-            a=unique_vals_sorted == unique_vals_sorted.astype(dtype=int)
-        ):
-            # Assume ordinal regression if unique count between 3 and 20
-            if 3 <= n_unique <= 20:
-                return "ordinal_regression"
-            else:
-                return "multi_class_classification"
-        else:
-            # Otherwise treat as multi-class classification if discrete numeric classes
-            if n_unique <= 20:
-                return "multi_class_classification"
-            else:
-                # If numeric with many unique classes but less than 20 (caught above regression >20)
-                return "multi_class_classification"
 
-    # Fallback (should not get here)
+    unique_vals_sorted = np.sort(unique_vals)
+    diffs = np.diff(unique_vals_sorted)
+
+    if np.all(diffs == 1) and np.all(
+        unique_vals_sorted == unique_vals_sorted.astype(int)
+    ):
+        if 3 <= n_unique <= 20:
+            return "ordinal_regression"
+        return "multi_class_classification"
+
+    if n_unique <= 20:
+        return "multi_class_classification"
+
+    # Fallback
     return "unknown"
 
 
-def skip_outliers(
-    target: pd.Series,
-) -> Dict[str, bool]:
+def skip_outliers(target: pd.Series) -> Dict[str, bool]:
     """
-    Decide whether to skip outlier handling based on target distribution.
+    Check whether extremely rare classes exist in a categorical target variable.
 
-    This heuristic checks for imbalanced classification problems by
-    examining the number of unique classes in the target and the frequency
-    of the rarest classes.
+    If any class in the target distribution has frequency < 1% of the dataset
+    and the total number of unique classes is <= 5, the function flags
+    that outliers should be skipped.
 
-    Returns:
-        bool: True if outlier handling should be skipped due to imbalanced classes,
-            False otherwise.
+    Parameters
+    ----------
+    target : pd.Series
+        Target values (assumed categorical for this heuristic).
+
+    Returns
+    -------
+    Dict[str, bool]
+        Dictionary with key "skip_outliers" set to True if rare
+        classes are detected, otherwise False.
     """
     unique_classes = target.unique()
     total_samples = len(target)
+
     if len(unique_classes) <= 5:
         for cls in unique_classes:
             freq = (target == cls).sum() / total_samples
             if freq < 0.01:
                 return {"skip_outliers": True}
+
     return {"skip_outliers": False}
 
 
@@ -205,106 +208,160 @@ def drop_duplicate_rows(
 
 def drop_strings(
     X: pd.DataFrame,
-    y: pd.Series,
+    y: Optional[pd.Series],
     *,
     fit: bool,
     step_params: Dict[str, Any],
-    target_aware: bool = True,
     logger: Logger,
-    step_outputs: Dict[str, Any],
+    meta_data: Dict[str, Any],
 ) -> Tuple[pd.DataFrame, Optional[pd.Series], Optional[Dict[str, Any]]]:
     """
-    Drop any feature columns in training, validation, test, and optional test datasets
-    that are detected as string dtype.
+    Drops string-like columns (string, category, object) with too many unique values.
 
-    This is often done to remove unprocessable text columns before modeling.
+    During the *fit* stage, the function identifies string-like columns whose number
+    of unique values exceeds a threshold (`max_unique`) and records them in `step_params`.
+    During the *transform* stage, the previously recorded columns are dropped.
+
+    Parameters
+    ----------
+    X : pd.DataFrame
+        Feature matrix.
+    y : Optional[pd.Series]
+        Target values, used to determine threshold for unique values.
+    fit : bool
+        Whether to operate in 'fit' mode (identify columns) or 'transform' mode (apply drops).
+    step_params : Dict[str, Any]
+        Dictionary for saving or retrieving parameters across fit/transform stages.
+    logger : Logger
+        Logger instance for debug messages.
+    meta_data : Dict[str, Any]
+        Additional metadata dictionary (currently unused).
+
+    Returns
+    -------
+    Tuple[pd.DataFrame, Optional[pd.Series], Optional[Dict[str, Any]]]
+        Transformed (or unmodified) X, unchanged y, and updated step_params.
     """
-    # Identify columns with string dtype (including object dtype with strings)
     if fit:
-        drop_cols = []
-        max_unique = min(20, max(10, int(0.01 * len(y))))
+        string_columns = []
+        max_unique = min(
+            20, max(10, int(0.01 * len(y)) if y is not None else 10)
+        )
         for col in X.columns:
             if X[col].dtype in ["string", "category", "object"]:
-                if len(X[col].unique()) > max_unique:
-                    drop_cols.append(col)
-        X.drop(columns=drop_cols, inplace=True)
-        logger.debug(f"[GREEN]- dropping {drop_cols} as they are strings")
-        step_params["drop_cols"] = drop_cols
-        return X, y, step_params
+                if X[col].nunique(dropna=True) > max_unique:
+                    string_columns.append(col)
+        step_params["drop_cols"] = string_columns
     else:
-        drop_cols = step_params["drop_cols"]
-        X.drop(columns=drop_cols, inplace=True)
-        return X, y, step_params
+        string_columns = step_params.get("drop_cols", [])
+        if string_columns:
+            logger.debug(
+                f"[GREEN]- Dropping string-like columns: {string_columns}"
+            )
+            X = X.drop(columns=string_columns)
+
+    return X, y, step_params
 
 
 def drop_duplicate_columns(
     X: pd.DataFrame,
-    y: Optional[pd.Series] = None,
+    y: Optional[pd.Series],
     *,
     fit: bool,
     step_params: Dict[str, Any],
-    target_aware: bool = True,
     logger: Logger,
-    step_outputs: Dict[str, Any],
+    meta_data: Dict[str, Any],
 ) -> Tuple[pd.DataFrame, Optional[pd.Series], Optional[Dict[str, Any]]]:
     """
-    Identifies and removes duplicate columns in the training features `self.X_train`
-    by comparing hash sums of each column. Drops the duplicate columns from all
-    datasets (train, validation, test, and optional test set).
+    Drops duplicate columns in the dataset.
 
-    Logs the list of dropped columns or 'None' if no duplicates were found.
+    During the *fit* stage, columns with identical content are detected
+    using hash-based comparison. Duplicate columns are stored in step_params.
+    During the *transform* stage, the recorded duplicate columns are dropped.
+
+    Parameters
+    ----------
+    X : pd.DataFrame
+        Feature matrix.
+    y : Optional[pd.Series]
+        Target values (unchanged).
+    fit : bool
+        Whether to operate in 'fit' mode (identify columns) or 'transform' mode (apply drops).
+    step_params : Dict[str, Any]
+        Dictionary for saving or retrieving parameters across fit/transform stages.
+    logger : Logger
+        Logger instance for debug messages.
+    meta_data : Dict[str, Any]
+        Additional metadata dictionary (currently unused).
+
+    Returns
+    -------
+    Tuple[pd.DataFrame, Optional[pd.Series], Optional[Dict[str, Any]]]
+        Transformed (or unmodified) X, unchanged y, and updated step_params.
     """
     if fit:
-        # Step 1: Compute hash sum per column to detect duplicates
-        hashes: pd.DataFrame = X.apply(
+        hashes = X.apply(
             lambda col: pd.util.hash_pandas_object(col, index=False).sum()
         )
-
-        # Step 2: Identify duplicated hashes (i.e., duplicate columns)
-        duplicated_mask: pd.Series = hashes.duplicated()
-        duplicate_columns: pd.Index[str] = X.columns[duplicated_mask]
-        X = X.drop(columns=duplicate_columns)
-        step_params = {"duplicate_columns": duplicate_columns}
-        # Log the duplicate columns (if any)
-        logger.debug(
-            msg=f"[GREEN]- Duplicate columns to be dropped: {list(duplicate_columns) if len(duplicate_columns) > 0 else 'None'}"
-        )
+        duplicated_mask = hashes.duplicated()
+        duplicate_columns = X.columns[duplicated_mask]
+        step_params["duplicate_columns"] = duplicate_columns
     else:
-        X = X.drop(columns=step_params["duplicate_columns"])
+        duplicate_columns = step_params.get("duplicate_columns", [])
+        if len(duplicate_columns) > 0:
+            logger.debug(
+                f"[GREEN]- Dropping duplicate columns: {list(duplicate_columns)}"
+            )
+            X = X.drop(columns=duplicate_columns)
     return X, y, step_params
 
 
 def drop_constant_columns(
     X: pd.DataFrame,
-    y: Optional[pd.Series] = None,
+    y: Optional[pd.Series],
     *,
     fit: bool,
     step_params: Dict[str, Any],
-    target_aware: bool = True,
     logger: Logger,
-    step_outputs: Dict[str, Any],
+    meta_data: Dict[str, Any],
 ) -> Tuple[pd.DataFrame, Optional[pd.Series], Optional[Dict[str, Any]]]:
     """
-    Detects columns in training features `self.X_train` with constant values
-    (only one unique value) and drops them from all datasets (train, val, test,
-    and optional test set).
+    Drops constant columns (columns with only one unique value).
 
-    Logs which columns were dropped or 'None' if none were found.
+    During the *fit* stage, columns with a single unique value are identified
+    and stored in step_params. During the *transform* stage, these columns
+    are dropped from the dataset.
+
+    Parameters
+    ----------
+    X : pd.DataFrame
+        Feature matrix.
+    y : Optional[pd.Series]
+        Target values (unchanged).
+    fit : bool
+        Whether to operate in 'fit' mode (identify columns) or 'transform' mode (apply drops).
+    step_params : Dict[str, Any]
+        Dictionary for saving or retrieving parameters across fit/transform stages.
+    logger : Logger
+        Logger instance for debug messages.
+    meta_data : Dict[str, Any]
+        Additional metadata dictionary (currently unused).
+
+    Returns
+    -------
+    Tuple[pd.DataFrame, Optional[pd.Series], Optional[Dict[str, Any]]]
+        Transformed (or unmodified) X, unchanged y, and updated step_params.
     """
     if fit:
-        # Vectorized approach: find columns where number of unique values is 1
-        nunique_per_col: pd.Series = X.nunique()
-        constant_columns: list[Any] = nunique_per_col[
-            nunique_per_col == 1
-        ].index.tolist()
-
-        logger.debug(
-            f"[GREEN]- Constant columns to be dropped: {constant_columns if len(constant_columns) > 0 else 'None'}"
-        )
-
-        # Drop constant columns from train, test, and val sets
-        X = X.drop(columns=constant_columns)
-        step_params = {"constant_columns": constant_columns}
+        nunique_per_col = X.nunique(dropna=True)
+        constant_columns = nunique_per_col[nunique_per_col == 1].index.tolist()
+        step_params["constant_columns"] = constant_columns
     else:
-        X = X.drop(columns=step_params["constant_columns"])
+        constant_columns = step_params.get("constant_columns", [])
+        if constant_columns:
+            logger.debug(
+                f"[GREEN]- Dropping constant columns: {constant_columns}"
+            )
+            X = X.drop(columns=constant_columns)
+
     return X, y, step_params

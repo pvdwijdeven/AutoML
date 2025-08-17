@@ -15,72 +15,97 @@ from typing import Tuple, Optional, Dict, Any
 
 def normalize_columns(
     X: pd.DataFrame,
-    y: pd.Series,
+    y: Optional[pd.Series],
     *,
     fit: bool,
     step_params: Dict[str, Any],
-    target_aware: bool = True,
     logger: Logger,
-    step_outputs: Dict[str, Any],
+    meta_data: Dict[str, Any],
     skewness_threshold: float = 0.75,
 ) -> Tuple[pd.DataFrame, Optional[pd.Series], Optional[Dict[str, Any]]]:
     """
-    Apply power transform (Yeo-Johnson) to skewed numeric columns and standard scale all numeric columns.
+    Normalize numeric columns with optional power transformation if highly skewed.
 
-    Columns with absolute skewness higher than `skewness_threshold` are transformed.
-    Scaling is fit on training set and applied to validation, test, and optional test.
+    Columns that have been created by auto-encoding (from meta_data["auto_encode_features"]["added_columns"])
+    are skipped. For each remaining numeric column:
+    - If abs(skewness) > skewness_threshold, fit a Yeo-Johnson PowerTransformer.
+    - Always fit a StandardScaler to normalize mean and variance.
+    - All fitted transformers are saved in step_params so the same transformations
+      are applied in transform stage.
 
-    Args:
-        skewness_threshold (float): Skewness level beyond which to apply Yeo-Johnson transform.
+    Parameters
+    ----------
+    X : pd.DataFrame
+        Input dataframe.
+    y : Optional[pd.Series]
+        Target variable (unused here).
+    fit : bool
+        If True, fit normalization transformers and save state.
+        If False, apply saved transformers.
+    step_params : Dict[str, Any]
+        Dictionary (per column) for storing fitted scalers and transformers as needed.
+    logger : Logger
+        Logger for debug output.
+    meta_data : Dict[str, Any]
+        Must contain "auto_encode_features" with "added_columns" list.
+    skewness_threshold : float, default=0.75
+        Absolute value above which skewed numeric columns get power transformed before scaling.
+
+    Returns
+    -------
+    Tuple[pd.DataFrame, Optional[pd.Series], Optional[Dict[str, Any]]]
+        Dataframe X (normalized), y (unchanged), and step_params (with fit state).
+
+    Notes
+    -----
+    - If skewness cannot be evaluated or a column isn’t numeric, that column is skipped.
+    - Original values are replaced in X, no new columns are added.
     """
     if fit:
-        added_columns = step_outputs["auto_encode_features"]["added_columns"]
-        logger.debug("[GREEN]- Normalizing")
+        added_columns = meta_data.get("auto_encode_features", {}).get(
+            "added_columns", []
+        )
         for column_name in X.columns:
             if column_name in added_columns:
-                # skip encoded columns
-                continue
+                continue  # Skip encoded columns
             if not is_numeric_dtype(X[column_name]):
-                continue
-            skewness_value = X[column_name].skew()
-            step_params[column_name] = {}
-            try:
-                skewness_float = float(skewness_value)  # type: ignore
-            except (TypeError, ValueError):
-                continue  # skip columns where skewness cannot be converted to float
-            if abs(skewness_float) > skewness_threshold:
-                pt = PowerTransformer(method="yeo-johnson", standardize=False)
-                # Fit on train column reshaped as 2D array
-                X_train_col = X[
-                    [column_name]
-                ]  # keeps DataFrame format for transform
-                pt.fit(X_train_col)
+                continue  # Skip non-numeric columns
 
-                # Transform all three sets' column
-                X[column_name] = pt.transform(X_train_col)
+            step_params[column_name] = {}
+            # Evaluate skewness, skip if not convertible to float
+            try:
+                skewness_value = float(X[column_name].skew())  # type: ignore
+            except (TypeError, ValueError):
+                continue
+
+            # If column is highly skewed, fit Yeo-Johnson PowerTransformer
+            if abs(skewness_value) > skewness_threshold:
+                pt = PowerTransformer(method="yeo-johnson", standardize=False)
+                X_col = X[[column_name]]
+                pt.fit(X_col)
                 step_params[column_name]["pt"] = pt
-                logger.debug(
-                    f"- Skewness found for {column_name}, yeo-johnson transormer applied"
-                )
+
+            # Always fit a StandardScaler
             scaler = StandardScaler()
-            train_col = X[[column_name]]
-            scaler.fit(train_col)
+            X_col = X[[column_name]]
+            scaler.fit(X_col)
             step_params[column_name]["scaler"] = scaler
-            # Transform returns 2D array, extract to 1D to assign safely
-            X.loc[:, column_name] = (
-                scaler.transform(train_col).flatten().astype(np.float64)
-            )
+
         return X, y, step_params
+
     else:
+        logger.debug("[GREEN]- Normalizing")
         for column_name in step_params:
+            # Power transformation if present
             if "pt" in step_params[column_name]:
                 pt = step_params[column_name]["pt"]
-                X_train_col = X[[column_name]]
-                X[column_name] = pt.transform(X_train_col)
+                X_col = X[[column_name]]
+                X[column_name] = pt.transform(X_col)
+            # Standard scaling always
             if "scaler" in step_params[column_name]:
                 scaler = step_params[column_name]["scaler"]
-                X_train_col = X[[column_name]]
+                X_col = X[[column_name]]
                 X.loc[:, column_name] = (
-                    scaler.transform(X_train_col).flatten().astype(np.float64)
+                    scaler.transform(X_col).flatten().astype(np.float64)
                 )
         return X, y, step_params

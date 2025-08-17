@@ -14,7 +14,7 @@ from typing import Dict, Any, Tuple
 
 def preprocess(
     X: pd.DataFrame, y: pd.Series, logger: Logger
-) -> Tuple[pd.DataFrame, pd.Series, Dict[str, Dict[str, Any]]]:
+) -> Tuple[pd.DataFrame, pd.Series, Dict[str, Any]]:
     X_prepro = X.copy()
     y_prepro = y.copy()
     meta_data = {}

@@ -14,7 +14,7 @@ from time import perf_counter
 from typing import Dict, Optional, Any, List
 import numpy as np
 import pandas as pd
-
+from sklearn.pipeline import Pipeline
 from sklearn.model_selection import train_test_split, KFold
 import os
 
@@ -54,8 +54,11 @@ class AutoML_Modeling:
         self.X_val_train, self.y_val_train, meta_data = preprocess(
             X=X_train, y=y_train, logger=self.logger
         )
-        self.dataset_type: str = str(meta_data["dataset_type"])
-        self.logger.warning(f"{self.dataset_type} found!")
+        meta_data["target"] = self.target
+        self.dataset_type: str = meta_data["dataset_type"]
+        self.logger.warning(msg=f"{self.dataset_type} found!")
+        self.logger.error(msg=f"{meta_data}")
+        raise ValueError
         top_models = self.train_test_kfold_loop(
             dict_models=models[self.dataset_type],
             output_file=self.output_file.replace("result", "model_selection"),

@@ -90,7 +90,7 @@ class AutomlTransformer:
         ]
 
     def fit(self, X_train, y_train):
-        self.step_outputs: Dict[str, Dict[str, Any]] = {}
+        self.meta_data: Dict[str, Dict[str, Any]] = {}
         self.X_train = X_train.copy()
         self.y_train = y_train.copy()
         for step in self.steps:
@@ -103,13 +103,13 @@ class AutomlTransformer:
                 fit=True,
                 step_params={},
                 logger=self.logger,
-                step_outputs=self.step_outputs.copy(),
+                step_outputs=self.meta_data.copy(),
                 **step.get("config", {}),
             )
 
-            self.step_outputs[step["name"]] = step["params"]
+            self.meta_data[step["name"]] = step["params"]
 
-        self.logger.debug(msg=self.step_outputs)
+        self.logger.debug(msg=self.meta_data)
 
     def transform(self, X_test):
         self.X_test = X_test.copy()
@@ -122,7 +122,7 @@ class AutomlTransformer:
                 fit=False,
                 step_params=step["params"],
                 logger=self.logger,
-                step_outputs=self.step_outputs.copy(),
+                step_outputs=self.meta_data.copy(),
                 **step.get("config", {}),
             )
 
