@@ -322,6 +322,8 @@ def handle_missing_values(
         # Define categorical and numeric columns excluding dropped ones
         cat_cols, num_cols = [], []
         for col in X_train.columns:
+            if col in cols_to_drop:
+                continue
             dtype = infer_dtype(X_train[col])
             if dtype in ["string", "category", "boolean", "object"]:
                 cat_cols.append(col)
