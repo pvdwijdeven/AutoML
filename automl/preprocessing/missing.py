@@ -300,7 +300,6 @@ def handle_missing_values(
             )
 
         step_params["cols_to_drop"] = cols_to_drop
-        logger.debug(f"[GREEN]- columns to drop done")
         # Update importances excluding dropped cols
         feature_importances = {
             k: v

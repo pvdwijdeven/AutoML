@@ -3,6 +3,91 @@ from sklearn.tree import DecisionTreeClassifier
 
 param_grids = {
     "binary_classification": {
+        "logistic_regression": {
+            "penalty": ["l1", "l2"],  # 2 options
+            "C": np.logspace(-2, 2, 5),  # 5 values -> total: 2*5=10
+            "solver": ["lbfgs", "saga"],  # 2 options -> total: 10*2=20
+            "max_iter": [500, 1000],  # 2 options -> total: 20*2=40
+        },
+        "random_forest": {
+            "n_estimators": [100, 300],  # 2
+            "max_depth": [None, 20],  # 2
+            "min_samples_split": [2, 10],  # 2
+            "min_samples_leaf": [1, 4],  # 2
+            "max_features": ["sqrt", "log2"],  # 2
+            "bootstrap": [True],  # 1
+            # 2*2*2*2*2*1 = 32 combinations
+        },
+        "svc": {
+            "C": [0.1, 1, 10],  # 3
+            "gamma": [0.01, 0.001],  # 2
+            "kernel": ["rbf"],  # 1
+            # 3*2*1=6 combinations
+        },
+        "knn": {
+            "n_neighbors": [3, 7, 11],  # 3
+            "weights": ["uniform"],  # 1
+            "algorithm": ["auto"],  # 1
+            "leaf_size": [30],  # 1
+            "p": [1, 2],  # 2
+            # 3*1*1*1*2=6 combinations
+        },
+        "gradient_boosting": {
+            "n_estimators": [50, 100],  # fewer options for number of trees
+            "learning_rate": [0.05, 0.1],  # narrowed learning rates
+            "max_depth": [3, 5],  # limited tree depths
+            "min_samples_split": [2, 5],  # fewer split thresholds
+            "min_samples_leaf": [8],  # 1
+            "subsample": [1.0],  # 1
+            "max_features": ["sqrt"],  # 1
+            "n_iter_no_change": [9],  # 1
+            "tol": [1e-4],  # 1
+            # 2*1*2*1*1*1*1*1*1 = 4 combinations
+        },
+        "naive_bayes": {
+            "alpha": [0.1, 1.0],  # 2
+            "fit_prior": [True, False],  # 2
+            "class_prior": [None],  # 1
+            # 2*2*1=4 combinations
+        },
+        "extra_trees": {
+            "n_estimators": [100, 200],  # 2
+            "criterion": ["gini"],  # 1
+            "max_depth": [None],  # 1
+            "min_samples_split": [2, 5],  # 2
+            "min_samples_leaf": [1],  # 1
+            "max_features": ["sqrt"],  # 1
+            "bootstrap": [False],  # 1
+            # 2*1*1*2*1*1*1=4 combinations
+        },
+        "adaboost": {
+            "n_estimators": [50, 100],  # 2
+            "learning_rate": [0.01, 0.1],  # 2
+            "estimator": [None],  # 1 (keep simple here)
+            "algorithm": ["SAMME"],  # 1
+            "random_state": [None],  # 1
+            # 2*2*1*1*1=4 combinations
+        },
+        "mlp": {
+            "hidden_layer_sizes": [(50,), (100,)],  # 2
+            "activation": ["relu"],  # 1
+            "solver": ["adam"],  # 1
+            "alpha": [1e-4],  # 1
+            "learning_rate": ["constant"],  # 1
+            # 2*1*1*1*1=2 combinations
+        },
+        "LinearDiscriminantAnalysis": {
+            "solver": ["svd", "lsqr"],  # 2
+            "shrinkage": [None],  # 1
+            "n_components": [None],  # 1
+            # 2*1*1=2 combinations
+        },
+    }
+}
+
+
+param_grids_detailed = {
+    "binary_classification": {
         "LogisticRegression": {
             "penalty": ["l1", "l2", "elasticnet", "none"],
             "C": np.logspace(-4, 4, 20),

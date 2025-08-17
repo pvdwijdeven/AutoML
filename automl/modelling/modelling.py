@@ -2,7 +2,14 @@
 from preprocessing import preprocess
 from library import Logger
 from .models import models
-from .modelselection import run_kfold_evaluation
+from .modelselection import (
+    run_kfold_evaluation,
+    run_kfold_grid_search,
+    create_results_html_table,
+    get_best_model_name,
+)
+from .scoring import select_top_models, write_to_output
+from .hypertuning import param_grids, param_grids_detailed
 
 # external libraries
 
@@ -11,7 +18,7 @@ import pandas as pd
 from sklearn.model_selection import train_test_split
 
 
-class AutoML_Modeling:
+class AutomlModeling:
 
     def __init__(
         self,
@@ -48,9 +55,9 @@ class AutoML_Modeling:
         )
         meta_data["target"] = self.target
         self.dataset_type: str = meta_data["dataset_type"]
-        self.logger.warning(msg=f"{self.dataset_type} found!")
-        self.logger.error(msg=f"{meta_data}")
+        self.logger.info(msg=f"[BLUE] Dataset type: {self.dataset_type}")
         self.split_validation_data()
+        self.logger.info(msg="[MAGENTA] Starting primarily model selction")
         results = run_kfold_evaluation(
             X=self.X_val_full,
             y=self.y_val_full,
@@ -58,7 +65,49 @@ class AutoML_Modeling:
             dataset_type=self.dataset_type,
             logger=self.logger,
         )
-        self.logger.warning(msg=results)
+        df_results = pd.DataFrame(
+            [
+                {
+                    "model": model,
+                    "mean_score": details["mean_score"],
+                    "std_score": details["std_score"],
+                }
+                for model, details in results.items()
+            ]
+        )
+        top_selection = select_top_models(summary_df=df_results)
+        self.logger.info(
+            msg="[MAGENTA] Starting hypertuning top X model selction"
+        )
+        best_grid_model = run_kfold_grid_search(
+            dataset_type=self.dataset_type,
+            top_models=top_selection,
+            param_grids=param_grids,
+            X=self.X_val_full,
+            y=self.y_val_full,
+            logger=self.logger,
+        )
+        best_model, best_score = get_best_model_name(results=best_grid_model)
+        self.logger.info(msg=f"Best model: {best_model}, score: {best_score}")
+        final_result = run_kfold_grid_search(
+            dataset_type=self.dataset_type,
+            top_models=[{"model_name": best_model}],
+            param_grids=param_grids_detailed,
+            X=self.X_val_full,
+            y=self.y_val_full,
+            logger=self.logger,
+        )
+
+        write_to_output(
+            output_file=self.output_file,
+            summary_df=df_results,
+            top_models=pd.DataFrame(data=top_selection),
+            best_grid=create_results_html_table(best_grid_model),
+            final_result=create_results_html_table(final_result),
+        )
+        best_model, best_score = get_best_model_name(results=final_result)
+        self.logger.info(msg=f"Best model: {best_model}, score: {best_score}")
+        self.logger.info(msg="[MAGENTA] DONE")
 
     def split_validation_data(
         self,

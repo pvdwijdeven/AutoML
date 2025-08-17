@@ -114,9 +114,7 @@ def get_score(
     return results
 
 
-def select_top_models(
-    summary_df, metric="accuracy", k=1, max_models=5
-) -> List[Dict[str, Any]]:
+def select_top_models(summary_df, k=1, max_models=5) -> List[Dict[str, Any]]:
     """
     Select top models based on mean and std accuracy criteria.
 
@@ -134,20 +132,17 @@ def select_top_models(
 
     # Extract mean and std columns for the metric, flatten columns for ease
 
-    mean_col = f"{metric}_mean"
-    std_col = f"{metric}_std"
-
     # Sort models by mean descending
-    mu_best = summary_df.iloc[0][mean_col]
-    sigma_best = summary_df.iloc[0][std_col]
+    mu_best = summary_df.iloc[0]["mean_score"]
+    sigma_best = summary_df.iloc[0]["std_score"]
 
     selected = []
-    for modelname, row in summary_df.iterrows():
-        if row[mean_col] >= mu_best - k * sigma_best:
+    for _, row in summary_df.iterrows():
+        if row["mean_score"] >= mu_best - k * sigma_best:
             selected_model = {
-                "model_name": modelname,
-                "accuracy_mean": row[mean_col],
-                "accuracy_std": row[std_col],
+                "model_name": row["model"],
+                "accuracy_mean": row["mean_score"],
+                "accuracy_std": row["std_score"],
             }
             selected.append(selected_model)
             if len(selected) >= max_models:
@@ -182,20 +177,27 @@ def summarize_results(
 
     summary.columns = ["_".join(col).strip() for col in summary.columns.values]
     mean_col = f"{scoring}_mean"
-    std_col = f"{scoring}_std"
+    # std_col = f"{scoring}_std"
 
     # Sort models by mean descending
     sorted_summary = summary.sort_values(by=mean_col, ascending=False)
 
     return sorted_summary, select_top_models(
-        summary_df=sorted_summary, metric=scoring, k=1, max_models=5
+        summary_df=sorted_summary, k=1, max_models=5
     )
 
 
-def write_to_output(output_file, summary_df, top_models) -> None:
+def write_to_output(
+    output_file, summary_df, top_models, best_grid, final_result
+) -> None:
     html = "<h3>Scoring Table:</h3>"
     html += summary_df.to_html(index=False, float_format=lambda x: f"{x:.4f}")
     html += "<h3>Top models:</h3>"
     html += top_models.to_html(index=False, float_format=lambda x: f"{x:.4f}")
+    html += "<h3>Best grid:</h3>"
+    html += best_grid
+    html += "<h3>Final result:</h3>"
+    html += final_result
+
     with open(output_file, "w") as f:
         f.write(html)
