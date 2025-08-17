@@ -15,7 +15,7 @@ from typing import Tuple, Optional, Dict, Any
 from pandas.api.types import is_numeric_dtype
 
 
-def decide_knn_imputation(X: pd.DataFrame, column: str) -> bool:
+def decide_knn_imputation(X: pd.DataFrame, column: str, logger: Logger) -> bool:
     """
     Decide if k-Nearest Neighbors (kNN) imputation is suitable for the specified column.
 
@@ -44,7 +44,6 @@ def decide_knn_imputation(X: pd.DataFrame, column: str) -> bool:
         if is_numeric_dtype(X[col]):
             if X[col].dropna().nunique() <= 1:
                 zero_var_cols.append(col)
-
     col_data = X[column]
     total_len = len(col_data)
 
@@ -64,7 +63,6 @@ def decide_knn_imputation(X: pd.DataFrame, column: str) -> bool:
 
     X_no_missing = X.loc[not_null_idx].drop(columns=[column])
     target_no_missing = col_data.loc[not_null_idx]
-
     if X_no_missing.empty:
         return False
 
@@ -96,7 +94,6 @@ def decide_knn_imputation(X: pd.DataFrame, column: str) -> bool:
 
     col_simulated = col_data.copy()
     col_simulated.loc[mask_indices] = np.nan
-
     X_for_impute = X.copy()
     X_for_impute[column] = col_simulated
 
@@ -113,7 +110,6 @@ def decide_knn_imputation(X: pd.DataFrame, column: str) -> bool:
     elapsed_time = time.time() - start_time
 
     col_knn_imputed = X_knn_imputed[:, X_for_impute.columns.get_loc(column)]
-
     true_values = col_data.loc[mask_indices]
     mask_pos = X_for_impute.index.get_indexer(mask_indices)
 
@@ -123,7 +119,6 @@ def decide_knn_imputation(X: pd.DataFrame, column: str) -> bool:
     knn_rmse = np.sqrt(
         mean_squared_error(true_values, col_knn_imputed[mask_pos])
     )
-
     return knn_rmse < 0.9 * mean_rmse and elapsed_time < 10
 
 
@@ -189,8 +184,6 @@ def handle_missing_values(
     meta_data: Dict[str, Any],
     col_importance_thresh: float = 0.01,
     col_missing_thresh: float = 0.5,
-    row_missing_thresh: float = 0.05,
-    max_row_drop_frac: float = 0.1,
     skew_thresh: float = 0.5,
 ) -> Tuple[pd.DataFrame, Optional[pd.Series], Optional[Dict[str, Any]]]:
     """
@@ -229,10 +222,6 @@ def handle_missing_values(
         Threshold below which low-importance columns with high missingness will be dropped.
     col_missing_thresh : float, default=0.5
         Threshold fraction of missing values in a column to consider dropping it.
-    row_missing_thresh : float, default=0.05
-        Weighted fraction of missing values per row above which rows may be dropped.
-    max_row_drop_frac : float, default=0.1
-        Maximum fraction of total rows that can be dropped.
     skew_thresh : float, default=0.5
         Absolute skewness threshold to choose between mean and median imputation for numeric columns.
 
@@ -278,6 +267,7 @@ def handle_missing_values(
         feature_importances = (
             get_feature_importances(X_train, y) if y is not None else {}
         )
+        logger.debug(f"[GREEN]- feature importances: {feature_importances}")
         missing_per_col = X_train.isna().mean()
         missing_counts = X_train.isna().sum().to_dict()
         cols_done = [
@@ -309,9 +299,8 @@ def handle_missing_values(
                 f"[GREEN]  - Dropping {col} because of too much missing values"
             )
 
-        X_train = X_train.drop(columns=cols_to_drop)
         step_params["cols_to_drop"] = cols_to_drop
-
+        logger.debug(f"[GREEN]- columns to drop done")
         # Update importances excluding dropped cols
         feature_importances = {
             k: v
@@ -322,19 +311,15 @@ def handle_missing_values(
         # Decide which columns to consider for kNN imputation
         knn_cols = []
         if not categorical_only:
-            for col in X_train.columns:
+            for col in X_train.columns[X_train.isna().any()].tolist():
+                logger.debug(f"{col}")
                 if col not in cols_done and decide_knn_imputation(
-                    X=X_train, column=col
+                    X=X_train, column=col, logger=logger
                 ):
                     knn_cols.append(col)
-            if knn_cols:
-                logger.debug(
-                    f"[GREEN]  - Columns selected for KNN imputation: {knn_cols}"
-                )
-
-        else:
-            knn_cols = []
-
+        logger.debug(
+            f"[GREEN]  - Columns selected for KNN imputation: {knn_cols}"
+        )
         # Define categorical and numeric columns excluding dropped ones
         cat_cols, num_cols = [], []
         for col in X_train.columns:
@@ -409,6 +394,7 @@ def handle_missing_values(
                 )
 
         # Fit mode: do not transform X here, only prepare imputers
+        logger.debug(f"[GREEN]  {imputers}")
         step_params["imputers"] = imputers
         return X, y, step_params
 

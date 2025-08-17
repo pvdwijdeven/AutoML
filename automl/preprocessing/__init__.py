@@ -26,6 +26,8 @@ from .target import (
     standardize_target,
 )
 
+from .transformer import AutomlTransformer
+
 __all__: list[str] = [
     "preprocess",
     "is_target_categorical",
@@ -44,4 +46,5 @@ __all__: list[str] = [
     "standardize_target",
     "TargetTransformer",
     "detect_dataset_type",
+    "AutomlTransformer",
 ]
