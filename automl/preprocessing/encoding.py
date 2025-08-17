@@ -11,146 +11,110 @@ import pandas as pd
 from sklearn.preprocessing import (
     OneHotEncoder,
     OrdinalEncoder,
-    LabelEncoder,
 )
 
-from typing import Tuple, Optional, Dict, Any
+from typing import Tuple, Optional, Dict, Any, List
 import warnings
 
 
-def encode_target(
-    X: pd.DataFrame,
-    y: pd.Series,
-    *,
-    fit: bool,
-    step_params: Dict[str, Any],
-    target_aware: bool = True,
-    logger: Logger,
-    step_outputs: Dict[str, Any],
-) -> Tuple[pd.DataFrame, Optional[pd.Series], Optional[Dict[str, Any]]]:
-    """
-    Encode the target variables (y_train, y_val, y_test) if they are non-numeric.
-
-    Uses LabelEncoder to convert string targets to numeric labels.
-    Converts boolean targets to integers.
-
-    No operation if targets are already numeric.
-    """
-    if fit:
-        le = LabelEncoder()
-        if not pd.api.types.is_numeric_dtype(y):
-            # Fit on y_train
-            le.fit(y)
-            # Transform y_train, y_test, y_val using the same encoder
-            y = pd.Series(
-                le.transform(y),  # type: ignore
-                index=y.index,
-                name=y.name,
-            )
-            step_params["le"] = le
-            step_params["transform"] = False
-            step_params["boolean"] = False
-        elif pd.api.types.is_bool_dtype(y) or set(y.dropna().unique()) <= {
-            0,
-            1,
-        }:
-            y = y.astype(dtype=int)
-            step_params["le"] = None
-            step_params["boolean"] = True
-            step_params["transform"] = False
-        else:
-            step_params["le"] = None
-            step_params["transform"] = True
-            step_params["boolean"] = False
-        return X, y, step_params
-    else:
-        if y is not None:
-            if step_params["le"] is not None:
-                le = step_params["le"]
-                y = pd.Series(
-                    le.transform(y),  # type: ignore
-                    index=y.index,
-                    name=y.name,
-                )
-            elif step_params["boolean"]:
-                y = y.astype(int)
-        return X, y, step_params
+import pandas.api.types as ptypes
 
 
 def auto_encode_features(
     X: pd.DataFrame,
-    y: pd.Series,
+    y: Optional[pd.Series],
     *,
     fit: bool,
     step_params: Dict[str, Any],
-    target_aware: bool = True,
     logger: Logger,
-    step_outputs: Dict[str, Any],
+    meta_data: Dict[str, Any],
     max_unique_for_categorical: int = 15,
 ) -> Tuple[pd.DataFrame, Optional[pd.Series], Optional[Dict[str, Any]]]:
     """
-    Automatically encode categorical features in training, validation, test, and optional test datasets.
+    Automatically encode categorical and boolean features in the dataset.
 
-    Encoding schemes:
-        - Boolean columns converted to int (0/1).
-        - Categorical dtype or object columns encoded with OneHotEncoder (drop='first', handle_unknown='ignore').
-        - Numeric columns with low unique values:
-            * Encoded with OrdinalEncoder if target mean monotonically varies with feature.
-            * Otherwise with OneHotEncoder.
-        - Continuous numeric columns left unchanged.
+    Fit mode:
+    - Fit appropriate encoders per column (OneHotEncoder, OrdinalEncoder, or boolean to int conversion).
+    - Does NOT transform X during fit (no data leakage).
+    - Store fitted encoder objects and list of added encoded columns in step_params.
 
-    Args:
-        max_unique_for_categorical (int): Maximum unique values in a numeric column to consider encoding as categorical.
+    Transform mode:
+    - Apply fitted encoders to X, replacing original columns with encoded columns.
+    - Boolean columns converted to int.
+    - Maintains consistency with fitted encoding scheme, ignoring unseen categories.
 
-    Returns:
-        dict[str, OneHotEncoder | OrdinalEncoder]: Mapping from column name to its encoder used.
+    Encoding Strategy:
+    - Boolean columns: convert to integer 0/1.
+    - Categorical dtype: OneHotEncoder with handle_unknown='ignore' and drop='first'.
+    - Object dtype: treated as categorical and OneHotEncoded similarly.
+    - Numeric dtype with low unique values (<= max_unique_for_categorical):
+      - If target y provided and mean target per category is monotonic (increasing or decreasing),
+        use OrdinalEncoder with unknown category handling.
+      - Otherwise, use OneHotEncoder as above.
+    - Numeric dtype with high unique values: left unchanged.
+
+    Parameters
+    ----------
+    X : pd.DataFrame
+        Input features.
+    y : Optional[pd.Series]
+        Target values, used only for ordinal encoding heuristic.
+    fit : bool
+        Whether to fit encoders (True) or transform using saved encoders (False).
+    step_params : Dict[str, Any]
+        Stores encoders and metadata across fit/transform stages.
+    logger : Logger
+        Logger for debug/info messages.
+    meta_data : Dict[str, Any]
+        Metadata dictionary (unused currently).
+    max_unique_for_categorical : int, default=15
+        Maximum unique values to consider numeric feature as categorical.
+
+    Returns
+    -------
+    Tuple[pd.DataFrame, Optional[pd.Series], Optional[Dict[str, Any]]]
+        Transformed feature DataFrame (only on transform), unchanged target,
+        and updated step_params containing encoders and added columns.
     """
-    # suppress warnings during encoding when new categories are found in val/test/df_test
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        if fit:
-            encoders = {}
-            transformed_train = X.copy()
-            df = X.copy()
 
-            for col in df.columns:
-                col_data = df[col]
+        if fit:
+            encoders: Dict[str, Any] = {}
+            added_columns: List[str] = []
+            # Do not transform X during fit; only fit encoders
+
+            for col in X.columns:
+                col_data = X[col]
                 unique_vals = col_data.nunique()
                 dtype = col_data.dtype
 
-                # Boolean: convert to int (0/1)
-                if pd.api.types.is_bool_dtype(dtype):
-                    transformed_train[col] = col_data.astype(int)
+                # Boolean: no fitting needed, just convert in transform
+                if ptypes.is_bool_dtype(dtype):
+                    encoders[col] = "bool_to_int"
+                    logger.debug(
+                        f"[GREEN]- Registered boolean to int conversion for column '{col}'"
+                    )
                     continue
 
-                # Category dtype: nominal categorical -> OneHotEncoder with handle_unknown='ignore'
-                elif isinstance(dtype, pd.CategoricalDtype):
+                # Categorical dtype: fit OneHotEncoder
+                if isinstance(dtype, pd.CategoricalDtype):
                     logger.debug(
-                        f"[GREEN]- Applying OneHotEncoder on column '{col}'"
+                        f"[GREEN]- Fitting OneHotEncoder for categorical column '{col}'"
                     )
                     encoder = OneHotEncoder(
                         drop="first",
                         sparse_output=False,
                         handle_unknown="ignore",
                     )
-                    encoded_train = encoder.fit_transform(
-                        np.asarray(col_data).reshape(-1, 1)
-                    )
-                    cats = encoder.categories_[0]
-                    cols_one_hot = [f"{col}_{cat}" for cat in cats[1:]]  # type: ignore
-                    encoded_train_df = pd.DataFrame(
-                        encoded_train, columns=cols_one_hot, index=df.index
-                    )
-                    transformed_train = transformed_train.drop(
-                        columns=[col]
-                    ).join(encoded_train_df)
+                    encoder.fit(np.asarray(col_data).reshape(-1, 1))
                     encoders[col] = encoder
                     continue
 
-                # String/object dtype: treat as nominal categorical with OneHotEncoder and handle_unknown='ignore'
-                elif pd.api.types.is_object_dtype(dtype):
+                # Object dtype: treat as categorical
+                if ptypes.is_object_dtype(dtype):
                     logger.debug(
-                        f"[GREEN]- Applying OneHotEncoder on column '{col}'"
+                        f"[GREEN]- Fitting OneHotEncoder for object-type column '{col}'"
                     )
                     temp_cat = col_data.astype("category")
                     encoder = OneHotEncoder(
@@ -158,134 +122,99 @@ def auto_encode_features(
                         sparse_output=False,
                         handle_unknown="ignore",
                     )
-                    encoded_train = encoder.fit_transform(
-                        np.asarray(temp_cat.values).reshape(-1, 1)
-                    )
-                    cats = encoder.categories_[0]
-                    cols_one_hot = [f"{col}_{cat}" for cat in cats[1:]]  # type: ignore
-                    encoded_train_df = pd.DataFrame(
-                        encoded_train, columns=cols_one_hot, index=df.index
-                    )
-                    transformed_train = transformed_train.drop(
-                        columns=[col]
-                    ).join(encoded_train_df)
+                    encoder.fit(np.asarray(temp_cat.values).reshape(-1, 1))
                     encoders[col] = encoder
                     continue
 
-                # Numeric dtype with low cardinality: one-hot or ordinal encoding with unknown category handling
-                elif pd.api.types.is_numeric_dtype(dtype):
+                # Numeric with limited cardinality: decide ordinal or one-hot
+                if ptypes.is_numeric_dtype(dtype):
                     if unique_vals <= max_unique_for_categorical:
-                        if y is not None:
-                            df_combined = df.copy()
-
+                        if y is not None and y.name is not None:
+                            df_combined = X.copy()
                             df_combined[y.name] = y
-
-                            means = df_combined.groupby(col)[  # type: ignore
-                                y.name
-                            ].mean()
+                            means = df_combined.groupby(col)[y.name].mean()  # type: ignore
                             if (
                                 means.is_monotonic_increasing
                                 or means.is_monotonic_decreasing
                             ):
-                                # OrdinalEncoder with unknown category handling
+                                # Ordinal encoder with unknown category handling
                                 encoder = OrdinalEncoder(
                                     handle_unknown="use_encoded_value",
                                     unknown_value=-1,
                                 )
-                                transformed_train[[col]] = (
-                                    encoder.fit_transform(
-                                        np.asarray(col_data.values).reshape(
-                                            -1, 1
-                                        )
-                                    )
-                                )
-                                logger.debug(
-                                    f"[GREEN]- Applying OrdinalEncoder with unknown category handling on column '{col}'"
-                                )
-                                encoders[col] = encoder
-                            else:
-                                # OneHotEncoder with handle_unknown='ignore'
-                                encoder = OneHotEncoder(
-                                    drop="first",
-                                    sparse_output=False,
-                                    handle_unknown="ignore",
-                                )
-                                encoded_train = encoder.fit_transform(
+                                encoder.fit(
                                     np.asarray(col_data.values).reshape(-1, 1)
                                 )
-                                cols_one_hot = [
-                                    f"{col}_{cat}"
-                                    for cat in encoder.categories_[0][1:]  # type: ignore
-                                ]
-                                encoded_train_df = pd.DataFrame(
-                                    encoded_train,
-                                    columns=cols_one_hot,
-                                    index=df.index,
-                                )
-                                transformed_train = transformed_train.drop(
-                                    columns=[col]
-                                ).join(encoded_train_df)
-
-                                logger.debug(
-                                    f"[GREEN]- Applying OneHotEncoder with unknown category handling on column {col}"
-                                )
                                 encoders[col] = encoder
-                        else:
-                            encoder = OneHotEncoder(
-                                drop="first",
-                                sparse_output=False,
-                                handle_unknown="ignore",
-                            )
-                            encoded_train = encoder.fit_transform(
-                                np.asarray(col_data.values).reshape(-1, 1)
-                            )
-                            cols_one_hot = [
-                                f"{col}_{cat}" for cat in encoder.categories_[0][1:]  # type: ignore
-                            ]
-                            encoded_train_df = pd.DataFrame(
-                                encoded_train,
-                                columns=cols_one_hot,
-                                index=df.index,
-                            )
-                            transformed_train = transformed_train.drop(
-                                columns=[col]
-                            ).join(encoded_train_df)
+                                logger.debug(
+                                    f"[GREEN]- Fitting OrdinalEncoder for monotonic numeric column '{col}'"
+                                )
+                                continue
+                            # else fall through to one-hot below
 
-                            logger.debug(
-                                f"[GREEN]- Applying OneHotEncoder with unknown category handling on column '{col}'"
-                            )
-                            encoders[col] = encoder
-                    else:
-                        # Leave continuous numeric unchanged
-                        pass
-            added_columns = list(
-                set(transformed_train.columns) - set(X.columns)
-            )
-            X = transformed_train
+                        # OneHotEncoder fallback for numeric categorical
+                        encoder = OneHotEncoder(
+                            drop="first",
+                            sparse_output=False,
+                            handle_unknown="ignore",
+                        )
+                        encoder.fit(np.asarray(col_data.values).reshape(-1, 1))
+                        encoders[col] = encoder
+                        logger.debug(
+                            f"[GREEN]- Fitting OneHotEncoder for numeric categorical column '{col}'"
+                        )
+                        continue
+
+                # Numeric with high uniqueness left unchanged (no encoder)
+                logger.debug(
+                    f"[GREEN]- Leaving continuous numeric column '{col}' unchanged"
+                )
+
             step_params["encoders"] = encoders
             step_params["added_columns"] = added_columns
             return X, y, step_params
-        else:
-            encoders = step_params["encoders"]
-            drop_cols = []
+
+        else:  # transform
+            encoders = step_params.get("encoders", {})
             transformed_X = X.copy()
+            drop_cols: List[str] = []
+
             for col, encoder in encoders.items():
+                if encoder == "bool_to_int":
+                    # Convert boolean column to int
+                    if col in transformed_X.columns and ptypes.is_bool_dtype(
+                        transformed_X[col].dtype
+                    ):
+                        transformed_X[col] = transformed_X[col].astype(int)
+                        logger.debug(
+                            f"[GREEN]- Converted boolean column '{col}' to int during transform"
+                        )
+                    continue
+
                 if isinstance(encoder, OrdinalEncoder):
-                    col_data = transformed_X[col]
-                    transformed_X[[col]] = encoder.fit_transform(
-                        np.asarray(col_data).reshape(-1, 1)
-                    )
-                else:
-                    encoded_X = encoder.transform(X[col].values.reshape(-1, 1))
-                    cats = encoder.categories_[0]
-                    cols_enc = [f"{col}_{cat}" for cat in cats[1:]]
-                    encoded_X_df = pd.DataFrame(
-                        encoded_X,  # type: ignore
-                        columns=cols_enc,
-                        index=X.index,
-                    )
-                    transformed_X = transformed_X.drop(columns=[col]).join(
-                        encoded_X_df
-                    )
-                    drop_cols.append(col)
+                    if col in transformed_X.columns:
+                        col_data = transformed_X[col]
+                        transformed_X[[col]] = encoder.transform(
+                            np.asarray(col_data).reshape(-1, 1)
+                        )
+                    continue
+
+                if isinstance(encoder, OneHotEncoder):
+                    if col in transformed_X.columns:
+                        encoded = encoder.transform(
+                            transformed_X[col].values.reshape(-1, 1)  # type: ignore
+                        )
+                        cats = encoder.categories_[0]
+                        encoded_cols = [f"{col}_{cat}" for cat in cats[1:]]  # type: ignore
+                        encoded_df = pd.DataFrame(
+                            encoded,  # type: ignore
+                            columns=encoded_cols,
+                            index=transformed_X.index,
+                        )
+                        transformed_X = transformed_X.drop(columns=[col]).join(
+                            encoded_df
+                        )
+                        drop_cols.append(col)
+                    continue
+
             return transformed_X, y, step_params

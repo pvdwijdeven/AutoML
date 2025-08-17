@@ -10,193 +10,102 @@ from sklearn.preprocessing import (
     PowerTransformer,
     StandardScaler,
 )
-from typing import Tuple, Optional, Dict, Any, Self
-
-
-class TargetTransformer:
-    """
-    Transforms the target variable using Yeo-Johnson power transform (to reduce skewness)
-    followed by standard scaling (zero mean, unit variance). Supports inverse transformation.
-
-    Attributes:
-        pt (PowerTransformer): PowerTransformer instance using Yeo-Johnson method.
-        scaler (StandardScaler): StandardScaler instance to scale the transformed target.
-    """
-
-    def __init__(self) -> None:
-        """
-        Initializes the TargetTransformer with PowerTransformer and StandardScaler.
-        """
-        self.pt: PowerTransformer = PowerTransformer(
-            method="yeo-johnson", standardize=False
-        )
-        self.scaler: StandardScaler = StandardScaler()
-
-    def fit(self, y_train: pd.Series | np.ndarray) -> Self:
-        """
-        Fits the power transformer and scaler on the training target data.
-
-        Args:
-            y_train (pd.Series | np.ndarray): Training target values.
-
-        Returns:
-            Self: The fitted transformer instance.
-        """
-        if isinstance(y_train, np.ndarray):
-            y_train_reshaped = y_train.reshape(-1, 1)
-        else:
-            y_train_reshaped = np.asarray(y_train).reshape(-1, 1)
-
-        y_transformed = self.pt.fit_transform(y_train_reshaped)
-        self.scaler.fit(y_transformed)
-        return self
-
-    def transform(self, y: pd.Series | np.ndarray) -> np.ndarray:
-        """
-        Transforms the target data using the fitted power transformer and scaler.
-
-        Args:
-            y (pd.Series | np.ndarray): Target values to transform.
-
-        Returns:
-            np.ndarray: Transformed and scaled target data as 1D array.
-        """
-        if isinstance(y, np.ndarray):
-            y_reshaped = y.reshape(-1, 1)
-        else:
-            y_reshaped = np.asarray(y).reshape(-1, 1)
-        y_transformed = self.pt.transform(y_reshaped)
-        y_scaled = self.scaler.transform(y_transformed)
-        return y_scaled.flatten()
-
-    def inverse_transform(self, y_scaled: pd.Series | np.ndarray) -> np.ndarray:
-        """
-        Inverse transforms scaled target data back to the original scale.
-
-        Args:
-            y_scaled (pd.Series | np.ndarray): Scaled target values.
-
-        Returns:
-            np.ndarray: Original scale target values as 1D array.
-        """
-        if isinstance(y_scaled, pd.Series):
-            y_scaled = np.asanyarray(y_scaled)
-        y_transformed = self.scaler.inverse_transform(y_scaled.reshape(-1, 1))
-        y_original = self.pt.inverse_transform(y_transformed)
-        return y_original.flatten()
+from typing import Tuple, Optional, Dict, Any
 
 
 def normalize_columns(
     X: pd.DataFrame,
-    y: pd.Series,
+    y: Optional[pd.Series],
     *,
     fit: bool,
     step_params: Dict[str, Any],
-    target_aware: bool = True,
     logger: Logger,
-    step_outputs: Dict[str, Any],
+    meta_data: Dict[str, Any],
     skewness_threshold: float = 0.75,
 ) -> Tuple[pd.DataFrame, Optional[pd.Series], Optional[Dict[str, Any]]]:
     """
-    Apply power transform (Yeo-Johnson) to skewed numeric columns and standard scale all numeric columns.
+    Normalize numeric columns with optional power transformation if highly skewed.
 
-    Columns with absolute skewness higher than `skewness_threshold` are transformed.
-    Scaling is fit on training set and applied to validation, test, and optional test.
+    Columns that have been created by auto-encoding (from meta_data["auto_encode_features"]["added_columns"])
+    are skipped. For each remaining numeric column:
+    - If abs(skewness) > skewness_threshold, fit a Yeo-Johnson PowerTransformer.
+    - Always fit a StandardScaler to normalize mean and variance.
+    - All fitted transformers are saved in step_params so the same transformations
+      are applied in transform stage.
 
-    Args:
-        skewness_threshold (float): Skewness level beyond which to apply Yeo-Johnson transform.
+    Parameters
+    ----------
+    X : pd.DataFrame
+        Input dataframe.
+    y : Optional[pd.Series]
+        Target variable (unused here).
+    fit : bool
+        If True, fit normalization transformers and save state.
+        If False, apply saved transformers.
+    step_params : Dict[str, Any]
+        Dictionary (per column) for storing fitted scalers and transformers as needed.
+    logger : Logger
+        Logger for debug output.
+    meta_data : Dict[str, Any]
+        Must contain "auto_encode_features" with "added_columns" list.
+    skewness_threshold : float, default=0.75
+        Absolute value above which skewed numeric columns get power transformed before scaling.
+
+    Returns
+    -------
+    Tuple[pd.DataFrame, Optional[pd.Series], Optional[Dict[str, Any]]]
+        Dataframe X (normalized), y (unchanged), and step_params (with fit state).
+
+    Notes
+    -----
+    - If skewness cannot be evaluated or a column isn’t numeric, that column is skipped.
+    - Original values are replaced in X, no new columns are added.
     """
     if fit:
-        added_columns = step_outputs["auto_encode_features"]["added_columns"]
-        logger.debug("[GREEN]- Normalizing")
+        added_columns = meta_data.get("auto_encode_features", {}).get(
+            "added_columns", []
+        )
         for column_name in X.columns:
             if column_name in added_columns:
-                # skip encoded columns
-                continue
+                continue  # Skip encoded columns
             if not is_numeric_dtype(X[column_name]):
-                continue
-            skewness_value = X[column_name].skew()
-            step_params[column_name] = {}
-            try:
-                skewness_float = float(skewness_value)  # type: ignore
-            except (TypeError, ValueError):
-                continue  # skip columns where skewness cannot be converted to float
-            if abs(skewness_float) > skewness_threshold:
-                pt = PowerTransformer(method="yeo-johnson", standardize=False)
-                # Fit on train column reshaped as 2D array
-                X_train_col = X[
-                    [column_name]
-                ]  # keeps DataFrame format for transform
-                pt.fit(X_train_col)
+                continue  # Skip non-numeric columns
 
-                # Transform all three sets' column
-                X[column_name] = pt.transform(X_train_col)
+            step_params[column_name] = {}
+            # Evaluate skewness, skip if not convertible to float
+            try:
+                skewness_value = float(X[column_name].skew())  # type: ignore
+            except (TypeError, ValueError):
+                continue
+
+            # If column is highly skewed, fit Yeo-Johnson PowerTransformer
+            if abs(skewness_value) > skewness_threshold:
+                pt = PowerTransformer(method="yeo-johnson", standardize=False)
+                X_col = X[[column_name]]
+                pt.fit(X_col)
                 step_params[column_name]["pt"] = pt
-                logger.debug(
-                    f"- Skewness found for {column_name}, yeo-johnson transormer applied"
-                )
+
+            # Always fit a StandardScaler
             scaler = StandardScaler()
-            train_col = X[[column_name]]
-            scaler.fit(train_col)
+            X_col = X[[column_name]]
+            scaler.fit(X_col)
             step_params[column_name]["scaler"] = scaler
-            # Transform returns 2D array, extract to 1D to assign safely
-            X.loc[:, column_name] = (
-                scaler.transform(train_col).flatten().astype(np.float64)
-            )
+
         return X, y, step_params
+
     else:
+        logger.debug("[GREEN]- Normalizing")
         for column_name in step_params:
+            # Power transformation if present
             if "pt" in step_params[column_name]:
                 pt = step_params[column_name]["pt"]
-                X_train_col = X[[column_name]]
-                X[column_name] = pt.transform(X_train_col)
+                X_col = X[[column_name]]
+                X[column_name] = pt.transform(X_col)
+            # Standard scaling always
             if "scaler" in step_params[column_name]:
                 scaler = step_params[column_name]["scaler"]
-                X_train_col = X[[column_name]]
+                X_col = X[[column_name]]
                 X.loc[:, column_name] = (
-                    scaler.transform(X_train_col).flatten().astype(np.float64)
+                    scaler.transform(X_col).flatten().astype(np.float64)
                 )
-        return X, y, step_params
-
-
-def standardize_target(
-    X: pd.DataFrame,
-    y: pd.Series,
-    *,
-    fit: bool,
-    step_params: Dict[str, Any],
-    target_aware: bool = True,
-    logger: Logger,
-    step_outputs: Dict[str, Any],
-) -> Tuple[pd.DataFrame, Optional[pd.Series], Optional[Dict[str, Any]]]:
-    """
-    Fit a TargetTransformer using Yeo-Johnson transform and standard scaling on y_train,
-    then transform y_train, y_val, and y_test targets correspondingly.
-
-    Stores the target_transformer object for later inverse transformations if needed.
-    """
-    if fit:
-        if step_outputs["encode_target"]["transform"]:
-            # 1. Fit transformer on training target
-            target_transformer = TargetTransformer()
-            target_transformer.fit(y)
-
-            # 2. Transform target in train, val, test sets
-            y = pd.Series(
-                target_transformer.transform(y),
-                index=y.index,
-                name=y.name,
-            )
-            step_params["target_transformer"] = target_transformer
-        else:
-            step_params["target_transformer"] = None
-        return X, y, step_params
-    else:
-        # target_transformer = step_params["target_transformer"]
-        # if target_transformer is not None:
-        #     y = pd.Series(
-        #         target_transformer.transform(y),
-        #         index=y.index,
-        #         name=y.name,
-        #     )
         return X, y, step_params

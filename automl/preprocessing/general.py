@@ -1,155 +1,367 @@
 from library import Logger
 
 import pandas as pd
-from typing import Optional, Tuple, Dict, Any
+import numpy as np
+from typing import Optional, Tuple, Dict, Any, Union
 
 
-def drop_strings(
-    X: pd.DataFrame,
-    y: pd.Series,
-    *,
-    fit: bool,
-    step_params: Dict[str, Any],
-    target_aware: bool = True,
-    logger: Logger,
-    step_outputs: Dict[str, Any],
-) -> Tuple[pd.DataFrame, Optional[pd.Series], Optional[Dict[str, Any]]]:
+def detect_dataset_type(
+    target: Union[pd.DataFrame, pd.Series, np.ndarray],
+) -> str:
     """
-    Drop any feature columns in training, validation, test, and optional test datasets
-    that are detected as string dtype.
+    Detect the type of supervised learning problem based on the characteristics of the target variable.
 
-    This is often done to remove unprocessable text columns before modeling.
+    The function inspects the target (labels) and categorizes it into one of:
+    - "multi_label_classification": when target is a DataFrame with multiple binary columns.
+    - "regression": when numeric with many unique values (> 20).
+    - "imbalanced_binary_classification": when binary with high imbalance (minority class <= 5%).
+    - "binary_classification": when binary and reasonably balanced.
+    - "multi_class_classification": when categorical or numeric with few discrete levels.
+    - "ordinal_regression": when integer-valued, contiguous classes, between 3 and 20 categories.
+    - "unknown": fallback if none of the above matches.
+
+    Parameters
+    ----------
+    target : Union[pd.DataFrame, pd.Series, np.ndarray]
+        The target variable(s). Can be a DataFrame (multi-output),
+        a Series (single-output), or a NumPy ndarray.
+
+    Returns
+    -------
+    str
+        The detected dataset type. One of:
+        [
+            "multi_label_classification",
+            "regression",
+            "imbalanced_binary_classification",
+            "binary_classification",
+            "multi_class_classification",
+            "ordinal_regression",
+            "unknown",
+        ]
     """
-    # Identify columns with string dtype (including object dtype with strings)
-    if fit:
-        drop_cols = []
-        max_unique = min(20, max(10, int(0.01 * len(y))))
-        for col in X.columns:
-            if X[col].dtype in ["string", "category", "object"]:
-                if len(X[col].unique()) > max_unique:
-                    drop_cols.append(col)
-        X.drop(columns=drop_cols, inplace=True)
-        logger.debug(f"[GREEN]- dropping {drop_cols} as they are strings")
-        step_params["drop_cols"] = drop_cols
-        return X, y, step_params
-    else:
-        drop_cols = step_params["drop_cols"]
-        X.drop(columns=drop_cols, inplace=True)
-        return X, y, step_params
+    # Convert to pandas object for convenience
+    if isinstance(target, (pd.DataFrame, pd.Series)):
+        target_df = target
+    else:  # Handle NumPy array
+        if target.ndim == 1:
+            target_df = pd.Series(data=target)
+        elif target.ndim == 2:
+            target_df = pd.DataFrame(data=target)
+        else:
+            raise ValueError("Target must be 1D or 2D array-like")
+
+    # Multi-label case: DataFrame with multiple columns
+    if isinstance(target_df, pd.DataFrame) and target_df.shape[1] > 1:
+        unique_vals = pd.unique(target_df.values.ravel())
+        if set(unique_vals).issubset({0, 1}):
+            return "multi_label_classification"
+        return "multi_label_classification"
+
+    # 1D case: Series
+    target_series = (
+        target_df if isinstance(target_df, pd.Series) else target_df.iloc[:, 0]
+    )
+    is_numeric = pd.api.types.is_numeric_dtype(target_series)
+
+    unique_vals = target_series.dropna().unique()
+    n_unique = len(unique_vals)
+
+    # Numeric continuous => regression
+    if is_numeric and n_unique > 20:
+        return "regression"
+
+    # Binary classification
+    if n_unique == 2:
+        counts = target_series.value_counts(normalize=True)
+        imbalance_threshold = 0.05
+        minority_ratio = counts.min()
+        return (
+            "imbalanced_binary_classification"
+            if minority_ratio <= imbalance_threshold
+            else "binary_classification"
+        )
+
+    # Multi-class or ordinal case
+    if not is_numeric:
+        return "multi_class_classification"
+
+    unique_vals_sorted = np.sort(unique_vals)
+    diffs = np.diff(unique_vals_sorted)
+
+    if np.all(diffs == 1) and np.all(
+        unique_vals_sorted == unique_vals_sorted.astype(int)
+    ):
+        if 3 <= n_unique <= 20:
+            return "ordinal_regression"
+        return "multi_class_classification"
+
+    if n_unique <= 20:
+        return "multi_class_classification"
+
+    # Fallback
+    return "unknown"
+
+
+def skip_outliers(target: pd.Series) -> Dict[str, bool]:
+    """
+    Check whether extremely rare classes exist in a categorical target variable.
+
+    If any class in the target distribution has frequency < 1% of the dataset
+    and the total number of unique classes is <= 5, the function flags
+    that outliers should be skipped.
+
+    Parameters
+    ----------
+    target : pd.Series
+        Target values (assumed categorical for this heuristic).
+
+    Returns
+    -------
+    Dict[str, bool]
+        Dictionary with key "skip_outliers" set to True if rare
+        classes are detected, otherwise False.
+    """
+    unique_classes = target.unique()
+    total_samples = len(target)
+
+    if len(unique_classes) <= 5:
+        for cls in unique_classes:
+            freq = (target == cls).sum() / total_samples
+            if freq < 0.01:
+                return {"skip_outliers": True}
+
+    return {"skip_outliers": False}
 
 
 def drop_duplicate_rows(
     X: pd.DataFrame,
-    y: Optional[pd.Series] = None,
+    y: pd.Series,
+    logger: Logger,
+) -> Tuple[pd.DataFrame, pd.Series, Dict[str, str]]:
+    """
+    Remove duplicate rows from the feature matrix `X` and target vector `y` where both match.
+
+    This function identifies duplicate samples based on the combination of `X` and `y`.
+    The first occurrence of each unique sample (features and target) is kept, while all
+    subsequent duplicates are removed to maintain dataset consistency. Information about
+    the number of dropped rows and their indices is logged and returned.
+
+    Parameters
+    ----------
+    X : pd.DataFrame
+        Feature matrix containing the independent variables of the dataset.
+    y : pd.Series
+        Target vector corresponding to `X`.
+    logger : Logger
+        Logger instance used to record a debug message with details
+        about the row removal operation.
+
+    Returns
+    -------
+    X_clean : pd.DataFrame
+        Feature matrix after duplicate rows were removed and indices reset.
+    y_clean : pd.Series
+        Target vector aligned with `X_clean`, with duplicates removed and indices reset.
+    step_params : Dict[str, str]
+        Metadata containing a human-readable description of the operation,
+        including the number of dropped duplicates and their row indices if applicable.
+
+    Notes
+    -----
+    - Only rows that have identical feature values in `X` *and* identical target values in `y`
+        are considered duplicates and removed.
+    - The first occurrence of each unique sample is retained (`keep="first"`).
+    - The logger will produce a debug-level message describing the outcome.
+    """
+    num_rows_before: int = X.shape[0]
+
+    # Concatenate X and y to consider both features and target in duplicate detection
+    combined = X.copy()
+    combined["_target"] = y.copy()
+
+    # Identify duplicate rows (all except the first occurrence)
+    duplicate_mask: pd.Series = combined.duplicated(keep="first")
+
+    # Get index labels of duplicate rows that will be dropped
+    dropped_indices: list[Any] = X.index[duplicate_mask].tolist()
+
+    # Drop duplicate rows from X and y
+    X_clean: pd.DataFrame = X.loc[~duplicate_mask].reset_index(drop=True)
+    y_clean: pd.Series = y.loc[~duplicate_mask].reset_index(drop=True)
+
+    # Correct row count after dropping duplicates
+    num_rows_after: int = X_clean.shape[0]
+
+    description = (
+        f"{num_rows_before - num_rows_after} duplicate rows have been dropped."
+    )
+    if num_rows_after < num_rows_before:
+        description += f"\nDropped rows with indices: {dropped_indices}"
+
+    meta_data = {"Description": description}
+
+    logger.debug(msg=f"[GREEN]- {description}")
+
+    return X_clean, y_clean, meta_data
+
+
+def drop_strings(
+    X: pd.DataFrame,
+    y: Optional[pd.Series],
     *,
     fit: bool,
     step_params: Dict[str, Any],
-    target_aware: bool = True,
     logger: Logger,
-    step_outputs: Dict[str, Any],
+    meta_data: Dict[str, Any],
 ) -> Tuple[pd.DataFrame, Optional[pd.Series], Optional[Dict[str, Any]]]:
     """
-    Removes duplicate rows from the original training dataframe `self.eda.df_train`.
-    Logs the number of duplicates dropped and their indices.
+    Drops string-like columns (string, category, object) with too many unique values.
+
+    During the *fit* stage, the function identifies string-like columns whose number
+    of unique values exceeds a threshold (`max_unique`) and records them in `step_params`.
+    During the *transform* stage, the previously recorded columns are dropped.
+
+    Parameters
+    ----------
+    X : pd.DataFrame
+        Feature matrix.
+    y : Optional[pd.Series]
+        Target values, used to determine threshold for unique values.
+    fit : bool
+        Whether to operate in 'fit' mode (identify columns) or 'transform' mode (apply drops).
+    step_params : Dict[str, Any]
+        Dictionary for saving or retrieving parameters across fit/transform stages.
+    logger : Logger
+        Logger instance for debug messages.
+    meta_data : Dict[str, Any]
+        Additional metadata dictionary (currently unused).
+
+    Returns
+    -------
+    Tuple[pd.DataFrame, Optional[pd.Series], Optional[Dict[str, Any]]]
+        Transformed (or unmodified) X, unchanged y, and updated step_params.
     """
     if fit:
-        num_rows_before: int = X.shape[0]
-
-        # Identify duplicate rows (all except the first occurrence)
-        duplicate_mask: pd.Series = X.duplicated(
-            keep="first"
-        )  # True for duplicates
-        # Get index labels of duplicate rows that will be dropped
-        dropped_indices: list[Any] = X.index[duplicate_mask].tolist()
-        # Drop duplicate rows
-        X_clean: pd.DataFrame = X.loc[~duplicate_mask].reset_index(drop=True)
-        if target_aware and y is not None:
-            y_clean = y.loc[~duplicate_mask].reset_index(drop=True)
-        else:
-            y_clean: pd.Series | None = y
-        num_rows_after: int = X.shape[0]
-        if num_rows_after < num_rows_before:
-            logger.debug(
-                msg=f"[GREEN]- Duplicate rows to be dropped: {num_rows_before - num_rows_after}"
-            )
-            logger.debug(
-                msg=f"[GREEN]  Dropped rows with indices: {dropped_indices}"
-            )
-        else:
-            logger.debug(msg="[GREEN]- Duplicate rows to be dropped: None")
-        return X_clean, y_clean, step_params
+        string_columns = []
+        max_unique = min(
+            20, max(10, int(0.01 * len(y)) if y is not None else 10)
+        )
+        for col in X.columns:
+            if X[col].dtype in ["string", "category", "object"]:
+                if X[col].nunique(dropna=True) > max_unique:
+                    string_columns.append(col)
+        step_params["drop_cols"] = string_columns
     else:
-        return X, y, step_params
+        string_columns = step_params.get("drop_cols", [])
+        if string_columns:
+            logger.debug(
+                f"[GREEN]- Dropping string-like columns: {string_columns}"
+            )
+            X = X.drop(columns=string_columns)
+
+    return X, y, step_params
 
 
 def drop_duplicate_columns(
     X: pd.DataFrame,
-    y: Optional[pd.Series] = None,
+    y: Optional[pd.Series],
     *,
     fit: bool,
     step_params: Dict[str, Any],
-    target_aware: bool = True,
     logger: Logger,
-    step_outputs: Dict[str, Any],
+    meta_data: Dict[str, Any],
 ) -> Tuple[pd.DataFrame, Optional[pd.Series], Optional[Dict[str, Any]]]:
     """
-    Identifies and removes duplicate columns in the training features `self.X_train`
-    by comparing hash sums of each column. Drops the duplicate columns from all
-    datasets (train, validation, test, and optional test set).
+    Drops duplicate columns in the dataset.
 
-    Logs the list of dropped columns or 'None' if no duplicates were found.
+    During the *fit* stage, columns with identical content are detected
+    using hash-based comparison. Duplicate columns are stored in step_params.
+    During the *transform* stage, the recorded duplicate columns are dropped.
+
+    Parameters
+    ----------
+    X : pd.DataFrame
+        Feature matrix.
+    y : Optional[pd.Series]
+        Target values (unchanged).
+    fit : bool
+        Whether to operate in 'fit' mode (identify columns) or 'transform' mode (apply drops).
+    step_params : Dict[str, Any]
+        Dictionary for saving or retrieving parameters across fit/transform stages.
+    logger : Logger
+        Logger instance for debug messages.
+    meta_data : Dict[str, Any]
+        Additional metadata dictionary (currently unused).
+
+    Returns
+    -------
+    Tuple[pd.DataFrame, Optional[pd.Series], Optional[Dict[str, Any]]]
+        Transformed (or unmodified) X, unchanged y, and updated step_params.
     """
     if fit:
-        # Step 1: Compute hash sum per column to detect duplicates
-        hashes: pd.DataFrame = X.apply(
+        hashes = X.apply(
             lambda col: pd.util.hash_pandas_object(col, index=False).sum()
         )
-
-        # Step 2: Identify duplicated hashes (i.e., duplicate columns)
-        duplicated_mask: pd.Series = hashes.duplicated()
-        duplicate_columns: pd.Index[str] = X.columns[duplicated_mask]
-        X = X.drop(columns=duplicate_columns)
-        step_params = {"duplicate_columns": duplicate_columns}
-        # Log the duplicate columns (if any)
-        logger.debug(
-            msg=f"[GREEN]- Duplicate columns to be dropped: {list(duplicate_columns) if len(duplicate_columns) > 0 else 'None'}"
-        )
+        duplicated_mask = hashes.duplicated()
+        duplicate_columns = X.columns[duplicated_mask]
+        step_params["duplicate_columns"] = duplicate_columns
     else:
-        X = X.drop(columns=step_params["duplicate_columns"])
+        duplicate_columns = step_params.get("duplicate_columns", [])
+        if len(duplicate_columns) > 0:
+            logger.debug(
+                f"[GREEN]- Dropping duplicate columns: {list(duplicate_columns)}"
+            )
+            X = X.drop(columns=duplicate_columns)
     return X, y, step_params
 
 
 def drop_constant_columns(
     X: pd.DataFrame,
-    y: Optional[pd.Series] = None,
+    y: Optional[pd.Series],
     *,
     fit: bool,
     step_params: Dict[str, Any],
-    target_aware: bool = True,
     logger: Logger,
-    step_outputs: Dict[str, Any],
+    meta_data: Dict[str, Any],
 ) -> Tuple[pd.DataFrame, Optional[pd.Series], Optional[Dict[str, Any]]]:
     """
-    Detects columns in training features `self.X_train` with constant values
-    (only one unique value) and drops them from all datasets (train, val, test,
-    and optional test set).
+    Drops constant columns (columns with only one unique value).
 
-    Logs which columns were dropped or 'None' if none were found.
+    During the *fit* stage, columns with a single unique value are identified
+    and stored in step_params. During the *transform* stage, these columns
+    are dropped from the dataset.
+
+    Parameters
+    ----------
+    X : pd.DataFrame
+        Feature matrix.
+    y : Optional[pd.Series]
+        Target values (unchanged).
+    fit : bool
+        Whether to operate in 'fit' mode (identify columns) or 'transform' mode (apply drops).
+    step_params : Dict[str, Any]
+        Dictionary for saving or retrieving parameters across fit/transform stages.
+    logger : Logger
+        Logger instance for debug messages.
+    meta_data : Dict[str, Any]
+        Additional metadata dictionary (currently unused).
+
+    Returns
+    -------
+    Tuple[pd.DataFrame, Optional[pd.Series], Optional[Dict[str, Any]]]
+        Transformed (or unmodified) X, unchanged y, and updated step_params.
     """
     if fit:
-        # Vectorized approach: find columns where number of unique values is 1
-        nunique_per_col: pd.Series = X.nunique()
-        constant_columns: list[Any] = nunique_per_col[
-            nunique_per_col == 1
-        ].index.tolist()
-
-        logger.debug(
-            f"[GREEN]- Constant columns to be dropped: {constant_columns if len(constant_columns) > 0 else 'None'}"
-        )
-
-        # Drop constant columns from train, test, and val sets
-        X = X.drop(columns=constant_columns)
-        step_params = {"constant_columns": constant_columns}
+        nunique_per_col = X.nunique(dropna=True)
+        constant_columns = nunique_per_col[nunique_per_col == 1].index.tolist()
+        step_params["constant_columns"] = constant_columns
     else:
-        X = X.drop(columns=step_params["constant_columns"])
+        constant_columns = step_params.get("constant_columns", [])
+        if constant_columns:
+            logger.debug(
+                f"[GREEN]- Dropping constant columns: {constant_columns}"
+            )
+            X = X.drop(columns=constant_columns)
+
     return X, y, step_params

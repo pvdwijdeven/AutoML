@@ -2,111 +2,134 @@ from library import Logger
 
 import numpy as np
 import pandas as pd
-from typing import Optional, Tuple, Dict, Any, Literal, List
+from typing import Optional, Tuple, Dict, Any, Literal
 from scipy.stats import shapiro
 
 
-def skip_outliers(
-    X: pd.DataFrame,
-    y: pd.Series,
-    *,
-    fit: bool,
-    step_params: Dict[str, Any],
-    target_aware: bool = True,
-    logger: Logger,
-    step_outputs: Dict[str, Any],
-) -> Tuple[pd.DataFrame, Optional[pd.Series], Optional[Dict[str, Any]]]:
-    """
-    Decide whether to skip outlier handling based on target distribution.
-
-    This heuristic checks for imbalanced classification problems by
-    examining the number of unique classes in the target and the frequency
-    of the rarest classes.
-
-    Returns:
-        bool: True if outlier handling should be skipped due to imbalanced classes,
-            False otherwise.
-    """
-    if fit:
-        unique_classes = y.unique()
-        total_samples = len(y)
-        if len(unique_classes) <= 5:
-            for cls in unique_classes:
-                freq = (y == cls).sum() / total_samples
-                if freq < 0.01:
-                    return X, y, {"skip_outliers": True}
-        return X, y, {"skip_outliers": False}
-    else:
-        return X, y, step_params
-
-
 def get_threshold_method(
-    column: pd.Series, max_sample_size: int = 5000
-) -> Literal["iqr"] | Literal["zscore"]:
+    column: pd.Series,
+    max_sample_size: int = 5000,
+) -> Literal["iqr", "zscore"]:
     """
-    Determine the appropriate statistical method to detect outliers for a specific
-    column. Uses the Shapiro-Wilk test for normality on sample sizes within
-    the `max_sample_size` limit.
+    Determine the method for outlier detection based on the distribution of a column.
 
-    Args:
-        column (pd.Series): Data column for normality test.
-        max_sample_size (int): Maximum size to run Shapiro-Wilk test.
+    This function applies a normality check to decide whether to use
+    the Interquartile Range (IQR) method or the Z-score method for outlier detection.
 
-    Returns:
-        str: 'zscore' if data is approximately normal and sample size is manageable;
-            'iqr' otherwise.
+    Logic:
+    - If the column has fewer than 3 samples (too small) or more than `max_sample_size` samples (too large),
+      default to IQR because Shapiro–Wilk normality test is unreliable at very small sizes
+      and computationally expensive for very large datasets.
+    - Otherwise, perform the Shapiro–Wilk test:
+        - If p-value > 0.05 → treat as approximately normal → return "zscore"
+        - Otherwise → return "iqr"
+
+    Parameters
+    ----------
+    column : pd.Series
+        Column of numerical values.
+    max_sample_size : int, default=5000
+        Maximum number of samples allowed for running the Shapiro–Wilk test.
+        Larger datasets will default to "iqr".
+
+    Returns
+    -------
+    Literal["iqr", "zscore"]
+        Chosen method for outlier detection:
+        - "zscore" → dataset is approximately normal
+        - "iqr"    → dataset is non-normal or data size not suitable for Shapiro test
     """
-    # Drop NaN values before normality test
+    # Remove NaN values before testing
     data = column.dropna()
 
-    # Use IQR if too few data points or too many
+    # Guard against too small or too large datasets
     if len(data) < 3 or len(data) > max_sample_size:
-        return "iqr"  # Skip Shapiro for large or too small datasets
-
-    stat, p_value = shapiro(data)
-
-    if p_value > 0.05:
-        return "zscore"
-    else:
         return "iqr"
+
+    # Shapiro-Wilk normality test
+    _, p_value = shapiro(data)
+
+    return "zscore" if p_value > 0.05 else "iqr"
 
 
 def outlier_imputation_order(
     X: pd.DataFrame,
-    y: pd.Series,
+    y: Optional[pd.Series],
     *,
     fit: bool,
     step_params: Dict[str, Any],
-    target_aware: bool = True,
     logger: Logger,
-    step_outputs: Dict[str, Any],
+    meta_data: Dict[str, Any],
     missing_threshold: float = 0.1,
     extreme_outlier_factor: float = 2.0,
 ) -> Tuple[pd.DataFrame, Optional[pd.Series], Optional[Dict[str, Any]]]:
     """
-    Decide whether outliers in a specific column should be handled before or after
-    missing value imputation.
+    Decide whether outliers in each numeric column should be handled before
+    or after missing value imputation.
 
-    The decision is based on:
-        - Presence of extreme outliers.
-        - Proportion of outliers relative to missing data.
-        - Distribution shape estimated by IQR or Z-score methods.
+    Logic:
+    - Non-numeric columns are ignored (labeled as "no_encoding").
+    - Columns with insufficient data (< 3 samples) default to "after_imputation".
+    - For numeric columns with enough data:
+        - The outlier detection method is chosen by `get_threshold_method`:
+          - "iqr": Interquartile Range method
+          - "zscore": Standard normal distribution check
+        - Standard outlier bounds are used to estimate outlier proportion.
+        - Amplified bounds (by `extreme_outlier_factor`) detect extreme outliers.
 
-    Args:
-        column (pd.Series): Column data including missing values.
-        missing_threshold (float): Missing value proportion threshold to consider low/high.
-        extreme_outlier_factor (float): Factor to enlarge thresholds for extreme outliers.
+    Decision criteria:
+    - Handle outliers **before imputation** if:
+        - Any extreme outliers are present, OR
+        - At least 10% of values are outliers while missingness is low (< missing_threshold).
+    - Otherwise, handle **after imputation**.
 
-    Returns:
-        str: 'before_imputation' or 'after_imputation' indicating outlier handling timing.
+    Parameters
+    ----------
+    X : pd.DataFrame
+        Feature matrix.
+    y : Optional[pd.Series]
+        Target vector (unchanged).
+    fit : bool
+        Whether called in "fit" mode (compute new logic) or "transform" mode (reuse parameters).
+    step_params : Dict[str, Any]
+        Dictionary for saving or reusing parameters across fit/transform stages.
+    logger : Logger
+        Logger for debug messages.
+    meta_data : Dict[str, Any]
+        Metadata dictionary. Must include "skip_outliers" key with {"skip_outliers": bool}.
+    missing_threshold : float, default=0.1
+        Maximum fraction of missing values tolerated when deciding "before imputation".
+    extreme_outlier_factor : float, default=2.0
+        Amplification factor for bounds when detecting extreme outliers.
+
+    Returns
+    -------
+    Tuple[pd.DataFrame, Optional[pd.Series], Optional[Dict[str, Any]]]
+        (Potentially unchanged) X, unchanged y, and updated step_params which includes:
+        - "before_or_after": dict mapping column → {"before_imputation" | "after_imputation" | "no_encoding"}
+        - "skip_outliers": bool flag from meta_data
+
+    Notes
+    -----
+    - If `fit` is False and `skip_outliers` is True, the function simply returns the inputs unchanged.
+    - This function depends on `get_threshold_method` for choosing outlier detection strategy.
     """
-    if fit or not step_outputs["skip_outliers"]["skip_outliers"]:
-        before_or_after = {}
-        for columnname in X.columns:
-            column = X[columnname].copy()
+    skip_outliers = meta_data.get("skip_outliers", {}).get(
+        "skip_outliers", False
+    )
+
+    if fit or not skip_outliers:
+        before_or_after: Dict[str, str] = {}
+
+        for column_name in X.columns:
+            column = X[column_name].copy()
+
+            # Skip non-numeric columns
             if not pd.api.types.is_numeric_dtype(column):
-                before_or_after[columnname] = "no_encoding"
+                before_or_after[column_name] = "no_encoding"
                 continue
+
+            # Drop NaN for analysis
             data = column.dropna()
             total_count = len(column)
             missing_pct = (
@@ -115,257 +138,249 @@ def outlier_imputation_order(
                 else 0
             )
 
+            # Not enough data to decide -> defer outlier handling
             if len(data) < 3:
-                # Not enough data to decide, default to after imputation
-                before_or_after[columnname] = "after_imputation"
+                before_or_after[column_name] = "after_imputation"
                 continue
 
+            # Pick thresholding method (IQR or Z-score)
             threshold_method = get_threshold_method(data)
 
-            # Calculate bounds for outlier detection, according to method
+            # Compute bounds using chosen method
             if threshold_method == "iqr":
-                Q1 = data.quantile(0.25)
-                Q3 = data.quantile(0.75)
+                Q1, Q3 = data.quantile(0.25), data.quantile(0.75)
                 IQR = Q3 - Q1
-                # Standard bounds
                 lower_bound = Q1 - 1.5 * IQR
                 upper_bound = Q3 + 1.5 * IQR
-                # Amplified bounds to detect extreme outliers
                 extreme_lower = Q1 - extreme_outlier_factor * 1.5 * IQR
                 extreme_upper = Q3 + extreme_outlier_factor * 1.5 * IQR
 
             elif threshold_method == "zscore":
-                mean = data.mean()
-                std = data.std()
-                # Standard bounds
+                mean, std = data.mean(), data.std(ddof=0)
                 lower_bound = mean - 3 * std
                 upper_bound = mean + 3 * std
-                # Amplified bounds for extreme outliers
                 extreme_lower = mean - extreme_outlier_factor * 3 * std
                 extreme_upper = mean + extreme_outlier_factor * 3 * std
 
-            else:
-                # Unsupported method fallback
-                before_or_after[columnname] = "after_imputation"
+            else:  # Fallback
+                before_or_after[column_name] = "after_imputation"
                 continue
 
-            # Detect outliers using the standard bounds:
+            # Detect standard and extreme outliers
             outliers = (data < lower_bound) | (data > upper_bound)
-            outliers_count = outliers.sum()
-            outliers_pct = outliers_count / len(data)
+            outliers_pct = outliers.sum() / len(data)
 
-            # Detect extreme outliers using amplified bounds:
             extreme_outliers = (data < extreme_lower) | (data > extreme_upper)
             extreme_outliers_count = extreme_outliers.sum()
 
-            # Decision logic:
-
-            # Handle outliers BEFORE imputation if:
-            # - The column has extreme outliers (significant number)
-            # - OR the proportion of outliers is high and missingness is low (outliers probably errors)
+            # Decision logic
             if extreme_outliers_count > 0:
-                before_or_after[columnname] = "before_imputation"
-                continue
+                before_or_after[column_name] = "before_imputation"
+            elif outliers_pct > 0.1 and missing_pct < missing_threshold:
+                before_or_after[column_name] = "before_imputation"
+            else:
+                before_or_after[column_name] = "after_imputation"
 
-            if outliers_pct > 0.1 and missing_pct < missing_threshold:
-                # More than 10% outliers and missingness low means outliers likely distort
-                before_or_after[columnname] = "before_imputation"
-                continue
+        step_params = {
+            "before_or_after": before_or_after,
+            "skip_outliers": skip_outliers,
+        }
 
-                # Otherwise, handle outliers after imputation
-            before_or_after[columnname] = "after_imputation"
-
-        return (
-            X,
-            y,
-            {
-                "before_or_after": before_or_after,
-                "skip_outliers": step_outputs["skip_outliers"]["skip_outliers"],
-            },
+        logger.debug(
+            f"[GREEN]- Outlier imputation strategy decided for {len(before_or_after)} columns."
         )
-    else:
         return X, y, step_params
+
+    # If skipping outlier handling entirely
+    logger.debug("[GREEN]- Skipping outlier handling based on meta_data.")
+    return X, y, step_params
 
 
 def decide_outlier_handling_method(
     column: pd.Series,
     min_large_dataset: int = 1000,
-    max_drop_outlier_pct: float = 0.05,
+    max_drop_outlier_pct: float = 0.05,  # kept for compatibility, now influences "cap" vs "impute"
     missing_threshold: float = 0.1,
     extreme_outlier_factor: float = 2.0,
-) -> Literal["impute"] | Literal["cap"] | Literal["drop"]:
+) -> Literal["impute", "cap"]:
     """
-    Decide how to treat outliers in a given column: drop rows, cap values, or impute.
+    Decide the method to handle outliers in a numeric column without dropping rows.
 
-    Logic depends on:
-        - Dataset size.
-        - Percent of outlier values.
-        - Missing data proportion.
-        - Presence of extreme outliers.
+    Since dropping rows is not allowed in a transform pipeline context (to avoid
+    misalignment with the target variable), this function only returns either:
+    - "cap": replace extreme values with threshold limits
+    - "impute": replace detected outliers with imputed values
 
-    Args:
-        column (pd.Series): Column data with potential outliers.
-        min_large_dataset (int): Dataset size for "large" classification.
-        max_drop_outlier_pct (float): Max % outliers allowed for safe row dropping.
-        missing_threshold (float): Threshold for high missingness to favor imputation.
-        extreme_outlier_factor (float): Multiplier for extreme outlier detection.
+    Logic
+    -----
+    1. If not enough data (< 3 samples) → "impute"
+    2. If extreme outliers exist → "cap"
+    3. If missingness is high (> missing_threshold)
+       OR outlier proportion is moderate/high (> max_drop_outlier_pct) → "impute"
+    4. Otherwise (mild outliers, tolerable missingness) → "cap"
 
-    Returns:
-        str: One of 'drop', 'cap', or 'impute' indicating chosen outlier handling method.
+    Parameters
+    ----------
+    column : pd.Series
+        Numeric column to evaluate.
+    min_large_dataset : int, default=1000
+        (Retained for compatibility, but no longer used to trigger "drop").
+    max_drop_outlier_pct : float, default=0.05
+        Threshold for deciding whether outliers are "moderate/high"; used to switch
+        between "cap" vs "impute".
+    missing_threshold : float, default=0.1
+        If missing ratio > threshold → prefer "impute".
+    extreme_outlier_factor : float, default=2.0
+        Multiplier to expand bounds and detect extreme outliers.
+
+    Returns
+    -------
+    Literal["impute", "cap"]
+        Strategy to handle outliers:
+        - "cap"    : clip/cap values within threshold bounds
+        - "impute" : replace with imputed estimates
+
+    Notes
+    -----
+    - Uses `get_threshold_method` (IQR or Z-score) for boundary calculation.
+    - Dropping rows is explicitly disallowed in this context.
     """
+    # Drop NaNs for outlier evaluation
     data = column.dropna()
     n = len(data)
     missing_pct = (len(column) - n) / len(column) if len(column) > 0 else 0
 
+    # Not enough data → safest option
     if n < 3:
-        # Not enough data to decide meaningfully, default to 'impute'
         return "impute"
 
+    # Outlier detection method
     threshold_method = get_threshold_method(data)
 
-    # Calculate bounds for outliers
+    # Compute outlier bounds
     if threshold_method == "iqr":
-        Q1 = data.quantile(0.25)
-        Q3 = data.quantile(0.75)
+        Q1, Q3 = data.quantile(0.25), data.quantile(0.75)
         IQR = Q3 - Q1
-
-        lower_bound = Q1 - 1.5 * IQR
-        upper_bound = Q3 + 1.5 * IQR
-
+        lower_bound, upper_bound = Q1 - 1.5 * IQR, Q3 + 1.5 * IQR
         extreme_lower = Q1 - extreme_outlier_factor * 1.5 * IQR
         extreme_upper = Q3 + extreme_outlier_factor * 1.5 * IQR
 
     elif threshold_method == "zscore":
-        mean = data.mean()
-        std = data.std()
-
-        lower_bound = mean - 3 * std
-        upper_bound = mean + 3 * std
-
+        mean, std = data.mean(), data.std(ddof=0)
+        lower_bound, upper_bound = mean - 3 * std, mean + 3 * std
         extreme_lower = mean - extreme_outlier_factor * 3 * std
         extreme_upper = mean + extreme_outlier_factor * 3 * std
 
-    else:
-        # Fallback, safest to cap
+    else:  # Fallback
         return "cap"
 
+    # Detect outliers
     outliers = (data < lower_bound) | (data > upper_bound)
-    outlier_pct = outliers.sum() / n if n > 0 else 0
+    outlier_pct = outliers.mean()
+    extreme_outlier_count = (
+        (data < extreme_lower) | (data > extreme_upper)
+    ).sum()
 
-    extreme_outliers = (data < extreme_lower) | (data > extreme_upper)
-    extreme_outlier_count = extreme_outliers.sum()
-
-    # Decision logic:
-
-    # 1. If dataset is large (>= min_large_dataset),
-    #    and outlier percentage is small enough (<= max_drop_outlier_pct),
-    #    and there are some outliers → drop rows to clean data aggressively.
-    if (
-        (n >= min_large_dataset)
-        and (outlier_pct <= max_drop_outlier_pct)
-        and (outlier_pct > 0)
-    ):
-        return "drop"
-
-    # 2. If there are extreme outliers, but dropping too many rows would lose data, cap them.
+    # 1. Extreme outliers → cap
     if extreme_outlier_count > 0:
         return "cap"
 
-    # 3. If missing data proportion is high or outlier % is moderate/large,
-    #    imputing is safer to avoid losing data or bias.
+    # 2. Significant missingness or too many outliers → impute
     if missing_pct > missing_threshold or outlier_pct > max_drop_outlier_pct:
         return "impute"
 
-    # 4. Default fallback to cap
+    # 3. Otherwise, mild outliers → cap safely
     return "cap"
 
 
 def handle_outliers(
     X: pd.DataFrame,
-    y: pd.Series,
+    y: Optional[pd.Series],
     *,
     fit: bool,
     step_params: Dict[str, Any],
-    target_aware: bool = True,
     logger: Logger,
-    step_outputs: Dict[str, Any],
+    meta_data: Dict[str, Any],
     before: bool = True,
 ) -> Tuple[pd.DataFrame, Optional[pd.Series], Optional[Dict[str, Any]]]:
     """
-    Detects and handles outliers on specified columns of the training dataset.
-    Applies same transformations consistently on validation, test, and optional test datasets.
+    Detect and handle outliers in numeric columns by either capping
+    them within calculated bounds or imputing their values (typically median).
+    This function does not drop any rows, ensuring feature-target alignment.
 
-    Supported methods: 'drop' (drop rows), 'cap' (clip values), 'impute' (median imputation).
-    Supports threshold methods: 'iqr' or 'zscore'.
+    Logic (fit/transform pattern)
+    -----------------------------
+    - During 'fit':
+        1. Decide which columns require outlier handling "before_imputation" or "after_imputation"
+           using meta_data['outlier_imputation_order']["before_or_after"].
+        2. For relevant columns, detect outliers by chosen threshold method (IQr or Z-score).
+        3. Decide for each column whether to cap or impute (median), as per decide_outlier_handling_method.
+        4. Store the chosen bounds/method per column in step_params.
 
-    Args:
-        columns (List[str]): Columns to handle outliers on.
-        before_or_after (str): Description of whether handling is before or after imputation.
-        method (str): Optional explicit method for handling outliers; if empty auto-decides.
-        threshold_method (str): Optional choice of threshold method; if empty auto-decides.
+    - During 'transform':
+        1. Use stored bounds/methods to cap or impute outliers in each column.
+
+    Parameters
+    ----------
+    X : pd.DataFrame
+        Feature dataframe to process.
+    y : Optional[pd.Series]
+        Target series (unchanged).
+    fit : bool
+        If True, method decides thresholds and stores processing instructions.
+        If False, applies stored instructions.
+    step_params : Dict[str, Any]
+        Dictionary for storing/retrieving outlier handling details.
+    logger : Logger
+        Logger for status/debug output.
+    meta_data : Dict[str, Any]
+        Metadata dictionary from preprocessing pipeline, must contain outlier handling order.
+    before : bool, default=True
+        If True, process columns flagged for 'before_imputation';
+        otherwise, process those flagged for 'after_imputation'.
+
+    Returns
+    -------
+    Tuple[pd.DataFrame, Optional[pd.Series], Optional[Dict[str, Any]]]
+        Updated X, unchanged y, and new step_params with per-column outlier handling info (on 'fit').
     """
     if fit:
-
-        logger.debug(
-            msg=f"[GREEN]- Handling outliers {'before missing values' if before else 'after missing values'} imputation"
+        X_work = X.copy()
+        # Determine which columns to process based on outlier imputation order
+        requested_order = "before_imputation" if before else "after_imputation"
+        before_or_after = meta_data.get("outlier_imputation_order", {}).get(
+            "before_or_after", {}
         )
-        X_train = X.copy()
-        current_cols: List[str] = []
-        to_find: str = "before_imputation" if before else "after_imputation"
-        before_or_after = step_outputs["outlier_imputation_order"][
-            "before_or_after"
+        # Only select columns in X (ignore those dropped earlier)
+        columns_to_process = [
+            col
+            for col, order in before_or_after.items()
+            if order == requested_order and col in X_work.columns
         ]
-        for col, value in before_or_after.items():
-            if value == to_find:
-                # remove columns that are already solved by encoding
-                if col in X_train.columns:
-                    current_cols.append(col)
+
         outlier_columns: Dict[str, Any] = {}
-
-        for col in X_train[current_cols].columns:
-            cur_threshold_method = get_threshold_method(column=X_train[col])
-            if cur_threshold_method == "iqr":
-                Q1 = X_train[col].quantile(0.25)
-                Q3 = X_train[col].quantile(0.75)
+        for col in columns_to_process:
+            threshold_method = get_threshold_method(X_work[col])
+            # Calculate bounds
+            if threshold_method == "iqr":
+                Q1, Q3 = X_work[col].quantile(0.25), X_work[col].quantile(0.75)
                 IQR = Q3 - Q1
-                lower_bound = Q1 - 1.5 * IQR
-                upper_bound = Q3 + 1.5 * IQR
-            else:
-                mean = X_train[col].mean()
-                std = X_train[col].std()
-                lower_bound = mean - 3 * std
-                upper_bound = mean + 3 * std
+                lower_bound, upper_bound = Q1 - 1.5 * IQR, Q3 + 1.5 * IQR
+            else:  # zscore
+                mean, std = X_work[col].mean(), X_work[col].std(ddof=0)
+                lower_bound, upper_bound = mean - 3 * std, mean + 3 * std
 
-            # Identify outliers in train set
-            outliers_train = (X_train[col] < lower_bound) | (
-                X_train[col] > upper_bound
+            outlier_mask = (X_work[col] < lower_bound) | (
+                X_work[col] > upper_bound
             )
+            handling_method = decide_outlier_handling_method(X_work[col])
 
-            cur_method = decide_outlier_handling_method(X_train[col])
-
-            # if outliers_train.sum() == 0:
-            #     outlier_columns[col] = {"method":"skip"}
-            #     continue
-            if cur_method == "drop":
-                # Drop rows with outliers in train set
-                X_train: pd.DataFrame = X_train.loc[~outliers_train]
-
-                # Also drop these rows in y_train if applicable
-                y = y.loc[X_train.index]
-                outlier_columns[col] = {
-                    "lower_bound": lower_bound,
-                    "upper_bound": upper_bound,
-                    "method": "drop",
-                }
-                logger.debug(
-                    msg=f"[GREEN]- {outliers_train.sum()} outliers in column {col} dropped"
+            if handling_method == "cap":
+                X_work[col] = np.where(
+                    X_work[col] < lower_bound, lower_bound, X_work[col]
                 )
-            elif cur_method == "cap":
-                X_train[col] = np.where(
-                    X_train[col] < lower_bound, lower_bound, X_train[col]
-                )
-                X_train[col] = np.where(
-                    X_train[col] > upper_bound, upper_bound, X_train[col]
+                X_work[col] = np.where(
+                    X_work[col] > upper_bound, upper_bound, X_work[col]
                 )
                 outlier_columns[col] = {
                     "lower_bound": lower_bound,
@@ -373,33 +388,40 @@ def handle_outliers(
                     "method": "cap",
                 }
                 logger.debug(
-                    msg=f"[GREEN]  - {outliers_train.sum()} outliers in column {col} capped between {X_train[col].min()} and {X_train[col].max()}"
+                    f"[GREEN] - {outlier_mask.sum()} outliers in column '{col}' capped "
+                    f"between {lower_bound:.5g} and {upper_bound:.5g}"
                 )
-            else:  # cur_method == "impute"
-                median: float = X_train[col].median()
-
-                X_train.loc[outliers_train, col] = median
+            else:  # "impute"
+                median_val: float = X_work[col].median()
+                X_work.loc[outlier_mask, col] = median_val
                 outlier_columns[col] = {
                     "lower_bound": lower_bound,
                     "upper_bound": upper_bound,
                     "method": "median",
-                    "median": median,
+                    "median": median_val,
                 }
                 logger.debug(
-                    msg=f"[GREEN]  - {outliers_train.sum()} outliers in column {col} imputed with median {median}"
+                    f"[GREEN] - {outlier_mask.sum()} outliers in column '{col}' imputed with median {median_val:.5g}"
                 )
-        return X_train, y, {"outlier_columns": outlier_columns}
+
+        return X_work, y, {"outlier_columns": outlier_columns}
     else:
-        for col, value in step_params["outlier_columns"].items():
-            lower_bound = value["lower_bound"]
-            upper_bound = value["upper_bound"]
-            outliers_train = (X[col] < lower_bound) | (X[col] > upper_bound)
-            if value["method"] == "drop":
-                pass
-            elif value["method"] == "cap":
+        logger.debug(
+            f"[GREEN]- Handling outliers {'before missing values' if before else 'after missing values'} imputation"
+        )
+        for col, meta in step_params.get("outlier_columns", {}).items():
+            lower_bound = meta["lower_bound"]
+            upper_bound = meta["upper_bound"]
+            outlier_mask = (X[col] < lower_bound) | (X[col] > upper_bound)
+            if meta["method"] == "cap":
                 X[col] = np.where(X[col] < lower_bound, lower_bound, X[col])
                 X[col] = np.where(X[col] > upper_bound, upper_bound, X[col])
-            else:  # value["method"] == "median"
-                X.loc[outliers_train, col] = value["median"]
-
+                logger.debug(
+                    f"[GREEN] - {outlier_mask.sum()} outliers in column '{col}' capped between {lower_bound:.5g} and {upper_bound:.5g}"
+                )
+            else:  # "median" impute
+                X.loc[outlier_mask, col] = meta["median"]
+                logger.debug(
+                    f"[GREEN] - {outlier_mask.sum()} outliers in column '{col}' imputed with median {meta['median']:.5g}"
+                )
         return X, y, {}

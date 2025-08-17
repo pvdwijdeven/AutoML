@@ -25,7 +25,7 @@ from xgboost import XGBRegressor
 models = {
     "binary_classification": {
         "logistic_regression": LogisticRegression(max_iter=1000),
-        "random_forest": RandomForestClassifier(n_estimators=100),
+        "random_forest": RandomForestClassifier(n_estimators=500),
         "svc": SVC(probability=True),
         "knn": KNeighborsClassifier(n_neighbors=11),
         "gradient_boosting": GradientBoostingClassifier(),
@@ -68,4 +68,29 @@ models = {
         ),
         "xgboost_regressor": XGBRegressor(n_estimators=100, random_state=42),
     },
+}
+
+
+model_class_map = {
+    "logistic_regression": LogisticRegression(),
+    "random_forest": RandomForestClassifier(),
+    "svc": SVC(),
+    "knn": KNeighborsClassifier(),
+    "gradient_boosting": GradientBoostingClassifier(),
+    "naive_bayes": GaussianNB(),
+    "extra_trees": ExtraTreesClassifier(),
+    "adaboost": AdaBoostClassifier(),
+    "mlp": MLPClassifier(),
+    "linear_discriminant_analysis": LinearDiscriminantAnalysis(),
+    "linear_regression": LinearRegression(),
+    "ridge_regression": Ridge(),
+    "lasso_regression": Lasso(),
+    "elasticnet_regression": ElasticNet(),
+    "bayesian_ridge_regression": BayesianRidge(),
+    "random_forest_regressor": RandomForestRegressor(),
+    "gradient_boosting_regressor": GradientBoostingRegressor(),
+    "svr": SVR(),
+    "knn_regressor": KNeighborsRegressor(),
+    "mlp_regressor": MLPRegressor(),
+    "xgboost_regressor": XGBRegressor(),
 }

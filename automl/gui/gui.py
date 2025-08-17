@@ -1,6 +1,6 @@
 import wx
 from eda import AutoML_EDA
-from modelling import AutoML_Modeling
+from modelling import AutomlModeling
 from pathlib import Path
 from library import Logger, TextCtrlHandler, WxTextRedirector
 import logging
@@ -277,7 +277,7 @@ class AutoMLFrame(wx.Frame):
 
         self.buttons_info["StartEDA"]["label"].SetLabel(result)
         assert current_EDA.df_train is not None
-        self.mymodels = AutoML_Modeling(
+        self.mymodels = AutomlModeling(
             target=current_EDA.target,
             X_train=current_EDA.df_train,
             df_test=current_EDA.df_test,
