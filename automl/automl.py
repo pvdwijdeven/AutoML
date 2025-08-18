@@ -20,6 +20,11 @@ def automl(*args):
         default="",
     )
     parser.add_argument(
+        "--scoring",
+        help="Strategy to evaluate the performance of the model on the test set.",
+        default="",
+    )
+    parser.add_argument(
         "--description",
         help="filename for column info - see readme for format",
         default="",

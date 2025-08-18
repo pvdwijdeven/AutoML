@@ -187,6 +187,20 @@ def summarize_results(
     )
 
 
+def get_scoring(scoring: str = "", dataset_type: str = "") -> str:
+    if scoring == "":
+        if dataset_type in [
+            "binary_classification",
+            "imbalanced_binary_classification",
+        ]:
+            scoring = "roc_auc"
+        elif dataset_type == "regression":
+            scoring = "r2"
+        else:
+            scoring = "accuracy"
+    return scoring
+
+
 def write_to_output(
     output_file, summary_df, top_models, best_grid, final_result
 ) -> None:

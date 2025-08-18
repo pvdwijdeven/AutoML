@@ -6,7 +6,9 @@ import numpy as np
 import pandas as pd
 
 
-def run_kfold_evaluation(X, y, models, dataset_type, logger, folds=5):
+def run_kfold_evaluation(
+    X, y, models, dataset_type, logger, scoring="", folds=5
+):
     """
     Runs K-Fold cross-validation using AutomlTransformer and the models
     defined for the given dataset type.
@@ -49,15 +51,6 @@ def run_kfold_evaluation(X, y, models, dataset_type, logger, folds=5):
         )
 
         # Pick scoring metric
-        if dataset_type in [
-            # "binary_classification",
-            "imbalanced_binary_classification",
-        ]:
-            scoring = "roc_auc"
-        elif dataset_type == "regression":
-            scoring = "r2"
-        else:
-            scoring = "accuracy"
 
         scores = cross_val_score(pipeline, X, y, cv=kf, scoring=scoring)
         results[model_name] = {
@@ -71,6 +64,7 @@ def run_kfold_evaluation(X, y, models, dataset_type, logger, folds=5):
 
 def run_kfold_grid_search(
     dataset_type,
+    scoring,
     top_models,
     param_grids,
     X,
@@ -131,7 +125,7 @@ def run_kfold_grid_search(
             estimator=pipeline,
             param_grid=param_grid,
             cv=cv,
-            scoring="accuracy",
+            scoring=scoring,
             n_jobs=-1,
             verbose=1,
             refit=True,

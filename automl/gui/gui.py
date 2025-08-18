@@ -44,6 +44,10 @@ class AutoMLFrame(wx.Frame):
                 "text": "target column",
                 "function": lambda event: self.on_get_target(),
             },
+            "scoring": {
+                "text": "scoring method",
+                "function": lambda event: self.on_get_scoring(),
+            },
             "description": {
                 "text": "Select description file",
                 "function": lambda event: self.on_open_file("description"),
@@ -183,6 +187,10 @@ class AutoMLFrame(wx.Frame):
             target = args.target
             self.buttons_info["target"]["label"].SetLabel(f"{target}")
             self.logger.debug("[GREEN]target from command line")
+        if args.scoring:
+            scoring = args.scoring
+            self.buttons_info["scoring"]["label"].SetLabel(f"{scoring}")
+            self.logger.debug("[GREEN]scoring from command line")
         if args.nogui:
             self.nogui = True
             self.logger.info("[GREEN]CLI mode, GUI will not be shown")
@@ -214,6 +222,15 @@ class AutoMLFrame(wx.Frame):
         if dlg.ShowModal() == wx.ID_OK:
             title = dlg.GetValue()
             self.buttons_info["target"]["label"].SetLabel(title)
+        dlg.Destroy()
+
+    def on_get_scoring(self):
+        dlg = wx.TextEntryDialog(
+            self, "Enter scoring method:", "Scoring method"
+        )
+        if dlg.ShowModal() == wx.ID_OK:
+            title = dlg.GetValue()
+            self.buttons_info["scoring"]["label"].SetLabel(title)
         dlg.Destroy()
 
     def on_open_file(self, kind: str):
@@ -267,6 +284,7 @@ class AutoMLFrame(wx.Frame):
             file_test=self.buttons_info["test"]["label"].GetLabel(),
             title=self.buttons_info["title"]["label"].GetLabel(),
             target=self.buttons_info["target"]["label"].GetLabel(),
+            scoring=self.buttons_info["scoring"]["label"].GetLabel(),
             description=self.buttons_info["description"]["label"].GetLabel(),
             nogui=self.nogui,
             update_script=self.buttons_info["update_script"][
@@ -279,6 +297,7 @@ class AutoMLFrame(wx.Frame):
         assert current_EDA.df_train is not None
         self.mymodels = AutomlModeling(
             target=current_EDA.target,
+            scoring=self.buttons_info["scoring"]["label"].GetLabel(),
             X_train=current_EDA.df_train,
             df_test=current_EDA.df_test,
             output_file=self.buttons_info["OutputFile"]["label"].GetLabel(),
@@ -286,30 +305,3 @@ class AutoMLFrame(wx.Frame):
         )
         if self.nogui:
             self.on_exit(event=None)
-
-    # def on_start_prepro(self):
-    #     thread = threading.Thread(target=self.actual_prepro)
-    #     thread.start()
-
-    # def actual_prepro(self):
-    #     # Placeholder for EDA functionality
-    #     self.buttons_info["Startprepro"]["label"].SetLabel(
-    #         "preprocessing started"
-    #     )
-    #     current_prepro = AutoML_Preprocess_old(
-    #         report_file=self.buttons_info["ReportFile"]["label"].GetLabel(),
-    #         file_train=self.buttons_info["training"]["label"].GetLabel(),
-    #         file_test=self.buttons_info["test"]["label"].GetLabel(),
-    #         title=self.buttons_info["title"]["label"].GetLabel(),
-    #         target=self.buttons_info["target"]["label"].GetLabel(),
-    #         description=self.buttons_info["description"]["label"].GetLabel(),
-    #         nogui=self.nogui,
-    #         update_script=self.buttons_info["update_script"][
-    #             "label"
-    #         ].GetLabel(),
-    #         logger=self.logger,
-    #     )
-    #     result = current_prepro.preprocess()
-    #     self.buttons_info["Startprepro"]["label"].SetLabel(result)
-    #     if self.nogui:
-    #         self.on_exit(event=None)

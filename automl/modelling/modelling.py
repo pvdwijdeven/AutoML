@@ -8,7 +8,7 @@ from .modelselection import (
     create_results_html_table,
     get_best_model_name,
 )
-from .scoring import select_top_models, write_to_output
+from .scoring import select_top_models, write_to_output, get_scoring
 from .hypertuning import param_grids, param_grids_detailed
 
 # external libraries
@@ -23,6 +23,7 @@ class AutomlModeling:
     def __init__(
         self,
         target: str,
+        scoring: str,
         X_train: pd.DataFrame,
         y_train: Optional[pd.Series] = None,
         df_test: Optional[pd.DataFrame] = None,
@@ -55,6 +56,8 @@ class AutomlModeling:
         )
         meta_data["target"] = self.target
         self.dataset_type: str = meta_data["dataset_type"]
+        self.scoring = get_scoring(scoring, self.dataset_type)
+        meta_data["scoring"] = self.scoring
         self.logger.info(msg=f"[BLUE] Dataset type: {self.dataset_type}")
         self.split_validation_data()
         self.logger.info(msg="[MAGENTA] Starting primarily model selction")
@@ -64,6 +67,7 @@ class AutomlModeling:
             models=models,
             dataset_type=self.dataset_type,
             logger=self.logger,
+            scoring=self.scoring,
         )
         df_results = pd.DataFrame(
             [
@@ -81,6 +85,7 @@ class AutomlModeling:
         )
         best_grid_model = run_kfold_grid_search(
             dataset_type=self.dataset_type,
+            scoring=self.scoring,
             top_models=top_selection,
             param_grids=param_grids,
             X=self.X_val_full,
@@ -91,6 +96,7 @@ class AutomlModeling:
         self.logger.info(msg=f"Best model: {best_model}, score: {best_score}")
         final_result = run_kfold_grid_search(
             dataset_type=self.dataset_type,
+            scoring=self.scoring,
             top_models=[{"model_name": best_model}],
             param_grids=param_grids_detailed,
             X=self.X_val_full,

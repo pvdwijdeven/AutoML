@@ -43,6 +43,7 @@ class AutoML_EDA:
         file_test (str): Path to the test dataset file (optional).
         title (str): Title for the EDA report.
         target (str): Name of the target column for analysis.
+        scoring (str): Name of scoring method.
         description (str): Path to a file containing column descriptions (optional).
         nogui (bool): If True, disables GUI-related logging.
         update_script (str): Path to a user-defined script for custom DataFrame updates (optional).
@@ -71,6 +72,7 @@ class AutoML_EDA:
             file_test="test.csv",
             title="My Dataset",
             target="target_column",
+            scoring="scoring_method",
             description="column_descriptions.txt"
         eda.perform_eda()
     """
@@ -82,6 +84,7 @@ class AutoML_EDA:
         file_test: str = "",
         title: str = "",
         target: str = "",
+        scoring: str = "",
         description: str = "",
         nogui: bool = True,
         update_script: str = "",
@@ -93,6 +96,7 @@ class AutoML_EDA:
         self.file_test = file_test
         self.title = title
         self.target = target
+        self.scoring = scoring
         self.description = description
         self.nogui = nogui
         self.update_script = update_script
