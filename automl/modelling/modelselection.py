@@ -1,3 +1,4 @@
+from typing import Callable
 from preprocessing import AutomlTransformer
 from .models import model_class_map
 from sklearn.pipeline import Pipeline
@@ -7,7 +8,7 @@ import pandas as pd
 
 
 def run_kfold_evaluation(
-    X, y, models, dataset_type, logger, scoring="", folds=5
+    X, y, models, dataset_type, logger, scoring: str | Callable = "", folds=5
 ):
     """
     Runs K-Fold cross-validation using AutomlTransformer and the models

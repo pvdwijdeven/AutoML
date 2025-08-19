@@ -135,7 +135,7 @@ class TargetTransformer:
         y_scaled = self.scaler.transform(y_transformed)
         return y_scaled.flatten()
 
-    def inverse_transform(self, y_scaled: pd.Series | np.ndarray) -> np.ndarray:
+    def inverse_transform(self, y: pd.Series | np.ndarray) -> np.ndarray:
         """
         Inverse transforms scaled target data back to the original scale.
 
@@ -145,9 +145,9 @@ class TargetTransformer:
         Returns:
             np.ndarray: Original scale target values as 1D array.
         """
-        if isinstance(y_scaled, pd.Series):
-            y_scaled = np.asanyarray(y_scaled)
-        y_transformed = self.scaler.inverse_transform(y_scaled.reshape(-1, 1))
+        if isinstance(y, pd.Series):
+            y = np.asanyarray(y)
+        y_transformed = self.scaler.inverse_transform(y.reshape(-1, 1))
         y_original = self.pt.inverse_transform(y_transformed)
         return y_original.flatten()
 

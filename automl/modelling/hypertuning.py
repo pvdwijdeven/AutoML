@@ -296,7 +296,6 @@ param_grids_detailed = {
                 "sag",
                 "saga",
             ],
-            "normalize": [True, False],
         },
         "lasso_regression": {
             "alpha": np.logspace(-3, 1, 5),  # [0.001, ..., 10]

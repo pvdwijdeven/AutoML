@@ -8,7 +8,9 @@ from sklearn.metrics import (
 )
 from math import sqrt
 import numpy as np
-from typing import Tuple, Any, List, Dict
+from typing import Tuple, Any, List, Dict, Callable
+
+from sklearn.metrics import make_scorer, get_scorer
 
 scoring_per_dataset_type = {
     "binary_classification": "accuracy",
@@ -19,6 +21,32 @@ scoring_requirement = {
     "accuracy": "high",
     "lrmse": "low",
 }
+
+
+def flexible_scorer(estimator, X, y, scorer_param):
+    """
+    Wrapper function to score estimator on (X, y) using scorer_param.
+    scorer_param can be:
+      - a string (built-in scorer name)
+      - a callable scorer object with signature scorer(estimator, X, y)
+    """
+    if isinstance(scorer_param, str):
+        # Use scikit-learn's get_scorer to retrieve scorer by name
+        scorer_func = get_scorer(scorer_param)
+        return scorer_func(estimator, X, y)
+    elif callable(scorer_param):
+        # If it's a custom callable scorer, call it directly
+        return scorer_param(estimator, X, y)
+    else:
+        raise ValueError("scorer_param must be a string or a callable scorer")
+
+
+# Define LRMSE scorer
+def lrmse(y_true, y_pred):
+    return np.sqrt(np.mean((np.log(y_true) - np.log(y_pred)) ** 2))
+
+
+lrmse_scorer: Callable = make_scorer(score_func=lrmse, greater_is_better=False)
 
 
 def get_score(
