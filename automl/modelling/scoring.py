@@ -229,17 +229,7 @@ def get_scoring(scoring: str = "", dataset_type: str = "") -> str:
     return scoring
 
 
-def write_to_output(
-    output_file, summary_df, top_models, best_grid, final_result
-) -> None:
-    html = "<h3>Scoring Table:</h3>"
-    html += summary_df.to_html(index=False, float_format=lambda x: f"{x:.4f}")
-    html += "<h3>Top models:</h3>"
-    html += top_models.to_html(index=False, float_format=lambda x: f"{x:.4f}")
-    html += "<h3>Best grid:</h3>"
-    html += best_grid
-    html += "<h3>Final result:</h3>"
-    html += final_result
+def write_to_output(html, output_file) -> None:
 
     with open(output_file, "w") as f:
         f.write(html)

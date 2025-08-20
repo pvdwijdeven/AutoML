@@ -1,11 +1,10 @@
 # internal libraries
-from preprocessing import preprocess
+from preprocessing import preprocess, AutomlTransformer
 from library import Logger
 from .models import models
 from .modelselection import (
     run_kfold_evaluation,
     run_kfold_grid_search,
-    create_results_html_table,
     get_best_model_name,
 )
 from .scoring import (
@@ -15,6 +14,7 @@ from .scoring import (
     lrmse_scorer,
     flexible_scorer,
 )
+from .report import create_report
 from .hypertuning import param_grids, param_grids_detailed
 
 # external libraries
@@ -35,6 +35,7 @@ class AutomlModeling:
         X_original: pd.DataFrame,
         y_original: Optional[pd.Series] = None,
         df_test: Optional[pd.DataFrame] = None,
+        title: str = "",
         output_file: str = "",
         logger: Optional[Logger] = None,
     ) -> None:
@@ -52,6 +53,8 @@ class AutomlModeling:
         self.output_file: str = output_file
         self.df_test = df_test
         self.scoring = scoring
+        self.title = title
+        self.meta_data = {}
         if logger is None:
             self.logger = Logger(
                 level_console=Logger.INFO,
@@ -69,7 +72,10 @@ class AutomlModeling:
         self.X_val_prepro, self.y_val_prepro, self.meta_data = preprocess(
             X=self.X_val, y=self.y_val, logger=self.logger
         )
+        self.meta_data["X_train_val_size"] = self.X_val.shape
+        self.meta_data["X_prepro_size"] = self.X_val_prepro.shape
         self.meta_data["target"] = self.target
+        self.meta_data["title"] = self.title
         self.dataset_type: str = self.meta_data["dataset_type"]
         self.scoring = get_scoring(self.scoring, self.dataset_type)
         if self.scoring == "lrmse":
@@ -99,16 +105,15 @@ class AutomlModeling:
                         "model": model,
                         "mean_score": details["mean_score"],
                         "std_score": details["std_score"],
+                        "time_taken": details["time_taken"],
                     }
                     for model, details in results.items()
                 ]
             )
             top_selection = select_top_models(summary_df=df_results)
-            self.save_step(
-                step=1, obj=(df_results, top_selection, self.meta_data)
-            )
+            self.save_step(step=1, obj=(df_results, results, top_selection))
         else:
-            df_results, top_selection, self.meta_data = checkpoint
+            df_results, results, top_selection = checkpoint
 
         self.logger.info(
             msg=f"[MAGENTA] Starting hypertuning top X model selction ({df_results})"
@@ -126,9 +131,9 @@ class AutomlModeling:
                 y=self.y_val_prepro,
                 logger=self.logger,
             )
-            self.save_step(step=2, obj=(best_grid_model, self.meta_data))
+            self.save_step(step=2, obj=(best_grid_model))
         else:
-            best_grid_model, self.meta_data = checkpoint
+            best_grid_model = checkpoint
 
         best_model_name, best_score = get_best_model_name(
             results=best_grid_model
@@ -137,7 +142,7 @@ class AutomlModeling:
             msg=f"[MAGENTA]Best model: {best_model_name}, score: {best_score}"
         )
 
-        # Step 3 hyperparameter tuning on best model of step 2 is done
+        # Step 3 hyperparameter tuning on best model of step 2
         checkpoint = self.load_step(step=3)
         if checkpoint is None:
             fine_tuned_model = run_kfold_grid_search(
@@ -149,17 +154,13 @@ class AutomlModeling:
                 y=self.y_val_prepro,
                 logger=self.logger,
             )
-            self.save_step(step=3, obj=(fine_tuned_model, self.meta_data))
+            self.save_step(step=3, obj=(fine_tuned_model))
         else:
-            fine_tuned_model, self.meta_data = checkpoint
+            fine_tuned_model = checkpoint
 
-        write_to_output(
-            output_file=self.output_file,
-            summary_df=df_results,
-            top_models=pd.DataFrame(data=top_selection),
-            best_grid=create_results_html_table(best_grid_model),
-            final_result=create_results_html_table(fine_tuned_model),
-        )
+        self.meta_data["step1"] = results
+        self.meta_data["step2"] = best_grid_model
+        self.meta_data["step3"] = fine_tuned_model
         best_model_name, best_score = get_best_model_name(
             results=fine_tuned_model
         )
@@ -178,29 +179,50 @@ class AutomlModeling:
             ].transform(y=self.y_final_test)
         checkpoint = self.load_step(step=4)
         if checkpoint is None:
-            best_model = next(iter(fine_tuned_model.values()))["best_estimator"]
-            best_model.fit(self.X_val_prepro, self.y_val_prepro)
+            best_model = next(iter(fine_tuned_model.values()))[
+                "best_estimator"
+            ].named_steps["model"]
+            best_estimator = next(iter(fine_tuned_model.values()))[
+                "best_estimator"
+            ]
+            self.meta_data["num_features"] = best_model.n_features_in_
+            transformer = AutomlTransformer(logger=self.logger)
+            transformer.fit(
+                X_train=self.X_val_prepro, y_train=self.y_val_prepro
+            )
+            self.X_val_trans = transformer.transform(X=self.X_val_prepro)
+            self.X_test_trans = transformer.transform(X=self.X_final_test)
+            best_model.fit(self.X_val_trans, self.y_val_prepro)
             score = flexible_scorer(
                 estimator=best_model,
-                X=self.X_final_test,
+                X=self.X_test_trans,
                 y=self.y_test_prepro,
                 scorer_param=self.scorer,
             )
-            self.save_step(step=4, obj=(best_model, score, self.meta_data))
+            self.meta_data["transformer"] = transformer.meta_data
+            self.save_step(
+                step=4,
+                obj=(best_model, best_estimator, score, transformer.meta_data),
+            )
         else:
-            best_model, score, self.meta_data = checkpoint
-
+            best_model, best_estimator, score, self.meta_data["transformer"] = (
+                checkpoint
+            )
+        self.meta_data["num_features"] = best_model.n_features_in_
         self.logger.info(
             msg=f"[ORANGE] Scoring on 20% untouched dataset: {score}"
         )
 
         # final step if df_test is available
         if self.df_test is not None:
-            self.X_full_prepro, self.y_full_prepro, self.meta_data = preprocess(
-                X=self.X_original, y=self.y_original, logger=self.logger
+            self.X_full_prepro, self.y_full_prepro, self.meta_data_add = (
+                preprocess(
+                    X=self.X_original, y=self.y_original, logger=self.logger
+                )
             )
-            best_model.fit(self.X_full_prepro, self.y_full_prepro)
-            self.y_pred = best_model.predict(self.df_test)
+            self.meta_data["preprocess_step4"] = self.meta_data_add
+            best_estimator.fit(self.X_full_prepro, self.y_full_prepro)
+            self.y_pred = best_estimator.predict(self.df_test)
             if "encode_target" in self.meta_data:
                 self.y_pred = self.meta_data["encode_target"][
                     "encoder"
@@ -223,6 +245,21 @@ class AutomlModeling:
             self.logger.info(
                 f"Submissing saved to {self.output_file.replace("results.html", "submission.csv")}"
             )
+
+        # Save meta_data as a text file
+        meta_data_path = self.output_file.replace(
+            "results.html", "meta_data.txt"
+        )
+
+        with open(file=meta_data_path, mode="w") as f:
+            for key, value in self.meta_data.items():
+                f.write(f"{key}: {value}\n")
+        self.logger.info(msg=f"Meta data saved to {meta_data_path}")
+        result = create_report(meta_data=self.meta_data)
+        write_to_output(
+            html=result,
+            output_file=self.output_file,
+        )
         self.logger.info(msg="[MAGENTA] DONE")
 
     def split_validation_data(

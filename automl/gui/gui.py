@@ -301,6 +301,7 @@ class AutoMLFrame(wx.Frame):
             X_original=current_EDA.df_train,
             df_test=current_EDA.df_test,
             output_file=self.buttons_info["OutputFile"]["label"].GetLabel(),
+            title=self.buttons_info["title"]["label"].GetLabel(),
             logger=self.logger,
         )
         if self.nogui:

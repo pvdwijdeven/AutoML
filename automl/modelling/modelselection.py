@@ -5,6 +5,7 @@ from sklearn.pipeline import Pipeline
 from sklearn.model_selection import KFold, cross_val_score, GridSearchCV
 import numpy as np
 import pandas as pd
+import time
 
 
 def run_kfold_evaluation(
@@ -52,11 +53,13 @@ def run_kfold_evaluation(
         )
 
         # Pick scoring metric
-
+        start_time = time.perf_counter()
         scores = cross_val_score(pipeline, X, y, cv=kf, scoring=scoring)
+        end_time = time.perf_counter()
         results[model_name] = {
             "mean_score": np.mean(scores),
             "std_score": np.std(scores),
+            "time_taken": end_time - start_time,
             "all_scores": scores,
         }
 
@@ -133,13 +136,15 @@ def run_kfold_grid_search(
         )
 
         logger.info(f"[GREEN]- Running GridSearchCV for {model_name_key}...")
+        start_time = time.perf_counter()
         grid_search.fit(X, y)
-
+        end_time = time.perf_counter()
         results[model_name_key] = {
             "best_estimator": grid_search.best_estimator_,
             "best_params": grid_search.best_params_,
             "best_score": grid_search.best_score_,
             "cv_results": grid_search.cv_results_,
+            "time_taken": end_time - start_time,
         }
         logger.info(
             f"[BLUE]Completed GridSearchCV for {model_name_key}. Best accuracy: {grid_search.best_score_:.4f}"

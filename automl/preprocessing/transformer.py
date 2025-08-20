@@ -203,5 +203,5 @@ class AutomlTransformer:
                 meta_data=self.meta_data.copy(),
                 **step.get("config", {}),
             )
-
+        self.meta_data["sizes"] = {"after_preprocessing": self.X.shape}
         return self.X

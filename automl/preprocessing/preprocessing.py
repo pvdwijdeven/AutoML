@@ -31,5 +31,9 @@ def preprocess(
             target=y_prepro, logger=logger
         )
     meta_data["skip_outliers"] = skip_outliers(target=y_prepro)
+    meta_data["supervised_learning_problem_type"] = (
+        "classification" if target_categorical else "regrression"
+    )
     meta_data["dataset_type"] = detect_dataset_type(target=y_prepro)
+    meta_data["X_prepro_size"] = X_prepro.shape
     return X_prepro, y_prepro, meta_data
