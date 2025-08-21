@@ -12,6 +12,58 @@ from typing import Tuple, Any, List, Dict, Callable
 
 from sklearn.metrics import make_scorer, get_scorer
 
+
+def sort_ascending(scorer_name):
+    """
+    Determine if higher scorer values indicate better performance.
+
+    Args:
+        scorer_name (str): The name of the scorer/metric.
+
+    Returns:
+        bool: True if higher score is better, False otherwise.
+    """
+    # Lowercase for case-insensitive matching
+    name = scorer_name.lower()
+
+    # Common "higher is better" metrics
+    high_better = [
+        "accuracy",
+        "precision",
+        "recall",
+        "f1",
+        "roc_auc",
+        "r2",
+        "explained_variance",
+        "balanced_accuracy",
+    ]
+
+    # Common "lower is better" metrics
+    low_better = [
+        "neg_mean_squared_error",  # sklearn's negated MSE, already negative
+        "mean_squared_error",
+        "mean_absolute_error",
+        "root_mean_squared_error",
+        "neg_log_loss",
+        "neg_mean_absolute_error",
+        "log_loss",
+        "lrsme",
+    ]
+
+    # Check contains any high_better substring
+    for metric in high_better:
+        if metric in name:
+            return False
+
+    # Check contains any low_better substring
+    for metric in low_better:
+        if metric in name:
+            return True
+
+    # Default fallback: assume higher is better
+    return False
+
+
 scoring_per_dataset_type = {
     "binary_classification": "accuracy",
     "regression": "lrmse",
@@ -142,7 +194,9 @@ def get_score(
     return results
 
 
-def select_top_models(summary_df, k=1, max_models=5) -> List[Dict[str, Any]]:
+def select_top_models(
+    summary_df, scorer="accuracy", k=1, max_models=5
+) -> List[Dict[str, Any]]:
     """
     Select top models based on mean and std accuracy criteria.
 
@@ -161,6 +215,9 @@ def select_top_models(summary_df, k=1, max_models=5) -> List[Dict[str, Any]]:
     # Extract mean and std columns for the metric, flatten columns for ease
 
     # Sort models by mean descending
+    summary_df = summary_df.sort_values(
+        by="mean_score", ascending=sort_ascending(scorer_name=scorer)
+    )
     mu_best = summary_df.iloc[0]["mean_score"]
     sigma_best = summary_df.iloc[0]["std_score"]
 

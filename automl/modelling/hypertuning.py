@@ -105,7 +105,7 @@ param_grids = {
             "selection": ["cyclic"],  # 1
         },
         "bayesian_ridge_regression": {
-            "n_iter": [300, 600],  # 2
+            "max_iter": [300, 600],  # 2
             "alpha_1": [1e-6, 1e-4],  # 2
             "lambda_1": [1e-6, 1e-4],  # 2
             "fit_intercept": [True],  # 1
@@ -313,7 +313,7 @@ param_grids_detailed = {
             "max_iter": [500, 1000, 2500],
         },
         "bayesian_ridge_regression": {
-            "n_iter": [300, 400, 500, 600, 1000],
+            "max_iter": [300, 400, 500, 600, 1000],
             "alpha_1": [1e-6, 1e-5, 1e-4],
             "alpha_2": [1e-6, 1e-5, 1e-4],
             "lambda_1": [1e-6, 1e-5, 1e-4],

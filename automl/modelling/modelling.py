@@ -110,7 +110,9 @@ class AutomlModeling:
                     for model, details in results.items()
                 ]
             )
-            top_selection = select_top_models(summary_df=df_results)
+            top_selection = select_top_models(
+                summary_df=df_results, scorer=self.scoring
+            )
             self.save_step(step=1, obj=(df_results, results, top_selection))
         else:
             df_results, results, top_selection = checkpoint
@@ -159,6 +161,7 @@ class AutomlModeling:
             fine_tuned_model = checkpoint
 
         self.meta_data["step1"] = results
+        self.meta_data["top_selection"] = top_selection
         self.meta_data["step2"] = best_grid_model
         self.meta_data["step3"] = fine_tuned_model
         best_model_name, best_score = get_best_model_name(
@@ -212,7 +215,7 @@ class AutomlModeling:
         self.logger.info(
             msg=f"[ORANGE] Scoring on 20% untouched dataset: {score}"
         )
-
+        self.meta_data["final_score"] = score
         # final step if df_test is available
         if self.df_test is not None:
             self.X_full_prepro, self.y_full_prepro, self.meta_data_add = (
@@ -251,9 +254,11 @@ class AutomlModeling:
             "results.html", "meta_data.txt"
         )
 
+        # Read the file in your custom format
         with open(file=meta_data_path, mode="w") as f:
             for key, value in self.meta_data.items():
                 f.write(f"{key}: {value}\n")
+
         self.logger.info(msg=f"Meta data saved to {meta_data_path}")
         result = create_report(meta_data=self.meta_data)
         write_to_output(

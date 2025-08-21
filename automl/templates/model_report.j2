@@ -22,6 +22,17 @@
     .tab { display: none; }
     .tab.active { display: block; }
 
+.highlight-yellow {
+  /* Light mode highlight */
+  color: #ff0800ff;  padding: 0.2em 0.4em;
+  border-radius: 0.2em;
+}
+
+[data-bs-theme="dark"] .highlight-yellow {
+  /* Dark mode highlight */
+  color: #f10c0cff;
+}
+
 .inner-table-wrapper {
   overflow-x: auto;
   max-width: 100%;
