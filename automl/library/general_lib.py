@@ -4,6 +4,19 @@ import wx
 import os
 import sys
 from typing import Optional
+import io
+import base64
+import matplotlib.pyplot as plt
+
+
+def fig_to_base64(fig, alt_text: str) -> str:
+    """Convert a matplotlib figure to a base64-encoded HTML image."""
+    buf = io.BytesIO()
+    fig.savefig(buf, format="png", bbox_inches="tight", transparent=True)
+    buf.seek(0)
+    img_base64 = base64.b64encode(buf.read()).decode("utf-8")
+    plt.close(fig)
+    return f'<img src="data:image/png;base64,{img_base64}" alt="alt_text" class="responsive-img"/>'
 
 
 class ColoredFormatter(logging.Formatter):

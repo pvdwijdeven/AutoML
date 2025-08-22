@@ -2,7 +2,7 @@ import pandas as pd
 import re
 from collections import Counter
 from scipy.stats import skew
-from library import infer_dtype, Logger
+from library import infer_dtype, Logger, fig_to_base64
 import numpy as np
 from sklearn.feature_selection import (
     mutual_info_classif,
@@ -14,8 +14,7 @@ from typing import List, Optional, Tuple, Dict
 from scipy.stats import entropy as scipy_entropy
 import seaborn as sns
 import matplotlib.pyplot as plt
-import io
-import base64
+
 import matplotlib as mpl
 
 # matplotlib not using GUI (thread used by wx)
@@ -499,16 +498,6 @@ def analyze_numeric_column(
             )
 
     return suggestions
-
-
-def fig_to_base64(fig, alt_text: str) -> str:
-    """Convert a matplotlib figure to a base64-encoded HTML image."""
-    buf = io.BytesIO()
-    fig.savefig(buf, format="png", bbox_inches="tight", transparent=True)
-    buf.seek(0)
-    img_base64 = base64.b64encode(buf.read()).decode("utf-8")
-    plt.close(fig)
-    return f'<img src="data:image/png;base64,{img_base64}" alt="alt_text" class="responsive-img"/>'
 
 
 def generate_eda_plots(

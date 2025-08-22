@@ -31,6 +31,7 @@ def sort_ascending(scorer_name):
         "neg_mean_squared_error",
         "neg_log_loss",
         "neg_mean_absolute_error",
+        "neg_root_mean_squared_error",
         "accuracy",
         "precision",
         "recall",

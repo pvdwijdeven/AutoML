@@ -111,7 +111,7 @@ class AutomlModeling:
                     for model, details in results.items()
                 ]
             )
-            # Sort models by mean descending
+            # Sort models by mean descending or ascending
             df_results = df_results.sort_values(
                 by="mean_score",
                 ascending=sort_ascending(scorer_name=self.scoring),

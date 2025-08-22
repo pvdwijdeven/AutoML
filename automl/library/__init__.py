@@ -1,6 +1,11 @@
 # automl/library/__init__.py
 
-from .general_lib import WxTextRedirector, TextCtrlHandler, Logger
+from .general_lib import (
+    WxTextRedirector,
+    TextCtrlHandler,
+    Logger,
+    fig_to_base64,
+)
 from .definitions import infer_dtype
 from .html_lib import (
     get_html_from_template,
@@ -36,4 +41,5 @@ __all__ = [
     "select_features_by_missingness",
     "generate_eda_plots",
     "check_classification",
+    "fig_to_base64",
 ]

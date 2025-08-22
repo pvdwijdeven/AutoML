@@ -1,6 +1,7 @@
 from .models import models
 from .scoring import sort_ascending
 from .hypertuning import param_grids, param_grids_detailed
+from .model_plot import plot_models_step1, plot_models_step2
 from typing import Dict, Any
 import pandas as pd
 import os
@@ -19,15 +20,17 @@ def create_report(meta_data: Dict[str, Any]) -> str:
         models_dict=models[meta_data["dataset_type"]],
         order_list=order_list,
     )
-    step2 = step2_to_html(meta_data=meta_data)
+    step2, rows_step2 = step2_to_html(meta_data=meta_data)
     step3 = step3_to_html(meta_data=meta_data)
     step4 = f"Scoring on 20% untouched dataset:<span class='highlight-yellow'>{meta_data["final_score"]:.6f}</span>"
     html = "<br><h3>General info:</h3>"
     html += general
     html += "<br><h3>Step1: model selection</h3>"
     html += step1
+    html += plot_models_step1(meta_data=meta_data, step="step1")
     html += f"<br><h3>Step2: hypertuning top {len(meta_data['step2'])}</h3>"
     html += step2
+    html += plot_models_step2(rows_step2)
     html += "<br><h3>Step3: Detailed hypertuning</h3>"
     html += step3
     html += "<br><h3>Step4: Ontouched test set</h3>"
@@ -238,7 +241,8 @@ def step2_to_html(
         model_grid = []
         for param in grid:
             model_grid.append(f"{param}:{grid[param]}")
-
+        best_params.sort()
+        model_grid.sort()
         rows.append(
             {
                 "model": model,
@@ -278,7 +282,7 @@ def step2_to_html(
 
     html_table += "</table>"
     html_table += "<span class='highlight-yellow'><sup>model selected for next step</sup></span><br>"
-    return html_table
+    return html_table, rows
 
 
 def step3_to_html(
@@ -327,7 +331,8 @@ def step3_to_html(
         model_grid = []
         for param in grid:
             model_grid.append(f"{param}:{grid[param]}")
-
+        best_params.sort()
+        model_grid.sort()
         rows.append(
             {
                 "model": model,
