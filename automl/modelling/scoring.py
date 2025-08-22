@@ -28,6 +28,9 @@ def sort_ascending(scorer_name):
 
     # Common "higher is better" metrics
     high_better = [
+        "neg_mean_squared_error",
+        "neg_log_loss",
+        "neg_mean_absolute_error",
         "accuracy",
         "precision",
         "recall",
@@ -40,12 +43,10 @@ def sort_ascending(scorer_name):
 
     # Common "lower is better" metrics
     low_better = [
-        "neg_mean_squared_error",  # sklearn's negated MSE, already negative
+        # sklearn's negated MSE, already negative
         "mean_squared_error",
         "mean_absolute_error",
         "root_mean_squared_error",
-        "neg_log_loss",
-        "neg_mean_absolute_error",
         "log_loss",
         "lrsme",
     ]
@@ -195,7 +196,7 @@ def get_score(
 
 
 def select_top_models(
-    summary_df, scorer="accuracy", k=1, max_models=5
+    summary_df, scorer="accuracy", k=1, max_models=5, min_models=3
 ) -> List[Dict[str, Any]]:
     """
     Select top models based on mean and std accuracy criteria.
@@ -214,14 +215,11 @@ def select_top_models(
 
     # Extract mean and std columns for the metric, flatten columns for ease
 
-    # Sort models by mean descending
-    summary_df = summary_df.sort_values(
-        by="mean_score", ascending=sort_ascending(scorer_name=scorer)
-    )
     mu_best = summary_df.iloc[0]["mean_score"]
     sigma_best = summary_df.iloc[0]["std_score"]
 
     selected = []
+    models = []
     for _, row in summary_df.iterrows():
         if row["mean_score"] >= mu_best - k * sigma_best:
             selected_model = {
@@ -229,9 +227,23 @@ def select_top_models(
                 "accuracy_mean": row["mean_score"],
                 "accuracy_std": row["std_score"],
             }
+            models.append(row["model"])
             selected.append(selected_model)
             if len(selected) >= max_models:
                 break
+
+    if len(selected) < 3:
+        for _, row in summary_df.iterrows():
+
+            if row["model"] not in models:
+                selected_model = {
+                    "model_name": row["model"],
+                    "accuracy_mean": row["mean_score"],
+                    "accuracy_std": row["std_score"],
+                }
+                selected.append(selected_model)
+                if len(selected) >= min_models:
+                    break
 
     return selected
 

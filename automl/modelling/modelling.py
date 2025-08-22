@@ -13,6 +13,7 @@ from .scoring import (
     get_scoring,
     lrmse_scorer,
     flexible_scorer,
+    sort_ascending,
 )
 from .report import create_report
 from .hypertuning import param_grids, param_grids_detailed
@@ -110,6 +111,11 @@ class AutomlModeling:
                     for model, details in results.items()
                 ]
             )
+            # Sort models by mean descending
+            df_results = df_results.sort_values(
+                by="mean_score",
+                ascending=sort_ascending(scorer_name=self.scoring),
+            )
             top_selection = select_top_models(
                 summary_df=df_results, scorer=self.scoring
             )
@@ -118,7 +124,7 @@ class AutomlModeling:
             df_results, results, top_selection = checkpoint
 
         self.logger.info(
-            msg=f"[MAGENTA] Starting hypertuning top X model selction ({df_results})"
+            msg=f"[MAGENTA] Starting hypertuning top {len(top_selection)} model selction"
         )
         # Step 2 model selection top (max) 5 of step 1, small hypertuning grid set
 

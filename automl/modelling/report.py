@@ -15,6 +15,7 @@ def create_report(meta_data: Dict[str, Any]) -> str:
     order_list = [m["model_name"] for m in meta_data["top_selection"]]
     step1 = step1_to_html(
         results_dict=meta_data["step1"],
+        meta_data=meta_data,
         models_dict=models[meta_data["dataset_type"]],
         order_list=order_list,
     )
@@ -98,6 +99,7 @@ def get_explicit_params(estimator):
 
 def step1_to_html(
     results_dict,
+    meta_data,
     models_dict=None,
     order_list=None,
     max_param_length=120,
@@ -134,6 +136,7 @@ def step1_to_html(
     else:
         ordered_models = list(results_dict.keys())
 
+    my_models = []
     for model in ordered_models:
         metrics = results_dict[model]
         mean_score = float(metrics["mean_score"])
@@ -154,16 +157,31 @@ def step1_to_html(
             else ""
         )
         highlight_end = "</span>" if order_list and model in order_list else ""
+        my_models.append(
+            {
+                "model": f"<td>{highlight_start}{html.escape(model)}{highlight_end}</td>",
+                "mean_score": mean_score,
+                "std_score": std_score,
+                "param_str": param_str,
+                "time_taken": time_taken,
+            }
+        )
+    my_models = sorted(
+        my_models,
+        key=lambda x: x["mean_score"],
+        reverse=not sort_ascending(scorer_name=meta_data["scoring"]),
+    )
+    for model in my_models:
         row_html = (
             f"  <tr>"
-            f"<td>{highlight_start}{html.escape(model)}{highlight_end}</td>"
-            f"<td>{mean_score:.6f}</td>"
-            f"<td>{std_score:.6f}</td>"
+            f"{model["model"]}"
+            f"<td>{model["mean_score"]:.6f}</td>"
+            f"<td>{model["std_score"]:.6f}</td>"
         )
 
         if models_dict:
-            row_html += f"<td>{html.escape(param_str)}</td>"
-        row_html += f"<td>{time_taken:.3f} sec</td>"
+            row_html += f"<td>{html.escape(model['param_str'])}</td>"
+        row_html += f"<td>{model['time_taken']:.3f} sec</td>"
 
         row_html += "</tr>\n"
         html_table += row_html
@@ -236,7 +254,7 @@ def step2_to_html(
     rows = sorted(
         rows,
         key=lambda x: x["best_score"],
-        reverse=sort_ascending(scorer_name=meta_data["scoring"]),
+        reverse=not sort_ascending(scorer_name=meta_data["scoring"]),
     )
 
     html_output = ""
