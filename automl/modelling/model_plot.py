@@ -12,7 +12,7 @@ def fig_to_base64(fig, alt_text: str) -> str:
     buf.seek(0)
     img_base64 = base64.b64encode(buf.read()).decode("utf-8")
     plt.close(fig)
-    return f'<img src="data:image/png;base64,{img_base64}" alt="{alt_text}" class="responsive-img"/>'
+    return f'<img src="data:image/png;base64,{img_base64}" alt="{alt_text}" class="responsive-img" style="display: block; margin: 0 auto; width: 50%;"/>'
 
 
 def plot_models_step1(meta_data, step) -> str:

@@ -94,3 +94,39 @@ model_class_map = {
     "mlp_regressor": MLPRegressor(),
     "xgboost_regressor": XGBRegressor(),
 }
+
+models_family = {
+    "binary_classification": {
+        "logistic_regression": "Linear Model",
+        "random_forest": "Tree Ensemble (Bagging)",
+        "svc": "Kernel-Based/Classical ML",
+        "knn": "Instance-Based/Lazy Learning",
+        "gradient_boosting": "Tree Ensemble (Boosting)",
+        "naive_bayes": "Probabilistic",
+        "extra_trees": "Tree Ensemble (Bagging)",
+        "adaboost": "Tree Ensemble (Boosting)",
+        "mlp": "Neural Network",
+        "linear_discriminant_analysis": "Linear Model",
+    },
+    "imbalanced_binary_classification": {
+        "logistic_regression": "Linear Model",
+        "random_forest": "Tree Ensemble (Bagging)",
+        "svc": "Kernel-Based/Classical ML",
+        "knn": "Instance-Based/Lazy Learning",
+        "gradient_boosting": "Tree Ensemble (Boosting)",
+        # Add others with their family/type when included
+    },
+    "regression": {
+        "linear_regression": "Linear Model",
+        "ridge_regression": "Regularized Linear Model",
+        "lasso_regression": "Regularized Linear Model",
+        "elasticnet_regression": "Regularized Linear Model",
+        "bayesian_ridge_regression": "Bayesian Linear Model",
+        "random_forest_regressor": "Tree Ensemble (Bagging)",
+        "gradient_boosting_regressor": "Tree Ensemble (Boosting)",
+        "svr": "Kernel-Based/Classical ML",
+        "knn_regressor": "Instance-Based/Lazy Learning",
+        "mlp_regressor": "Neural Network",
+        "xgboost_regressor": "Tree Ensemble (Boosting)",
+    },
+}
