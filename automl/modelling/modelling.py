@@ -6,6 +6,7 @@ from .modelselection import (
     run_kfold_evaluation,
     run_kfold_grid_search,
     get_best_model_name,
+    stacking_ensembler,
 )
 from .scoring import (
     select_top_models,
@@ -134,7 +135,7 @@ class AutomlModeling:
                 dataset_type=self.dataset_type,
                 scoring=self.scorer,
                 top_models=top_selection,
-                param_grids=param_grids,
+                param_grid_matrix=param_grids,
                 X=self.X_val_prepro,
                 y=self.y_val_prepro,
                 logger=self.logger,
@@ -157,7 +158,7 @@ class AutomlModeling:
                 dataset_type=self.dataset_type,
                 scoring=self.scorer,
                 top_models=[{"model_name": best_model_name}],
-                param_grids=param_grids_detailed,
+                param_grid_matrix=param_grids_detailed,
                 X=self.X_val_prepro,
                 y=self.y_val_prepro,
                 logger=self.logger,
@@ -176,7 +177,14 @@ class AutomlModeling:
         self.logger.info(
             msg=f"Best model: {best_model_name}, score: {best_score}"
         )
-        # Step 4 - final test on unexposed test set on best model of step 3.
+        result = stacking_ensembler(
+            meta_data=self.meta_data,
+            X=self.X_val_prepro,
+            y=self.y_val_prepro,
+            logger=self.logger,
+        )
+        self.meta_data["Step5"] = result
+        # Step 5 - final test on unexposed test set on best model of step 3/4.
 
         if "encode_target" in self.meta_data:
             self.y_test_prepro = self.meta_data["encode_target"][

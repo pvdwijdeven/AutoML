@@ -158,6 +158,14 @@ param_grids = {
             "reg_lambda": [0.5, 1.0],  # 2
         },
     },
+    "meta": {
+        "meta": {
+            "rf__n_estimators": [50, 100],
+            "rf__max_depth": [None, 10, 20],
+            "svm__C": [0.1, 1, 10],
+            "final_estimator__C": [0.1, 1, 10],
+        },
+    },
 }
 
 
