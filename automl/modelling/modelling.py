@@ -177,14 +177,21 @@ class AutomlModeling:
         self.logger.info(
             msg=f"Best model: {best_model_name}, score: {best_score}"
         )
-        result = stacking_ensembler(
-            meta_data=self.meta_data,
-            X=self.X_val_prepro,
-            y=self.y_val_prepro,
-            logger=self.logger,
-        )
-        self.meta_data["Step5"] = result
-        # Step 5 - final test on unexposed test set on best model of step 3/4.
+
+        checkpoint = self.load_step(step=4)
+        if checkpoint is None:
+            stacking_model = stacking_ensembler(
+                meta_data=self.meta_data,
+                X=self.X_val_prepro,
+                y=self.y_val_prepro,
+                logger=self.logger,
+            )
+            self.save_step(step=4, obj=(stacking_model))
+        else:
+            stacking_model = checkpoint
+
+        self.meta_data["Step5"] = stacking_model
+        # Step 4 -
 
         if "encode_target" in self.meta_data:
             self.y_test_prepro = self.meta_data["encode_target"][
@@ -194,7 +201,7 @@ class AutomlModeling:
             self.y_test_prepro = self.meta_data["standardize_target"][
                 "target_transformer"
             ].transform(y=self.y_final_test)
-        checkpoint = self.load_step(step=4)
+        checkpoint = self.load_step(step=5)
         if checkpoint is None:
             best_model = next(iter(fine_tuned_model.values()))[
                 "best_estimator"
@@ -218,7 +225,7 @@ class AutomlModeling:
             )
             self.meta_data["transformer"] = transformer.meta_data
             self.save_step(
-                step=4,
+                step=5,
                 obj=(best_model, best_estimator, score, transformer.meta_data),
             )
         else:
@@ -227,9 +234,31 @@ class AutomlModeling:
             )
         self.meta_data["num_features"] = best_model.n_features_in_
         self.logger.info(
-            msg=f"[ORANGE] Scoring on 20% untouched dataset: {score}"
+            msg=f"[ORANGE] Scoring on 20% untouched dataset with {best_model_name}: {score}"
         )
         self.meta_data["final_score"] = score
+
+        # step 6: test on meta stacker
+        transformer = AutomlTransformer(logger=self.logger)
+        transformer.fit(X_train=self.X_val_prepro, y_train=self.y_val_prepro)
+        self.X_val_trans = transformer.transform(X=self.X_val_prepro)
+        self.X_test_trans = transformer.transform(X=self.X_final_test)
+        best_model_stack = next(iter(stacking_model.values()))[
+            "best_estimator"
+        ].named_steps["stacking"]
+        best_estimator_stack = next(iter(stacking_model.values()))[
+            "best_estimator"
+        ]
+        best_model_stack.fit(self.X_val_trans, self.y_val_prepro)
+        score = flexible_scorer(
+            estimator=best_model_stack,
+            X=self.X_test_trans,
+            y=self.y_test_prepro,
+            scorer_param=self.scorer,
+        )
+        self.logger.info(
+            msg=f"[ORANGE] Scoring on 20% untouched dataset with meta stacker: {score}"
+        )
         # final step if df_test is available
         if self.df_test is not None:
             self.X_full_prepro, self.y_full_prepro, self.meta_data_add = (
@@ -261,6 +290,33 @@ class AutomlModeling:
             )
             self.logger.info(
                 f"Submissing saved to {self.output_file.replace("results.html", "submission.csv")}"
+            )
+            # same for meta stacker
+            best_estimator_stack.fit(self.X_full_prepro, self.y_full_prepro)
+            self.y_pred = best_estimator_stack.predict(self.df_test)
+            if "encode_target" in self.meta_data:
+                self.y_pred = self.meta_data["encode_target"][
+                    "encoder"
+                ].inverse_transform(y=self.y_pred)
+            elif "standardize_target" in self.meta_data:
+                self.y_pred = self.meta_data["standardize_target"][
+                    "target_transformer"
+                ].inverse_transform(y=self.y_pred)
+            first_col = self.df_test.iloc[:, 0]
+            # Create a DataFrame combining the first column and y_pred
+            df = pd.DataFrame(
+                data={first_col.name: first_col, self.target: self.y_pred}
+            )
+
+            # Save DataFrame to CSV
+            df.to_csv(
+                self.output_file.replace(
+                    "results.html", "submission_stack.csv"
+                ),
+                index=False,
+            )
+            self.logger.info(
+                f"Submissing for stack saved to {self.output_file.replace("results.html", "submission_stack.csv")}"
             )
 
         # Save meta_data as a text file
