@@ -1,6 +1,6 @@
 # Standard library imports
 import warnings
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Optional
 
 # Third-party imports
 import numpy as np
@@ -17,11 +17,11 @@ def auto_encode_features(
     y: Optional[pd.Series],
     *,
     fit: bool,
-    step_params: Dict[str, Any],
+    step_params: dict[str, Any],
     logger: Logger,
-    meta_data: Dict[str, Any],
+    meta_data: dict[str, Any],
     max_unique_for_categorical: int = 15,
-) -> Tuple[pd.DataFrame, Optional[pd.Series], Optional[Dict[str, Any]]]:
+) -> tuple[pd.DataFrame, Optional[pd.Series], Optional[dict[str, Any]]]:
     """
     Automatically encode categorical and boolean features in the dataset.
 
@@ -53,18 +53,18 @@ def auto_encode_features(
         Target values, used only for ordinal encoding heuristic.
     fit : bool
         Whether to fit encoders (True) or transform using saved encoders (False).
-    step_params : Dict[str, Any]
+    step_params : dict[str, Any]
         Stores encoders and metadata across fit/transform stages.
     logger : Logger
         Logger for debug/info messages.
-    meta_data : Dict[str, Any]
+    meta_data : dict[str, Any]
         Metadata dictionary (unused currently).
     max_unique_for_categorical : int, default=15
         Maximum unique values to consider numeric feature as categorical.
 
     Returns
     -------
-    Tuple[pd.DataFrame, Optional[pd.Series], Optional[Dict[str, Any]]]
+    tuple[pd.DataFrame, Optional[pd.Series], Optional[dict[str, Any]]]
         Transformed feature DataFrame (only on transform), unchanged target,
         and updated step_params containing encoders and added columns.
     """
@@ -72,8 +72,8 @@ def auto_encode_features(
         warnings.simplefilter("ignore")
 
         if fit:
-            encoders: Dict[str, Any] = {}
-            added_columns: List[str] = []
+            encoders: dict[str, Any] = {}
+            added_columns: list[str] = []
             # Do not transform X during fit; only fit encoders
 
             for col in X.columns:
@@ -169,7 +169,7 @@ def auto_encode_features(
         else:  # transform
             encoders = step_params.get("encoders", {})
             transformed_X = X.copy()
-            drop_cols: List[str] = []
+            drop_cols: list[str] = []
 
             for col, encoder in encoders.items():
                 if encoder == "bool_to_int":

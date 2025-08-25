@@ -1,5 +1,5 @@
 # Standard library imports
-from typing import Any, Dict, Optional, Tuple, Union
+from typing import Any, Optional, Union
 
 # Third-party imports
 import numpy as np
@@ -107,7 +107,7 @@ def detect_dataset_type(
     return "unknown"
 
 
-def skip_outliers(target: pd.Series) -> Dict[str, bool]:
+def skip_outliers(target: pd.Series) -> dict[str, bool]:
     """
     Check whether extremely rare classes exist in a categorical target variable.
 
@@ -122,8 +122,8 @@ def skip_outliers(target: pd.Series) -> Dict[str, bool]:
 
     Returns
     -------
-    Dict[str, bool]
-        Dictionary with key "skip_outliers" set to True if rare
+    dict[str, bool]
+        dictionary with key "skip_outliers" set to True if rare
         classes are detected, otherwise False.
     """
     unique_classes = target.unique()
@@ -142,7 +142,7 @@ def drop_duplicate_rows(
     X: pd.DataFrame,
     y: pd.Series,
     logger: Logger,
-) -> Tuple[pd.DataFrame, pd.Series, Dict[str, str]]:
+) -> tuple[pd.DataFrame, pd.Series, dict[str, str]]:
     """
     Remove duplicate rows from the feature matrix `X` and target vector `y` where both match.
 
@@ -167,7 +167,7 @@ def drop_duplicate_rows(
         Feature matrix after duplicate rows were removed and indices reset.
     y_clean : pd.Series
         Target vector aligned with `X_clean`, with duplicates removed and indices reset.
-    step_params : Dict[str, str]
+    step_params : dict[str, str]
         Metadata containing a human-readable description of the operation,
         including the number of dropped duplicates and their row indices if applicable.
 
@@ -215,10 +215,10 @@ def drop_strings(
     y: Optional[pd.Series],
     *,
     fit: bool,
-    step_params: Dict[str, Any],
+    step_params: dict[str, Any],
     logger: Logger,
-    meta_data: Dict[str, Any],
-) -> Tuple[pd.DataFrame, Optional[pd.Series], Optional[Dict[str, Any]]]:
+    meta_data: dict[str, Any],
+) -> tuple[pd.DataFrame, Optional[pd.Series], Optional[dict[str, Any]]]:
     """
     Drops string-like columns (string, category, object) with too many unique values.
 
@@ -234,16 +234,16 @@ def drop_strings(
         Target values, used to determine threshold for unique values.
     fit : bool
         Whether to operate in 'fit' mode (identify columns) or 'transform' mode (apply drops).
-    step_params : Dict[str, Any]
-        Dictionary for saving or retrieving parameters across fit/transform stages.
+    step_params : dict[str, Any]
+        dictionary for saving or retrieving parameters across fit/transform stages.
     logger : Logger
         Logger instance for debug messages.
-    meta_data : Dict[str, Any]
+    meta_data : dict[str, Any]
         Additional metadata dictionary (currently unused).
 
     Returns
     -------
-    Tuple[pd.DataFrame, Optional[pd.Series], Optional[Dict[str, Any]]]
+    tuple[pd.DataFrame, Optional[pd.Series], Optional[dict[str, Any]]]
         Transformed (or unmodified) X, unchanged y, and updated step_params.
     """
     if fit:
@@ -272,10 +272,10 @@ def drop_duplicate_columns(
     y: Optional[pd.Series],
     *,
     fit: bool,
-    step_params: Dict[str, Any],
+    step_params: dict[str, Any],
     logger: Logger,
-    meta_data: Dict[str, Any],
-) -> Tuple[pd.DataFrame, Optional[pd.Series], Optional[Dict[str, Any]]]:
+    meta_data: dict[str, Any],
+) -> tuple[pd.DataFrame, Optional[pd.Series], Optional[dict[str, Any]]]:
     """
     Drops duplicate columns in the dataset.
 
@@ -291,16 +291,16 @@ def drop_duplicate_columns(
         Target values (unchanged).
     fit : bool
         Whether to operate in 'fit' mode (identify columns) or 'transform' mode (apply drops).
-    step_params : Dict[str, Any]
-        Dictionary for saving or retrieving parameters across fit/transform stages.
+    step_params : dict[str, Any]
+        dictionary for saving or retrieving parameters across fit/transform stages.
     logger : Logger
         Logger instance for debug messages.
-    meta_data : Dict[str, Any]
+    meta_data : dict[str, Any]
         Additional metadata dictionary (currently unused).
 
     Returns
     -------
-    Tuple[pd.DataFrame, Optional[pd.Series], Optional[Dict[str, Any]]]
+    tuple[pd.DataFrame, Optional[pd.Series], Optional[dict[str, Any]]]
         Transformed (or unmodified) X, unchanged y, and updated step_params.
     """
     if fit:
@@ -325,10 +325,10 @@ def drop_constant_columns(
     y: Optional[pd.Series],
     *,
     fit: bool,
-    step_params: Dict[str, Any],
+    step_params: dict[str, Any],
     logger: Logger,
-    meta_data: Dict[str, Any],
-) -> Tuple[pd.DataFrame, Optional[pd.Series], Optional[Dict[str, Any]]]:
+    meta_data: dict[str, Any],
+) -> tuple[pd.DataFrame, Optional[pd.Series], Optional[dict[str, Any]]]:
     """
     Drops constant columns (columns with only one unique value).
 
@@ -344,16 +344,16 @@ def drop_constant_columns(
         Target values (unchanged).
     fit : bool
         Whether to operate in 'fit' mode (identify columns) or 'transform' mode (apply drops).
-    step_params : Dict[str, Any]
-        Dictionary for saving or retrieving parameters across fit/transform stages.
+    step_params : dict[str, Any]
+        dictionary for saving or retrieving parameters across fit/transform stages.
     logger : Logger
         Logger instance for debug messages.
-    meta_data : Dict[str, Any]
+    meta_data : dict[str, Any]
         Additional metadata dictionary (currently unused).
 
     Returns
     -------
-    Tuple[pd.DataFrame, Optional[pd.Series], Optional[Dict[str, Any]]]
+    tuple[pd.DataFrame, Optional[pd.Series], Optional[dict[str, Any]]]
         Transformed (or unmodified) X, unchanged y, and updated step_params.
     """
     if fit:

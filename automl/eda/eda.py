@@ -4,7 +4,7 @@ import os
 import pathlib
 import sys
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 # Third-party imports
 import pandas as pd
@@ -117,8 +117,8 @@ class AutoML_EDA:
             self.logger = logger
 
     def parse_column_descriptions_to_html(
-        self, text: List[str]
-    ) -> Dict[str, str]:
+        self, text: list[str]
+    ) -> dict[str, str]:
         result = {}
         current_column = None
         current_description = []
@@ -150,7 +150,7 @@ class AutoML_EDA:
 
         return result
 
-    def read_description(self, file_path: str) -> Dict[str, str]:
+    def read_description(self, file_path: str) -> dict[str, str]:
         self.logger.info(
             f"[BLUE]- Reading column descriptions from {file_path}"
         )
@@ -213,7 +213,7 @@ class AutoML_EDA:
         # Apply the function to the dataframe
         return update_func(df)
 
-    def analyse_column(self, column_name: str) -> Optional[Dict[str, Any]]:
+    def analyse_column(self, column_name: str) -> Optional[dict[str, Any]]:
 
         assert (
             self.df_train is not None

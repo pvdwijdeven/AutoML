@@ -3,7 +3,7 @@ import html
 import inspect
 import os
 from datetime import datetime
-from typing import Any, Dict
+from typing import Any
 
 # Third-party imports
 import pandas as pd
@@ -15,7 +15,7 @@ from .models import models
 from .scoring import sort_ascending
 
 
-def create_report(meta_data: Dict[str, Any]) -> str:
+def create_report(meta_data: dict[str, Any]) -> str:
     general = create_general_table(meta_data=meta_data)
     order_list = [m["model_name"] for m in meta_data["top_selection"]]
     step1 = step1_to_html(
@@ -63,7 +63,7 @@ def render_report(title, overview, details=""):
     return output_html
 
 
-def create_general_table(meta_data: Dict[str, Any]) -> str:
+def create_general_table(meta_data: dict[str, Any]) -> str:
     problem_type = f"{meta_data["supervised_learning_problem_type"]} ({meta_data["dataset_type"]})"
     general_dict = {
         "Problem type": problem_type,
@@ -117,7 +117,7 @@ def step1_to_html(
 
     Parameters:
         results_dict (dict): Model scores, times, etc.
-        models_dict (dict, optional): Dict mapping model names to estimator objects.
+        models_dict (dict, optional): dict mapping model names to estimator objects.
         order_list (list, optional): List of model names defining the display order.
         max_param_length (int): Maximum characters for the parameter string.
 

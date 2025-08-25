@@ -1,5 +1,5 @@
 # Standard library imports
-from typing import Any, Dict, Self, Tuple
+from typing import Any, Self
 
 # Third-party imports
 import numpy as np
@@ -27,7 +27,7 @@ def is_target_categorical(
     return unique_values <= unique_threshold
 
 
-def encode_target(target: pd.Series) -> tuple[pd.Series, Dict[str, Any]]:
+def encode_target(target: pd.Series) -> tuple[pd.Series, dict[str, Any]]:
     """
     Encode a pandas Series categorical target using LabelEncoder and keep result as pandas Series.
 
@@ -51,7 +51,7 @@ def encode_target(target: pd.Series) -> tuple[pd.Series, Dict[str, Any]]:
     return y_encoded, meta_data
 
 
-def decode_target(y_encoded, label_encoder) -> tuple[pd.Series, Dict[str, Any]]:
+def decode_target(y_encoded, label_encoder) -> tuple[pd.Series, dict[str, Any]]:
     """
     Decode a pandas Series encoded target back to original categories using a fitted LabelEncoder.
 
@@ -152,7 +152,7 @@ class TargetTransformer:
 def standardize_target(
     target: pd.Series,
     logger: Logger,
-) -> Tuple[pd.Series, Dict[str, Any]]:
+) -> tuple[pd.Series, dict[str, Any]]:
     """
     Fit a TargetTransformer using Yeo-Johnson transform and standard scaling on y_train,
     then transform y_train, y_val, and y_test targets correspondingly.

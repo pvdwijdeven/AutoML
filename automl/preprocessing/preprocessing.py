@@ -1,5 +1,5 @@
 # Standard library imports
-from typing import Any, Dict, Tuple
+from typing import Any
 
 # Third-party imports
 import pandas as pd
@@ -13,7 +13,7 @@ from .target import encode_target, is_target_categorical, standardize_target
 
 def preprocess(
     X: pd.DataFrame, y: pd.Series, logger: Logger
-) -> Tuple[pd.DataFrame, pd.Series, Dict[str, Any]]:
+) -> tuple[pd.DataFrame, pd.Series, dict[str, Any]]:
     X_prepro = X.copy()
     y_prepro = y.copy()
     meta_data = {}

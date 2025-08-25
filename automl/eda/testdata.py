@@ -1,6 +1,5 @@
 # Standard library imports
 import re
-from typing import List, Tuple
 
 # Third-party imports
 import numpy as np
@@ -12,7 +11,7 @@ from automl.library import check_classification
 
 def analyze_test_data(
     df_train: pd.DataFrame, df_test: pd.DataFrame, target
-) -> Tuple[str, str]:
+) -> tuple[str, str]:
     html_sections = []
 
     # 1. Size comparison
@@ -177,7 +176,7 @@ def analyze_test_data(
 
     stats_df = pd.DataFrame(stats)
 
-    def highlight_shifts(row: pd.Series) -> List[str]:
+    def highlight_shifts(row: pd.Series) -> list[str]:
         style = [""] * len(row)
         col_idx = list(row.index)
         if row["Mean Shift"]:

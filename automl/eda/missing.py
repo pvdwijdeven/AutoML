@@ -1,6 +1,3 @@
-# Standard library imports
-from typing import Tuple
-
 # Third-party imports
 import pandas as pd
 import plotly.express as px
@@ -9,7 +6,7 @@ import plotly.express as px
 from automl.library import infer_dtype
 
 
-def missing_data_summary(df: pd.DataFrame) -> Tuple[int, str, str]:
+def missing_data_summary(df: pd.DataFrame) -> tuple[int, str, str]:
     # Count of missing values per column
     missing_count = df.isnull().sum()
 

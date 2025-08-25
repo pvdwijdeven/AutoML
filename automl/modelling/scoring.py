@@ -1,6 +1,6 @@
 # Standard library imports
 from math import sqrt
-from typing import Any, Callable, Dict, List, Tuple
+from typing import Any, Callable
 
 # Third-party imports
 import numpy as np
@@ -201,7 +201,7 @@ def get_score(
 
 def select_top_models(
     summary_df, scorer="accuracy", k=1, max_models=5, min_models=3
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     """
     Select top models based on mean and std accuracy criteria.
 
@@ -254,8 +254,8 @@ def select_top_models(
 
 def summarize_results(
     results_dict, model_dict, scoring="accuracy"
-) -> Tuple[
-    pd.DataFrame, List[Dict]
+) -> tuple[
+    pd.DataFrame, list[dict]
 ]:  # -> tuple[DataFrame, Any | None, Any | Series[Any] | None, An...:
     # Flatten nested dictionary into a list of rows
     rows = []

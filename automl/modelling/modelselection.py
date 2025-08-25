@@ -1,6 +1,6 @@
 # Standard library imports
 import time
-from typing import Any, Callable, Dict
+from typing import Any, Callable
 
 # Third-party imports
 import numpy as np
@@ -19,7 +19,7 @@ from .scoring import sort_ascending
 
 def run_kfold_evaluation(
     X, y, models, dataset_type, logger, scoring: str | Callable = "", folds=5
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Runs K-Fold cross-validation using AutomlTransformer and the models
     defined for the given dataset type.
@@ -31,7 +31,7 @@ def run_kfold_evaluation(
     y : numpy array or pandas Series
         Target vector
     models : dict
-        Dictionary of models keyed by dataset_type
+        dictionary of models keyed by dataset_type
     dataset_type : str
         Dataset type key ("binary_classification", "imbalanced_binary_classification", "regression")
     folds : int
@@ -40,7 +40,7 @@ def run_kfold_evaluation(
     Returns
     -------
     results : dict
-        Dictionary with model names as keys and CV score statistics as values
+        dictionary with model names as keys and CV score statistics as values
     """
 
     dataset_models = models.get(dataset_type, {})
@@ -239,7 +239,7 @@ def stacking_ensembler(
     X,
     y,
     logger,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
 
     # Define base models (already hypertuned instances)
     # replace first model with step3 optimized one

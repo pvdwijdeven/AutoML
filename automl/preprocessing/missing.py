@@ -1,6 +1,6 @@
 # Standard library imports
 import time
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Optional
 
 # Third-party imports
 import numpy as np
@@ -124,7 +124,7 @@ def decide_knn_imputation(X: pd.DataFrame, column: str, logger: Logger) -> bool:
 
 def get_feature_importances(
     X: pd.DataFrame, y: pd.Series
-) -> Dict[str, np.ndarray]:
+) -> dict[str, np.ndarray]:
     """
     Compute feature importances using a Random Forest model fitted on encoded features.
 
@@ -140,8 +140,8 @@ def get_feature_importances(
 
     Returns
     -------
-    Dict[str, np.ndarray]
-        Dictionary mapping feature names to their importance scores.
+    dict[str, np.ndarray]
+        dictionary mapping feature names to their importance scores.
     """
     X_train_enc = X.copy()
 
@@ -178,14 +178,14 @@ def handle_missing_values(
     y: Optional[pd.Series],
     *,
     fit: bool,
-    step_params: Dict[str, Any],
+    step_params: dict[str, Any],
     logger: Logger,
     categorical_only: bool = False,
-    meta_data: Dict[str, Any],
+    meta_data: dict[str, Any],
     col_importance_thresh: float = 0.01,
     col_missing_thresh: float = 0.5,
     skew_thresh: float = 0.5,
-) -> Tuple[pd.DataFrame, Optional[pd.Series], Optional[Dict[str, Any]]]:
+) -> tuple[pd.DataFrame, Optional[pd.Series], Optional[dict[str, Any]]]:
     """
     Handle missing values by dropping columns or rows selectively, and imputing missing entries.
 
@@ -210,13 +210,13 @@ def handle_missing_values(
         Target variable (used for feature importance calculation).
     fit : bool
         Fit mode (True) or transform mode (False).
-    step_params : Dict[str, Any]
-        Dictionary to persist fitted imputers, columns to drop, etc.
+    step_params : dict[str, Any]
+        dictionary to persist fitted imputers, columns to drop, etc.
     logger : Logger
         Logger instance for debug and warning messages.
     categorical_only : bool, default=False
         If True, only categorical features are processed.
-    meta_data : Dict[str, Any]
+    meta_data : dict[str, Any]
         Metadata dictionary carrying precomputed parameters during pipeline runs.
     col_importance_thresh : float, default=0.01
         Threshold below which low-importance columns with high missingness will be dropped.
@@ -227,7 +227,7 @@ def handle_missing_values(
 
     Returns
     -------
-    Tuple[pd.DataFrame, Optional[pd.Series], Optional[Dict[str, Any]]]
+    tuple[pd.DataFrame, Optional[pd.Series], Optional[dict[str, Any]]]
         The DataFrame with missing value handling applied or parameters updated,
         unchanged target, and updated step_params storing fitted imputers and drop info.
 
@@ -238,7 +238,7 @@ def handle_missing_values(
     """
 
     def apply_imputers(
-        X_input: pd.DataFrame, imputers: Dict[str, Tuple[Any, list]]
+        X_input: pd.DataFrame, imputers: dict[str, tuple[Any, list]]
     ) -> pd.DataFrame:
         X_copy = X_input.copy()
         for imp, cols in imputers.values():
@@ -334,7 +334,7 @@ def handle_missing_values(
         cat_cols = [c for c in cat_cols if c not in knn_cols]
         num_cols = [c for c in num_cols if c not in knn_cols]
 
-        imputers: Dict[str, Tuple[Any, list]] = {}
+        imputers: dict[str, tuple[Any, list]] = {}
 
         if not categorical_only:
             # Skewness calculation on numeric cols excluding kNN

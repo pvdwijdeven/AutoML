@@ -1,6 +1,6 @@
 # Standard library imports
 import os
-from typing import Any, Dict, List
+from typing import Any
 
 # Third-party imports
 import numpy as np
@@ -55,7 +55,7 @@ def get_frequency_table(df: pd.DataFrame, column_name: str) -> str:
 
 
 def get_html_from_template(
-    template_file: str, context: Dict[str, Any], plots: List[str] = []
+    template_file: str, context: dict[str, Any], plots: list[str] = []
 ) -> str:
     current_dir = os.path.dirname(os.path.abspath(__file__))  # automl/gui
     automl_dir = os.path.dirname(current_dir)  # automl

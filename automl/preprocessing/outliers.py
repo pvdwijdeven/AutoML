@@ -1,5 +1,5 @@
 # Standard library imports
-from typing import Any, Dict, Literal, Optional, Tuple
+from typing import Any, Literal, Optional
 
 # Third-party imports
 import numpy as np
@@ -61,12 +61,12 @@ def outlier_imputation_order(
     y: Optional[pd.Series],
     *,
     fit: bool,
-    step_params: Dict[str, Any],
+    step_params: dict[str, Any],
     logger: Logger,
-    meta_data: Dict[str, Any],
+    meta_data: dict[str, Any],
     missing_threshold: float = 0.1,
     extreme_outlier_factor: float = 2.0,
-) -> Tuple[pd.DataFrame, Optional[pd.Series], Optional[Dict[str, Any]]]:
+) -> tuple[pd.DataFrame, Optional[pd.Series], Optional[dict[str, Any]]]:
     """
     Decide whether outliers in each numeric column should be handled before
     or after missing value imputation.
@@ -95,11 +95,11 @@ def outlier_imputation_order(
         Target vector (unchanged).
     fit : bool
         Whether called in "fit" mode (compute new logic) or "transform" mode (reuse parameters).
-    step_params : Dict[str, Any]
-        Dictionary for saving or reusing parameters across fit/transform stages.
+    step_params : dict[str, Any]
+        dictionary for saving or reusing parameters across fit/transform stages.
     logger : Logger
         Logger for debug messages.
-    meta_data : Dict[str, Any]
+    meta_data : dict[str, Any]
         Metadata dictionary. Must include "skip_outliers" key with {"skip_outliers": bool}.
     missing_threshold : float, default=0.1
         Maximum fraction of missing values tolerated when deciding "before imputation".
@@ -108,7 +108,7 @@ def outlier_imputation_order(
 
     Returns
     -------
-    Tuple[pd.DataFrame, Optional[pd.Series], Optional[Dict[str, Any]]]
+    tuple[pd.DataFrame, Optional[pd.Series], Optional[dict[str, Any]]]
         (Potentially unchanged) X, unchanged y, and updated step_params which includes:
         - "before_or_after": dict mapping column → {"before_imputation" | "after_imputation" | "no_encoding"}
         - "skip_outliers": bool flag from meta_data
@@ -123,7 +123,7 @@ def outlier_imputation_order(
     )
 
     if fit or not skip_outliers:
-        before_or_after: Dict[str, str] = {}
+        before_or_after: dict[str, str] = {}
 
         for column_name in X.columns:
             column = X[column_name].copy()
@@ -302,11 +302,11 @@ def handle_outliers(
     y: Optional[pd.Series],
     *,
     fit: bool,
-    step_params: Dict[str, Any],
+    step_params: dict[str, Any],
     logger: Logger,
-    meta_data: Dict[str, Any],
+    meta_data: dict[str, Any],
     before: bool = True,
-) -> Tuple[pd.DataFrame, Optional[pd.Series], Optional[Dict[str, Any]]]:
+) -> tuple[pd.DataFrame, Optional[pd.Series], Optional[dict[str, Any]]]:
     """
     Detect and handle outliers in numeric columns by either capping
     them within calculated bounds or imputing their values (typically median).
@@ -333,11 +333,11 @@ def handle_outliers(
     fit : bool
         If True, method decides thresholds and stores processing instructions.
         If False, applies stored instructions.
-    step_params : Dict[str, Any]
-        Dictionary for storing/retrieving outlier handling details.
+    step_params : dict[str, Any]
+        dictionary for storing/retrieving outlier handling details.
     logger : Logger
         Logger for status/debug output.
-    meta_data : Dict[str, Any]
+    meta_data : dict[str, Any]
         Metadata dictionary from preprocessing pipeline, must contain outlier handling order.
     before : bool, default=True
         If True, process columns flagged for 'before_imputation';
@@ -345,7 +345,7 @@ def handle_outliers(
 
     Returns
     -------
-    Tuple[pd.DataFrame, Optional[pd.Series], Optional[Dict[str, Any]]]
+    tuple[pd.DataFrame, Optional[pd.Series], Optional[dict[str, Any]]]
         Updated X, unchanged y, and new step_params with per-column outlier handling info (on 'fit').
     """
     if fit:
@@ -362,7 +362,7 @@ def handle_outliers(
             if order == requested_order and col in X_work.columns
         ]
 
-        outlier_columns: Dict[str, Any] = {}
+        outlier_columns: dict[str, Any] = {}
         for col in columns_to_process:
             threshold_method = get_threshold_method(X_work[col])
             # Calculate bounds

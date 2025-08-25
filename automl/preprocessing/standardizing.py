@@ -1,5 +1,5 @@
 # Standard library imports
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Optional
 
 # Third-party imports
 import numpy as np
@@ -16,11 +16,11 @@ def normalize_columns(
     y: Optional[pd.Series],
     *,
     fit: bool,
-    step_params: Dict[str, Any],
+    step_params: dict[str, Any],
     logger: Logger,
-    meta_data: Dict[str, Any],
+    meta_data: dict[str, Any],
     skewness_threshold: float = 0.75,
-) -> Tuple[pd.DataFrame, Optional[pd.Series], Optional[Dict[str, Any]]]:
+) -> tuple[pd.DataFrame, Optional[pd.Series], Optional[dict[str, Any]]]:
     """
     Normalize numeric columns with optional power transformation if highly skewed.
 
@@ -40,18 +40,18 @@ def normalize_columns(
     fit : bool
         If True, fit normalization transformers and save state.
         If False, apply saved transformers.
-    step_params : Dict[str, Any]
-        Dictionary (per column) for storing fitted scalers and transformers as needed.
+    step_params : dict[str, Any]
+        dictionary (per column) for storing fitted scalers and transformers as needed.
     logger : Logger
         Logger for debug output.
-    meta_data : Dict[str, Any]
+    meta_data : dict[str, Any]
         Must contain "auto_encode_features" with "added_columns" list.
     skewness_threshold : float, default=0.75
         Absolute value above which skewed numeric columns get power transformed before scaling.
 
     Returns
     -------
-    Tuple[pd.DataFrame, Optional[pd.Series], Optional[Dict[str, Any]]]
+    tuple[pd.DataFrame, Optional[pd.Series], Optional[dict[str, Any]]]
         Dataframe X (normalized), y (unchanged), and step_params (with fit state).
 
     Notes

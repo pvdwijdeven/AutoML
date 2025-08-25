@@ -1,5 +1,5 @@
 # Standard library imports
-from typing import Any, Dict, List, Optional, Self
+from typing import Any, Optional, Self
 
 # Third-party imports
 import pandas as pd
@@ -35,9 +35,9 @@ class AutomlTransformer:
     ----------
     logger : Logger
         Custom logger for tracking pipeline execution.
-    steps : List[Dict[str, Any]]
+    steps : list[dict[str, Any]]
         Ordered list of processing steps with functions and configurations.
-    meta_data : Dict[str, Dict[str, Any]]
+    meta_data : dict[str, dict[str, Any]]
         Stores fitted parameters for each step to ensure consistency during transformation.
     X_train, y_train, X_test, y_test : Any
         Copies of training/testing datasets.
@@ -64,7 +64,7 @@ class AutomlTransformer:
         )
 
         # Define the pipeline steps with optional config parameters
-        self.steps: List[Dict[str, Any]] = [
+        self.steps: list[dict[str, Any]] = [
             {
                 "name": "drop_duplicate_columns",
                 "function": drop_duplicate_columns,
@@ -136,7 +136,7 @@ class AutomlTransformer:
         Applies each step in sequence, fitting step parameters which are stored
         for later use during transformation.
         """
-        self.meta_data: Dict[str, Dict[str, Any]] = {}
+        self.meta_data: dict[str, dict[str, Any]] = {}
         self.X_train, self.y_train = X_train.copy(), y_train.copy()
 
         for step in self.steps:

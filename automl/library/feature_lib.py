@@ -2,7 +2,7 @@
 import re
 import warnings
 from collections import Counter
-from typing import Dict, List, Optional, Tuple
+from typing import Optional
 
 # Third-party imports
 import matplotlib as mpl
@@ -38,7 +38,7 @@ mpl.rcParams.update(
 
 def pandas_to_numpy(
     X: pd.DataFrame, y: Optional[pd.Series] = None
-) -> Tuple[np.ndarray, Optional[np.ndarray], Dict[str, List[str]]]:
+) -> tuple[np.ndarray, Optional[np.ndarray], dict[str, list[str]]]:
     """
     Convert pandas DataFrame X and optional target y to numpy arrays,
     preserving metadata needed to revert back later.
@@ -71,11 +71,11 @@ def pandas_to_numpy(
 
 def numpy_to_pandas(
     X_array: np.ndarray,
-    columns: List[str],
+    columns: list[str],
     y_array: Optional[np.ndarray] = None,
     y_index: Optional[pd.Index] = None,
     y_name: Optional[str] = None,
-) -> Tuple[pd.DataFrame, Optional[pd.Series]]:
+) -> tuple[pd.DataFrame, Optional[pd.Series]]:
     """
     Convert numpy arrays back to pandas DataFrame and optional Series
     using preserved metadata.
@@ -115,10 +115,10 @@ def check_classification(target: pd.Series, no_strings=False) -> bool:
 def select_features_by_missingness(
     df: pd.DataFrame,
     target: str = "",
-    candidate_features: List[str] = [],
+    candidate_features: list[str] = [],
     max_features: int = 100,
     min_row_fraction: float = 0.2,
-) -> List[str]:
+) -> list[str]:
     """
     Select features sorted by ascending missing values, adding features
     until max_features is reached or dropping NA rows keeps at least min_row_fraction of data.
@@ -167,11 +167,11 @@ def select_features_by_missingness(
 def generate_feature_relations(
     df,
     target: Optional[str] = "",
-    dict_descriptors: Dict[str, str] = {},
+    dict_descriptors: dict[str, str] = {},
     max_features: int = 100,
     max_samples: int = 10000,
     logger: Optional[Logger] = None,
-) -> Tuple[Dict[str, Dict[str, str]], int]:
+) -> tuple[dict[str, dict[str, str]], int]:
 
     warnings.filterwarnings("ignore")
 
@@ -285,7 +285,7 @@ def generate_feature_relations(
     return insights, num_features
 
 
-def analyze_target(df: pd.DataFrame, target_col: str) -> List[str]:
+def analyze_target(df: pd.DataFrame, target_col: str) -> list[str]:
     suggestions = []
     target = df[target_col]
     target_non_null = target.dropna()
@@ -380,7 +380,7 @@ def analyze_target(df: pd.DataFrame, target_col: str) -> List[str]:
     return suggestions
 
 
-def detect_outliers_iqr(series: pd.Series) -> Tuple[int, int, pd.Series]:
+def detect_outliers_iqr(series: pd.Series) -> tuple[int, int, pd.Series]:
     q1 = series.quantile(0.25)
     q3 = series.quantile(0.75)
     iqr = q3 - q1
@@ -392,7 +392,7 @@ def detect_outliers_iqr(series: pd.Series) -> Tuple[int, int, pd.Series]:
 
 def analyze_boolean_column(
     df: pd.DataFrame, column_name: str, sample_size: int = 1000
-) -> List[str]:
+) -> list[str]:
     # Reduce size for large datasets
     if len(df) > sample_size:
         df = df.sample(sample_size, random_state=42)
@@ -427,7 +427,7 @@ def safe_skew(values: pd.Series) -> Optional[float]:
 
 def analyze_numeric_column(
     df: pd.DataFrame, column_name: str, sample_size: int = 10000
-) -> List[str]:
+) -> list[str]:
     suggestions = []
 
     if len(df) > sample_size:
@@ -510,7 +510,7 @@ def generate_eda_plots(
     inferred_type: str,
     target: str = "",
     verbose: bool = False,
-) -> Dict[str, str]:
+) -> dict[str, str]:
     MAX_ROWS = 5000
     TOP_CATEGORIES = 20
 
