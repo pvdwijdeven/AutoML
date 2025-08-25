@@ -1,21 +1,25 @@
-import pandas as pd
+# Standard library imports
 import re
+import warnings
 from collections import Counter
-from scipy.stats import skew
-from library import infer_dtype, Logger, fig_to_base64
+from typing import Dict, List, Optional, Tuple
+
+# Third-party imports
+import matplotlib as mpl
+import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
+import seaborn as sns
+from scipy.stats import entropy as scipy_entropy
+from scipy.stats import skew
 from sklearn.feature_selection import (
     mutual_info_classif,
     mutual_info_regression,
 )
 from sklearn.preprocessing import LabelEncoder
-import warnings
-from typing import List, Optional, Tuple, Dict
-from scipy.stats import entropy as scipy_entropy
-import seaborn as sns
-import matplotlib.pyplot as plt
 
-import matplotlib as mpl
+# Local application imports
+from automl.library import Logger, fig_to_base64, infer_dtype
 
 # matplotlib not using GUI (thread used by wx)
 mpl.use("Agg")

@@ -1,14 +1,20 @@
-from typing import Callable, Dict, Any
-from preprocessing import AutomlTransformer
-from .models import model_class_map
-from sklearn.pipeline import Pipeline
-from .scoring import sort_ascending
-from sklearn.model_selection import KFold, cross_val_score, GridSearchCV
+# Standard library imports
+import time
+from typing import Any, Callable, Dict
+
+# Third-party imports
 import numpy as np
 import pandas as pd
-import time
 from sklearn.ensemble import StackingClassifier, StackingRegressor
-from sklearn.linear_model import Ridge, LogisticRegression
+from sklearn.linear_model import LogisticRegression, Ridge
+from sklearn.model_selection import GridSearchCV, KFold, cross_val_score
+from sklearn.pipeline import Pipeline
+
+# Local application imports
+from automl.preprocessing import AutomlTransformer
+
+from .models import model_class_map
+from .scoring import sort_ascending
 
 
 def run_kfold_evaluation(

@@ -1,23 +1,17 @@
-# internal imports
-from library import Logger
-from .general import (
-    drop_duplicate_columns,
-    drop_constant_columns,
-    drop_strings,
-)
-from .outliers import (
-    outlier_imputation_order,
-    handle_outliers,
-)
-from .encoding import auto_encode_features
-from .missing import handle_missing_values
-from .standardizing import (
-    normalize_columns,
-)
+# Standard library imports
+from typing import Any, Dict, List, Optional, Self
 
-# external imports
-from typing import Optional, Dict, List, Any, Self
+# Third-party imports
 import pandas as pd
+
+# Local application imports
+from automl.library import Logger
+
+from .encoding import auto_encode_features
+from .general import drop_constant_columns, drop_duplicate_columns, drop_strings
+from .missing import handle_missing_values
+from .outliers import handle_outliers, outlier_imputation_order
+from .standardizing import normalize_columns
 
 
 class AutomlTransformer:

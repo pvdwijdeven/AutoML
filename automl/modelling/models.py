@@ -1,25 +1,27 @@
-from sklearn.linear_model import LogisticRegression, LinearRegression
-from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
-from sklearn.svm import SVC, SVR
-from sklearn.neighbors import KNeighborsClassifier, KNeighborsRegressor
+# Third-party imports
+from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
 from sklearn.ensemble import (
+    AdaBoostClassifier,
+    ExtraTreesClassifier,
     GradientBoostingClassifier,
     GradientBoostingRegressor,
+    RandomForestClassifier,
+    RandomForestRegressor,
 )
 from sklearn.linear_model import (
-    Ridge,
-    Lasso,
-    ElasticNet,
     BayesianRidge,
+    ElasticNet,
+    Lasso,
+    LinearRegression,
+    LogisticRegression,
+    Ridge,
 )
-from sklearn.neural_network import MLPRegressor
 from sklearn.naive_bayes import GaussianNB
-from sklearn.ensemble import ExtraTreesClassifier, AdaBoostClassifier
-from sklearn.neural_network import MLPClassifier
-from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
+from sklearn.neighbors import KNeighborsClassifier, KNeighborsRegressor
+from sklearn.neural_network import MLPClassifier, MLPRegressor
+from sklearn.svm import SVC, SVR
 from xgboost import XGBRegressor
 
-# from catboost import CatBoostRegressor
 
 # Example for binary classification (balanced or imbalanced)
 models = {

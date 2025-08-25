@@ -1,7 +1,12 @@
+# Standard library imports
+from typing import Tuple
+
+# Third-party imports
 import pandas as pd
 import plotly.express as px
-from library import infer_dtype
-from typing import Tuple
+
+# Local application imports
+from automl.library import infer_dtype
 
 
 def missing_data_summary(df: pd.DataFrame) -> Tuple[int, str, str]:

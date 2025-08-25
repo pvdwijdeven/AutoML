@@ -1,15 +1,19 @@
-import pandas as pd
+# Standard library imports
+import os
+from typing import Any, Dict, List
+
+# Third-party imports
 import numpy as np
+import pandas as pd
 import plotly.express as px
 from jinja2 import Environment, FileSystemLoader
-import os
 from sklearn.feature_selection import (
     mutual_info_classif,
     mutual_info_regression,
 )
 from sklearn.preprocessing import LabelEncoder
+
 from .feature_lib import select_features_by_missingness
-from typing import List, Dict, Any
 
 
 def get_frequency_table(df: pd.DataFrame, column_name: str) -> str:

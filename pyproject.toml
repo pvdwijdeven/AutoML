@@ -17,3 +17,24 @@ dependencies = [
     "wxpython>=4.2.3",
     "xgboost>=3.0.4",
 ]
+
+[tool.ruff.lint]
+ignore = ["I"]  # disable import sorting rules
+
+[tool.isort]
+profile = "black"
+line_length = 88
+multi_line_output = 3
+include_trailing_comma = true
+
+# Custom sections
+known_first_party = ["myapp", "mypackage"]
+known_third_party = ["requests", "numpy", "pandas"]
+
+# Order of sections
+sections = ["FUTURE", "STDLIB", "THIRDPARTY", "FIRSTPARTY", "LOCALFOLDER"]
+
+# Add headings above each group
+import_heading_stdlib = "Standard library imports"
+import_heading_thirdparty = "Third-party imports"
+import_heading_firstparty = "Local application imports"

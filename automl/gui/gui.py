@@ -1,12 +1,17 @@
-import wx
-from eda import AutoML_EDA
-from modelling import AutomlModeling
-from pathlib import Path
-from library import Logger, TextCtrlHandler, WxTextRedirector
+# Standard library imports
 import logging
+import os
 import sys
 import threading
-import os
+from pathlib import Path
+
+# Third-party imports
+import wx
+
+# Local application imports
+from automl.eda import AutoML_EDA
+from automl.library import Logger, TextCtrlHandler, WxTextRedirector
+from automl.modelling import AutomlModeling
 
 
 class AutoMLFrame(wx.Frame):

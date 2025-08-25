@@ -1,18 +1,18 @@
-# internal imports
-from library import Logger, infer_dtype, check_classification
+# Standard library imports
+import time
+from typing import Any, Dict, Optional, Tuple
 
-# external imports
+# Third-party imports
 import numpy as np
 import pandas as pd
-from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
-from sklearn.impute import SimpleImputer, KNNImputer
-from sklearn.metrics import mean_squared_error
-from sklearn.preprocessing import (
-    OrdinalEncoder,
-)
-import time
-from typing import Tuple, Optional, Dict, Any
 from pandas.api.types import is_numeric_dtype
+from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
+from sklearn.impute import KNNImputer, SimpleImputer
+from sklearn.metrics import mean_squared_error
+from sklearn.preprocessing import OrdinalEncoder
+
+# Local application imports
+from automl.library import Logger, check_classification, infer_dtype
 
 
 def decide_knn_imputation(X: pd.DataFrame, column: str, logger: Logger) -> bool:

@@ -1,11 +1,12 @@
-from pandas.api.types import (
-    is_integer_dtype,
-    is_float_dtype,
-    is_bool_dtype,
-    is_string_dtype,
-    is_object_dtype,
-)
+# Third-party imports
 import pandas as pd
+from pandas.api.types import (
+    is_bool_dtype,
+    is_float_dtype,
+    is_integer_dtype,
+    is_object_dtype,
+    is_string_dtype,
+)
 
 
 def infer_dtype(series: pd.Series) -> str:

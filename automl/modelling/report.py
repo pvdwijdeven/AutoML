@@ -1,14 +1,18 @@
-from .models import models
-from .scoring import sort_ascending
-from .hypertuning import param_grids, param_grids_detailed
-from .model_plot import plot_models_step1, plot_models_step2
-from typing import Dict, Any
-import pandas as pd
-import os
-from jinja2 import Environment, FileSystemLoader
-from datetime import datetime
+# Standard library imports
 import html
 import inspect
+import os
+from datetime import datetime
+from typing import Any, Dict
+
+# Third-party imports
+import pandas as pd
+from jinja2 import Environment, FileSystemLoader
+
+from .hypertuning import param_grids, param_grids_detailed
+from .model_plot import plot_models_step1, plot_models_step2
+from .models import models
+from .scoring import sort_ascending
 
 
 def create_report(meta_data: Dict[str, Any]) -> str:

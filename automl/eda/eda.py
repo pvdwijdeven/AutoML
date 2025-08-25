@@ -1,35 +1,41 @@
+# Standard library imports
+import importlib.util
+import os
+import pathlib
+import sys
+from datetime import datetime
+from typing import Any, Dict, List, Optional
+
+# Third-party imports
 import pandas as pd
 from jinja2 import Environment, FileSystemLoader
-from .overview import create_overview_table
-from .missing import (
-    missing_data_summary,
-    plot_missingness_matrix,
-    plot_missing_correlation,
-    generate_missing_summary,
-)
-from .testdata import analyze_test_data
+from scipy.stats import entropy as scipy_entropy
 from scipy.stats import skew
-from library import (
-    infer_dtype,
+
+# Local application imports
+from automl.library import (
     Logger,
-    get_html_from_template,
-    get_frequency_table,
-    analyze_string_column,
+    analyze_boolean_column,
     analyze_categorical_column,
     analyze_numeric_column,
-    analyze_boolean_column,
+    analyze_string_column,
     analyze_target,
+    generate_eda_plots,
     generate_feature_relations,
     generate_relation_visuals,
-    generate_eda_plots,
+    get_frequency_table,
+    get_html_from_template,
+    infer_dtype,
 )
-import os
-from scipy.stats import entropy as scipy_entropy
-from datetime import datetime
-import importlib.util
-import sys
-import pathlib
-from typing import List, Dict, Optional, Any
+
+from .missing import (
+    generate_missing_summary,
+    missing_data_summary,
+    plot_missing_correlation,
+    plot_missingness_matrix,
+)
+from .overview import create_overview_table
+from .testdata import analyze_test_data
 
 
 class AutoML_EDA:

@@ -1,9 +1,13 @@
-from library import Logger
+# Standard library imports
+from typing import Any, Dict, Literal, Optional, Tuple
 
+# Third-party imports
 import numpy as np
 import pandas as pd
-from typing import Optional, Tuple, Dict, Any, Literal
 from scipy.stats import shapiro
+
+# Local application imports
+from automl.library import Logger
 
 
 def get_threshold_method(

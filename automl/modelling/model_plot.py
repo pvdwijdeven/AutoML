@@ -1,7 +1,11 @@
-import numpy as np
-import matplotlib.pyplot as plt
-import io
+# Standard library imports
 import base64
+import io
+
+# Third-party imports
+import matplotlib.pyplot as plt
+import numpy as np
+
 from .scoring import sort_ascending
 
 

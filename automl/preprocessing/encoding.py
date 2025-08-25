@@ -1,23 +1,15 @@
-# internal imports
-from library import Logger
+# Standard library imports
+import warnings
+from typing import Any, Dict, List, Optional, Tuple
 
-
-# external imports
-
+# Third-party imports
 import numpy as np
 import pandas as pd
-
-
-from sklearn.preprocessing import (
-    OneHotEncoder,
-    OrdinalEncoder,
-)
-
-from typing import Tuple, Optional, Dict, Any, List
-import warnings
-
-
 import pandas.api.types as ptypes
+from sklearn.preprocessing import OneHotEncoder, OrdinalEncoder
+
+# Local application imports
+from automl.library import Logger
 
 
 def auto_encode_features(

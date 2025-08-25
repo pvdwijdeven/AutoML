@@ -1,16 +1,14 @@
-from library import Logger
+# Standard library imports
+from typing import Any, Dict, Optional, Tuple
 
-# external imports
-
+# Third-party imports
 import numpy as np
 import pandas as pd
 from pandas.api.types import is_numeric_dtype
+from sklearn.preprocessing import PowerTransformer, StandardScaler
 
-from sklearn.preprocessing import (
-    PowerTransformer,
-    StandardScaler,
-)
-from typing import Tuple, Optional, Dict, Any
+# Local application imports
+from automl.library import Logger
 
 
 def normalize_columns(

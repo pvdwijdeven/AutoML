@@ -1,9 +1,14 @@
-from jinja2 import Environment, FileSystemLoader
-from library import infer_dtype
-from collections import defaultdict
-import pandas as pd
-import re
+# Standard library imports
 import os
+import re
+from collections import defaultdict
+
+# Third-party imports
+import pandas as pd
+from jinja2 import Environment, FileSystemLoader
+
+# Local application imports
+from automl.library import infer_dtype
 
 
 def add_links_to_headers(html: str, target: str) -> str:

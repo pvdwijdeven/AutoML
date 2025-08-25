@@ -1,15 +1,14 @@
-# internal imports
-from library import Logger
-from .target import (
-    is_target_categorical,
-    encode_target,
-    standardize_target,
-)
-from .general import drop_duplicate_rows, skip_outliers, detect_dataset_type
+# Standard library imports
+from typing import Any, Dict, Tuple
 
-# external imports
+# Third-party imports
 import pandas as pd
-from typing import Dict, Any, Tuple
+
+# Local application imports
+from automl.library import Logger
+
+from .general import detect_dataset_type, drop_duplicate_rows, skip_outliers
+from .target import encode_target, is_target_categorical, standardize_target
 
 
 def preprocess(

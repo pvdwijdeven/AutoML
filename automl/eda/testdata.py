@@ -1,8 +1,13 @@
-import pandas as pd
-import numpy as np
+# Standard library imports
 import re
-from typing import Tuple, List
-from library import check_classification
+from typing import List, Tuple
+
+# Third-party imports
+import numpy as np
+import pandas as pd
+
+# Local application imports
+from automl.library import check_classification
 
 
 def analyze_test_data(

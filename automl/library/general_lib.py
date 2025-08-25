@@ -1,12 +1,15 @@
+# Standard library imports
+import base64
+import io
 import logging
-from logging.handlers import RotatingFileHandler
-import wx
 import os
 import sys
+from logging.handlers import RotatingFileHandler
 from typing import Optional
-import io
-import base64
+
+# Third-party imports
 import matplotlib.pyplot as plt
+import wx
 
 
 def fig_to_base64(fig, alt_text: str) -> str:

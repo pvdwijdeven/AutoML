@@ -15,7 +15,7 @@
         "name": "Run Titanic AutoML",
         "type": "debugpy",
         "request": "launch",
-        "program": "${workspaceFolder}/automl/automl_main.py",
+        "module": "automl.automl_main",
         "console": "integratedTerminal",
         "args": [
             "--title", "Titanic (Kaggle)",
@@ -38,7 +38,7 @@
         "name": "Run House Prices AutoML",
         "type": "debugpy",
         "request": "launch",
-        "program": "${workspaceFolder}/automl/automl_main.py",
+        "module": "automl.automl_main",
         "console": "integratedTerminal",
         "args": [
             "--title", "House Prices (Kaggle)",
@@ -60,7 +60,7 @@
         "name": "Run Spaceship Titanic AutoML",
         "type": "debugpy",
         "request": "launch",
-        "program": "${workspaceFolder}/automl/automl_main.py",
+        "module": "automl.automl_main",
         "console": "integratedTerminal",
         "args": [
             "--title", "Spaceship Titanic (Kaggle)",

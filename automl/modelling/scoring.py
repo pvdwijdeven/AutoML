@@ -1,16 +1,19 @@
+# Standard library imports
+from math import sqrt
+from typing import Any, Callable, Dict, List, Tuple
+
+# Third-party imports
+import numpy as np
 import pandas as pd
 from sklearn.metrics import (
     accuracy_score,
     f1_score,
-    roc_auc_score,
+    get_scorer,
+    make_scorer,
     mean_squared_error,
     r2_score,
+    roc_auc_score,
 )
-from math import sqrt
-import numpy as np
-from typing import Tuple, Any, List, Dict, Callable
-
-from sklearn.metrics import make_scorer, get_scorer
 
 
 def sort_ascending(scorer_name):

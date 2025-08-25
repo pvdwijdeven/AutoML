@@ -1,16 +1,13 @@
-from library import Logger
+# Standard library imports
+from typing import Any, Dict, Self, Tuple
 
-# external imports
-import pandas as pd
+# Third-party imports
 import numpy as np
-from sklearn.preprocessing import (
-    LabelEncoder,
-)
-from typing import Self, Dict, Any, Tuple
-from sklearn.preprocessing import (
-    PowerTransformer,
-    StandardScaler,
-)
+import pandas as pd
+from sklearn.preprocessing import LabelEncoder, PowerTransformer, StandardScaler
+
+# Local application imports
+from automl.library import Logger
 
 
 def is_target_categorical(

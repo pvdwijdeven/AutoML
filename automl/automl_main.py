@@ -1,7 +1,12 @@
-import wx
-from gui import AutoMLFrame
+# Standard library imports
 import argparse
 from pathlib import Path
+
+# Third-party imports
+import wx
+
+# Local application imports
+from automl.gui import AutoMLFrame
 
 
 def automl(*args):

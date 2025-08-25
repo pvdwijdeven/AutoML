@@ -1,8 +1,12 @@
-from library import Logger
+# Standard library imports
+from typing import Any, Dict, Optional, Tuple, Union
 
-import pandas as pd
+# Third-party imports
 import numpy as np
-from typing import Optional, Tuple, Dict, Any, Union
+import pandas as pd
+
+# Local application imports
+from automl.library import Logger
 
 
 def detect_dataset_type(
