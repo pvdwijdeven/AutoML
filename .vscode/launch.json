@@ -10,6 +10,74 @@
             "request": "launch",
             "program": "${file}",
             "console": "integratedTerminal"
+        },
+        {
+        "name": "Run Titanic AutoML",
+        "type": "debugpy",
+        "request": "launch",
+        "program": "${workspaceFolder}/automl/automl_main.py",
+        "console": "integratedTerminal",
+        "args": [
+            "--title", "Titanic (Kaggle)",
+            "--training_data", "../personal/data/Titanic/train.csv",
+            "--test_data", "../personal/data/Titanic/test.csv",
+            "--update_script", "../personal/update_df/Titanic.py",
+            "--description", "../personal/data/Titanic/description.txt",
+            "--EDA",
+            "--scoring", "accuracy",
+            "--output_file", "../personal/export/Titanic/Titanic_results.html",
+            "--report_file", "../personal/export/Titanic/Titanic_report.html",
+            "--logger_file", "./personal/logs/Titanic.log",
+            "--nogui"
+        ],
+        "env": {
+            "UV_PREFER_BINARY": "1"
+        }
+        },
+        {
+        "name": "Run House Prices AutoML",
+        "type": "debugpy",
+        "request": "launch",
+        "program": "${workspaceFolder}/automl/automl_main.py",
+        "console": "integratedTerminal",
+        "args": [
+            "--title", "House Prices (Kaggle)",
+            "--training_data", "../personal/data/HousePrices/train.csv",
+            "--test_data", "../personal/data/HousePrices/test.csv",
+            "--description", "../personal/data/HousePrices/description.txt",
+            "--EDA",
+            "--scoring", "neg_root_mean_squared_error",
+            "--report_file", "../personal/export/HousePrices/HousePrices_report.html",
+            "--output_file", "../personal/export/HousePrices/HousePrices_results.html",
+            "--logger_file", "./personal/logs/HousePrices.log",
+            "--nogui"
+        ],
+        "env": {
+            "UV_PREFER_BINARY": "1"
+        }
+        },
+        {
+        "name": "Run Spaceship Titanic AutoML",
+        "type": "debugpy",
+        "request": "launch",
+        "program": "${workspaceFolder}/automl/automl_main.py",
+        "console": "integratedTerminal",
+        "args": [
+            "--title", "Spaceship Titanic (Kaggle)",
+            "--training_data", "../personal/data/SpaceshipTitanic/train.csv",
+            "--test_data", "../personal/data/SpaceshipTitanic/test.csv",
+            "--description", "../personal/data/SpaceshipTitanic/description.txt",
+            "--update_script", "../personal/update_df/SpaceshipTitanic.py",
+            "--EDA",
+            "--scoring", "accuracy",
+            "--output_file", "../personal/export/SpaceshipTitanic/SpaceshipTitanic_results.html",
+            "--report_file", "../personal/export/SpaceshipTitanic/SpaceshipTitanic_report.html",
+            "--logger_file", "./personal/logs/SpaceshipTitanic.log",
+            "--nogui"
+        ],
+        "env": {
+            "UV_PREFER_BINARY": "1"
+        }
         }
     ]
 }
