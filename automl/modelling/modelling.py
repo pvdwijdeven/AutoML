@@ -51,14 +51,14 @@ class AutomlModeling:
                 )
             y_original = X_original[target]
             X_original = X_original.drop(target, axis=1)
-        self.X_original = X_original
-        self.y_original = y_original
-        self.target: str = target
-        self.output_file: str = output_file
-        self.df_test = df_test
-        self.scoring = scoring
-        self.title = title
         self.meta_data = {}
+        self.meta_data["X_original"] = X_original
+        self.meta_data["y_original"] = y_original
+        self.meta_data["target"] = target
+        self.meta_data["output_file"] = output_file
+        self.meta_data["df_test"] = df_test
+        self.meta_data["scoring"] = scoring
+        self.meta_data["title"] = title
         if logger is None:
             self.logger = Logger(
                 level_console=Logger.INFO,
@@ -70,40 +70,49 @@ class AutomlModeling:
             self.logger: Logger = logger
         self.start_modelling()
 
-    def start_modelling(self):
+    def start_modelling(self) -> None:
         self.split_validation_data()
 
-        self.X_val_prepro, self.y_val_prepro, self.meta_data = preprocess(
-            X=self.X_val, y=self.y_val, logger=self.logger
+        (
+            self.meta_data["X_val_prepro"],
+            self.meta_data["y_val_prepro"],
+            meta_data_add,
+        ) = preprocess(
+            X=self.meta_data["X_val"],
+            y=self.meta_data["y_val"],
+            logger=self.logger,
         )
-        self.meta_data["X_train_val_size"] = self.X_val.shape
-        self.meta_data["X_prepro_size"] = self.X_val_prepro.shape
-        self.meta_data["target"] = self.target
-        self.meta_data["title"] = self.title
-        self.dataset_type: str = self.meta_data["dataset_type"]
-        self.scoring = get_scoring(self.scoring, self.dataset_type)
-        if self.scoring == "lrmse":
-            self.scorer = lrmse_scorer
+        self.meta_data.update(meta_data_add)
+        self.meta_data["X_train_val_size"] = self.meta_data["X_val"].shape
+        self.meta_data["X_prepro_size"] = self.meta_data["X_val_prepro"].shape
+        self.meta_data["scoring"] = get_scoring(
+            scoring=self.meta_data["scoring"],
+            dataset_type=self.meta_data["dataset_type"],
+        )
+        if self.meta_data["scoring"] == "lrmse":
+            self.meta_data["scorer"] = lrmse_scorer
         else:
-            self.scorer = self.scoring
-        self.meta_data["scoring"] = self.scoring
-        self.meta_data["scorer"] = self.scorer
-        self.logger.info(msg=f"[BLUE] Dataset type: {self.dataset_type}")
+            self.meta_data["scorer"] = self.meta_data["scoring"]
+        self.meta_data["scoring"] = self.meta_data["scoring"]
+        self.meta_data["scorer"] = self.meta_data["scorer"]
+        self.logger.info(
+            msg=f"[BLUE] Dataset type: {self.meta_data["dataset_type"]}"
+        )
 
         self.logger.info(msg="[MAGENTA] Starting primarily model selction")
 
         # Step 1 - model selection 10 models, 1 parameter per set
         checkpoint = self.load_step(step=1)
         if checkpoint is None:
-            results = run_kfold_evaluation(
-                X=self.X_val_prepro,
-                y=self.y_val_prepro,
+            self.meta_data["10_models_output"] = run_kfold_evaluation(
+                X=self.meta_data["X_val_prepro"],
+                y=self.meta_data["y_val_prepro"],
                 models=models,
-                dataset_type=self.dataset_type,
+                dataset_type=self.meta_data["dataset_type"],
                 logger=self.logger,
-                scoring=self.scorer,
+                scoring=self.meta_data["scorer"],
             )
-            df_results = pd.DataFrame(
+            self.meta_data["10_models_results"] = pd.DataFrame(
                 [
                     {
                         "model": model,
@@ -111,218 +120,269 @@ class AutomlModeling:
                         "std_score": details["std_score"],
                         "time_taken": details["time_taken"],
                     }
-                    for model, details in results.items()
+                    for model, details in self.meta_data[
+                        "10_models_output"
+                    ].items()
                 ]
             )
             # Sort models by mean descending or ascending
-            df_results = df_results.sort_values(
+            self.meta_data["10_models_results"] = self.meta_data[
+                "10_models_results"
+            ].sort_values(
                 by="mean_score",
-                ascending=sort_ascending(scorer_name=self.scoring),
+                ascending=sort_ascending(scorer_name=self.meta_data["scoring"]),
             )
-            top_selection = select_top_models(
-                summary_df=df_results, scorer=self.scoring
+            self.meta_data["top_selection_step1"] = select_top_models(
+                summary_df=self.meta_data["10_models_results"],
+                scorer=self.meta_data["scoring"],
             )
-            self.save_step(step=1, obj=(df_results, results, top_selection))
+            self.save_step(step=1)
         else:
-            df_results, results, top_selection = checkpoint
+            self.meta_data = checkpoint
 
         self.logger.info(
-            msg=f"[MAGENTA] Starting hypertuning top {len(top_selection)} model selction"
+            msg=f"[MAGENTA] Starting hypertuning top {len(self.meta_data["top_selection_step1"])} model selction"
         )
         # Step 2 model selection top (max) 5 of step 1, small hypertuning grid set
 
         checkpoint = self.load_step(2)
         if checkpoint is None:
-            best_grid_model = run_kfold_grid_search(
-                dataset_type=self.dataset_type,
-                scoring=self.scorer,
-                top_models=top_selection,
+            self.meta_data["topX_grid_results"] = run_kfold_grid_search(
+                dataset_type=self.meta_data["dataset_type"],
+                scoring=self.meta_data["scorer"],
+                top_models=self.meta_data["top_selection_step1"],
                 param_grid_matrix=param_grids,
-                X=self.X_val_prepro,
-                y=self.y_val_prepro,
+                X=self.meta_data["X_val_prepro"],
+                y=self.meta_data["y_val_prepro"],
                 logger=self.logger,
             )
-            self.save_step(step=2, obj=(best_grid_model))
+            self.save_step(step=2)
         else:
-            best_grid_model = checkpoint
+            self.meta_data = checkpoint
 
-        best_model_name, best_score = get_best_model_name(
-            results=best_grid_model
-        )
+        (
+            self.meta_data["TopX_best_model_name"],
+            self.meta_data["TopX_best_score"],
+        ) = get_best_model_name(results=self.meta_data["topX_grid_results"])
         self.logger.info(
-            msg=f"[MAGENTA]Best model: {best_model_name}, score: {best_score}"
+            msg=f"[MAGENTA]Best model: {self.meta_data["TopX_best_model_name"]}, score: {self.meta_data["TopX_best_score"]}"
         )
 
         # Step 3 hyperparameter tuning on best model of step 2
         checkpoint = self.load_step(step=3)
         if checkpoint is None:
-            fine_tuned_model = run_kfold_grid_search(
-                dataset_type=self.dataset_type,
-                scoring=self.scorer,
-                top_models=[{"model_name": best_model_name}],
+            self.meta_data["Top_model_top_grid_output"] = run_kfold_grid_search(
+                dataset_type=self.meta_data["dataset_type"],
+                scoring=self.meta_data["scorer"],
+                top_models=[
+                    {"model_name": self.meta_data["TopX_best_model_name"]}
+                ],
                 param_grid_matrix=param_grids_detailed,
-                X=self.X_val_prepro,
-                y=self.y_val_prepro,
+                X=self.meta_data["X_val_prepro"],
+                y=self.meta_data["y_val_prepro"],
                 logger=self.logger,
             )
-            self.save_step(step=3, obj=(fine_tuned_model))
+            self.save_step(step=3)
         else:
-            fine_tuned_model = checkpoint
+            self.meta_data = checkpoint
 
-        self.meta_data["step1"] = results
-        self.meta_data["top_selection"] = top_selection
-        self.meta_data["step2"] = best_grid_model
-        self.meta_data["step3"] = fine_tuned_model
-        best_model_name, best_score = get_best_model_name(
-            results=fine_tuned_model
+        # self.meta_data["step1"] = self.meta_data["10_models_output"]
+        self.meta_data["top_selection"] = self.meta_data["top_selection_step1"]
+        (
+            self.meta_data["Top_model_best_model_name"],
+            self.meta_data["Top_model_best_score"],
+        ) = get_best_model_name(
+            results=self.meta_data["Top_model_top_grid_output"]
         )
         self.logger.info(
-            msg=f"Best model: {best_model_name}, score: {best_score}"
+            msg=f"Best model: {self.meta_data["Top_model_best_model_name"]}, score: {self.meta_data["Top_model_best_score"]}"
         )
 
         checkpoint = self.load_step(step=4)
         if checkpoint is None:
-            stacking_model = stacking_ensembler(
+            self.meta_data["stacking_model"] = stacking_ensembler(
                 meta_data=self.meta_data,
-                X=self.X_val_prepro,
-                y=self.y_val_prepro,
+                X=self.meta_data["X_val_prepro"],
+                y=self.meta_data["y_val_prepro"],
                 logger=self.logger,
             )
-            self.save_step(step=4, obj=(stacking_model))
+            self.save_step(step=4)
         else:
-            stacking_model = checkpoint
+            self.meta_data = checkpoint
 
-        self.meta_data["Step5"] = stacking_model
+        self.meta_data["Step5"] = self.meta_data["stacking_model"]
         # Step 4 -
 
         if "encode_target" in self.meta_data:
-            self.y_test_prepro = self.meta_data["encode_target"][
+            self.meta_data["y_test_prepro"] = self.meta_data["encode_target"][
                 "encoder"
-            ].transform(y=self.y_final_test)
+            ].transform(y=self.meta_data["y_final_test"])
         elif "standardize_target" in self.meta_data:
-            self.y_test_prepro = self.meta_data["standardize_target"][
-                "target_transformer"
-            ].transform(y=self.y_final_test)
+            self.meta_data["y_test_prepro"] = self.meta_data[
+                "standardize_target"
+            ]["target_transformer"].transform(y=self.meta_data["y_final_test"])
         checkpoint = self.load_step(step=5)
         if checkpoint is None:
-            best_model = next(iter(fine_tuned_model.values()))[
-                "best_estimator"
-            ].named_steps["model"]
-            best_estimator = next(iter(fine_tuned_model.values()))[
-                "best_estimator"
-            ]
-            self.meta_data["num_features"] = best_model.n_features_in_
-            transformer = AutomlTransformer(logger=self.logger)
-            transformer.fit(
-                X_train=self.X_val_prepro, y_train=self.y_val_prepro
+            self.meta_data["best_model"] = next(
+                iter(self.meta_data["Top_model_top_grid_output"].values())
+            )["best_estimator"].named_steps["model"]
+            self.meta_data["best_estimator"] = next(
+                iter(self.meta_data["Top_model_top_grid_output"].values())
+            )["best_estimator"]
+            self.meta_data["num_features"] = self.meta_data[
+                "best_model"
+            ].n_features_in_
+            self.meta_data["transformer"] = AutomlTransformer(
+                logger=self.logger
             )
-            self.X_val_trans = transformer.transform(X=self.X_val_prepro)
-            self.X_test_trans = transformer.transform(X=self.X_final_test)
-            best_model.fit(self.X_val_trans, self.y_val_prepro)
-            score = flexible_scorer(
-                estimator=best_model,
-                X=self.X_test_trans,
-                y=self.y_test_prepro,
-                scorer_param=self.scorer,
+            self.meta_data["transformer"].fit(
+                X_train=self.meta_data["X_val_prepro"],
+                y_train=self.meta_data["y_val_prepro"],
             )
-            self.meta_data["transformer"] = transformer.meta_data
-            self.save_step(
-                step=5,
-                obj=(best_model, best_estimator, score, transformer.meta_data),
+            self.meta_data["X_val_trans"] = self.meta_data[
+                "transformer"
+            ].transform(X=self.meta_data["X_val_prepro"])
+            self.meta_data["X_test_trans"] = self.meta_data[
+                "transformer"
+            ].transform(X=self.meta_data["X_final_test"])
+            self.meta_data["best_model"].fit(
+                self.meta_data["X_val_trans"], self.meta_data["y_val_prepro"]
             )
+            self.meta_data["flex_scorer"] = flexible_scorer(
+                estimator=self.meta_data["best_model"],
+                X=self.meta_data["X_test_trans"],
+                y=self.meta_data["y_test_prepro"],
+                scorer_param=self.meta_data["scorer"],
+            )
+            self.meta_data["transformer"] = self.meta_data[
+                "transformer"
+            ].meta_data
+            self.save_step(step=5)
         else:
-            best_model, best_estimator, score, self.meta_data["transformer"] = (
-                checkpoint
-            )
-        self.meta_data["num_features"] = best_model.n_features_in_
+            self.meta_data = checkpoint
+        self.meta_data["num_features"] = self.meta_data[
+            "best_model"
+        ].n_features_in_
         self.logger.info(
-            msg=f"[ORANGE] Scoring on 20% untouched dataset with {best_model_name}: {score}"
+            msg=f"[ORANGE] Scoring on 20% untouched dataset with {self.meta_data["TopX_best_model_name"]}: {self.meta_data["flex_scorer"]}"
         )
-        self.meta_data["final_score"] = score
+        self.meta_data["final_score"] = self.meta_data["flex_scorer"]
 
         # step 6: test on meta stacker
-        transformer = AutomlTransformer(logger=self.logger)
-        transformer.fit(X_train=self.X_val_prepro, y_train=self.y_val_prepro)
-        self.X_val_trans = transformer.transform(X=self.X_val_prepro)
-        self.X_test_trans = transformer.transform(X=self.X_final_test)
-        best_model_stack = next(iter(stacking_model.values()))[
-            "best_estimator"
-        ].named_steps["stacking"]
-        best_estimator_stack = next(iter(stacking_model.values()))[
-            "best_estimator"
-        ]
-        best_model_stack.fit(self.X_val_trans, self.y_val_prepro)
-        score = flexible_scorer(
-            estimator=best_model_stack,
-            X=self.X_test_trans,
-            y=self.y_test_prepro,
-            scorer_param=self.scorer,
+        self.meta_data["transformer"] = AutomlTransformer(logger=self.logger)
+        self.meta_data["transformer"].fit(
+            X_train=self.meta_data["X_val_prepro"],
+            y_train=self.meta_data["y_val_prepro"],
+        )
+        self.meta_data["X_val_trans"] = self.meta_data["transformer"].transform(
+            X=self.meta_data["X_val_prepro"]
+        )
+        self.meta_data["X_test_trans"] = self.meta_data[
+            "transformer"
+        ].transform(X=self.meta_data["X_final_test"])
+        self.meta_data["best_model_stack"] = next(
+            iter(self.meta_data["stacking_model"].values())
+        )["best_estimator"].named_steps["stacking"]
+        self.meta_data["best_estimator_stack"] = next(
+            iter(self.meta_data["stacking_model"].values())
+        )["best_estimator"]
+        self.meta_data["best_model_stack"].fit(
+            self.meta_data["X_val_trans"], self.meta_data["y_val_prepro"]
+        )
+        self.meta_data["flex_scorer"] = flexible_scorer(
+            estimator=self.meta_data["best_model_stack"],
+            X=self.meta_data["X_test_trans"],
+            y=self.meta_data["y_test_prepro"],
+            scorer_param=self.meta_data["scorer"],
         )
         self.logger.info(
-            msg=f"[ORANGE] Scoring on 20% untouched dataset with meta stacker: {score}"
+            msg=f"[ORANGE] Scoring on 20% untouched dataset with meta stacker: {self.meta_data["flex_scorer"]}"
         )
         # final step if df_test is available
-        if self.df_test is not None:
-            self.X_full_prepro, self.y_full_prepro, self.meta_data_add = (
-                preprocess(
-                    X=self.X_original, y=self.y_original, logger=self.logger
-                )
+        if self.meta_data["df_test"] is not None:
+            (
+                self.meta_data["X_full_prepro"],
+                self.meta_data["y_full_prepro"],
+                self.meta_data["preprocess_step4"],
+            ) = preprocess(
+                X=self.meta_data["X_original"],
+                y=self.meta_data["y_original"],
+                logger=self.logger,
             )
-            self.meta_data["preprocess_step4"] = self.meta_data_add
-            best_estimator.fit(self.X_full_prepro, self.y_full_prepro)
-            self.y_pred = best_estimator.predict(self.df_test)
+            self.meta_data["best_estimator"].fit(
+                self.meta_data["X_full_prepro"], self.meta_data["y_full_prepro"]
+            )
+            self.meta_data["y_pred"] = self.meta_data["best_estimator"].predict(
+                self.meta_data["df_test"]
+            )
             if "encode_target" in self.meta_data:
-                self.y_pred = self.meta_data["encode_target"][
+                self.meta_data["y_pred"] = self.meta_data["encode_target"][
                     "encoder"
-                ].inverse_transform(y=self.y_pred)
+                ].inverse_transform(y=self.meta_data["y_pred"])
             elif "standardize_target" in self.meta_data:
-                self.y_pred = self.meta_data["standardize_target"][
+                self.meta_data["y_pred"] = self.meta_data["standardize_target"][
                     "target_transformer"
-                ].inverse_transform(y=self.y_pred)
-            first_col = self.df_test.iloc[:, 0]
+                ].inverse_transform(y=self.meta_data["y_pred"])
+            self.meta_data["first_col"] = self.meta_data["df_test"].iloc[:, 0]
             # Create a DataFrame combining the first column and y_pred
-            df = pd.DataFrame(
-                data={first_col.name: first_col, self.target: self.y_pred}
+            self.meta_data["submission"] = pd.DataFrame(
+                data={
+                    self.meta_data["first_col"].name: self.meta_data[
+                        "first_col"
+                    ],
+                    self.meta_data["target"]: self.meta_data["y_pred"],
+                }
             )
 
             # Save DataFrame to CSV
-            df.to_csv(
-                self.output_file.replace("results.html", "submission.csv"),
+            self.meta_data["submission"].to_csv(
+                self.meta_data["output_file"].replace(
+                    "results.html", "submission.csv"
+                ),
                 index=False,
             )
             self.logger.info(
-                f"Submissing saved to {self.output_file.replace("results.html", "submission.csv")}"
+                f"Submissing saved to {self.meta_data["output_file"].replace("results.html", "submission.csv")}"
             )
             # same for meta stacker
-            best_estimator_stack.fit(self.X_full_prepro, self.y_full_prepro)
-            self.y_pred = best_estimator_stack.predict(self.df_test)
+            self.meta_data["best_estimator_stack"].fit(
+                self.meta_data["X_full_prepro"], self.meta_data["y_full_prepro"]
+            )
+            self.meta_data["y_pred"] = self.meta_data[
+                "best_estimator_stack"
+            ].predict(self.meta_data["df_test"])
             if "encode_target" in self.meta_data:
-                self.y_pred = self.meta_data["encode_target"][
+                self.meta_data["y_pred"] = self.meta_data["encode_target"][
                     "encoder"
-                ].inverse_transform(y=self.y_pred)
+                ].inverse_transform(y=self.meta_data["y_pred"])
             elif "standardize_target" in self.meta_data:
-                self.y_pred = self.meta_data["standardize_target"][
+                self.meta_data["y_pred"] = self.meta_data["standardize_target"][
                     "target_transformer"
-                ].inverse_transform(y=self.y_pred)
-            first_col = self.df_test.iloc[:, 0]
+                ].inverse_transform(y=self.meta_data["y_pred"])
+            self.meta_data["first_col"] = self.meta_data["df_test"].iloc[:, 0]
             # Create a DataFrame combining the first column and y_pred
-            df = pd.DataFrame(
-                data={first_col.name: first_col, self.target: self.y_pred}
+            self.meta_data["submission"] = pd.DataFrame(
+                data={
+                    self.meta_data["first_col"].name: self.meta_data[
+                        "first_col"
+                    ],
+                    self.meta_data["target"]: self.meta_data["y_pred"],
+                }
             )
 
             # Save DataFrame to CSV
-            df.to_csv(
-                self.output_file.replace(
+            self.meta_data["submission"].to_csv(
+                self.meta_data["output_file"].replace(
                     "results.html", "submission_stack.csv"
                 ),
                 index=False,
             )
             self.logger.info(
-                f"Submissing for stack saved to {self.output_file.replace("results.html", "submission_stack.csv")}"
+                f"Submissing for stack saved to {self.meta_data["output_file"].replace("results.html", "submission_stack.csv")}"
             )
 
         # Save meta_data as a text file
-        meta_data_path = self.output_file.replace(
+        meta_data_path = self.meta_data["output_file"].replace(
             "results.html", "meta_data.txt"
         )
 
@@ -335,7 +395,7 @@ class AutomlModeling:
         result = create_report(meta_data=self.meta_data)
         write_to_output(
             html=result,
-            output_file=self.output_file,
+            output_file=self.meta_data["output_file"],
         )
         self.logger.info(msg="[MAGENTA] DONE")
 
@@ -346,27 +406,31 @@ class AutomlModeling:
         shuffle=True,
     ) -> None:
         (
-            self.X_val,
-            self.X_final_test,
-            self.y_val,
-            self.y_final_test,
+            self.meta_data["X_val"],
+            self.meta_data["X_final_test"],
+            self.meta_data["y_val"],
+            self.meta_data["y_final_test"],
         ) = train_test_split(
-            self.X_original,
-            self.y_original,
+            self.meta_data["X_original"],
+            self.meta_data["y_original"],
             test_size=test_size,
             random_state=random_state,
             shuffle=shuffle,
         )
 
-    def save_step(self, step: int, obj):
+    def save_step(self, step: int):
 
-        path = self.output_file.replace("results.html", f"step{step}.pkl")
+        path = self.meta_data["output_file"].replace(
+            "results.html", f"step{step}.pkl"
+        )
         with open(file=path, mode="wb") as f:
-            pickle.dump(obj=obj, file=f)
+            pickle.dump(obj=self.meta_data, file=f)
         self.logger.info(msg=f"[GREEN] Saved checkpoint: {path}")
 
     def load_step(self, step: int):
-        path = self.output_file.replace("results.html", f"step{step}.pkl")
+        path = self.meta_data["output_file"].replace(
+            "results.html", f"step{step}.pkl"
+        )
         if os.path.exists(path):
             with open(path, "rb") as f:
                 self.logger.info(f"[CYAN] Loaded checkpoint: {path}")

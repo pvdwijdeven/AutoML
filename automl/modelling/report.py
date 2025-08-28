@@ -19,7 +19,7 @@ def create_report(meta_data: dict[str, Any]) -> str:
     general = create_general_table(meta_data=meta_data)
     order_list = [m["model_name"] for m in meta_data["top_selection"]]
     step1 = step1_to_html(
-        results_dict=meta_data["step1"],
+        results_dict=meta_data["10_models_output"],
         meta_data=meta_data,
         models_dict=models[meta_data["dataset_type"]],
         order_list=order_list,
@@ -32,7 +32,7 @@ def create_report(meta_data: dict[str, Any]) -> str:
     html += "<br><h3>Step1: model selection</h3>"
     html += step1
     html += plot_models_step1(meta_data=meta_data, step="step1")
-    html += f"<br><h3>Step2: hypertuning top {len(meta_data['step2'])}</h3>"
+    html += f"<br><h3>Step2: hypertuning top {len(meta_data['topX_grid_results'])}</h3>"
     html += step2
     html += plot_models_step2(rows_step2)
     html += "<br><h3>Step3: Detailed hypertuning</h3>"
@@ -229,14 +229,14 @@ def step2_to_html(
 
     rows = []
     first = True
-    for model in meta_data["step2"]:
+    for model in meta_data["topX_grid_results"]:
 
-        best_score = meta_data["step2"][model]["best_score"]
-        best_params_temp = meta_data["step2"][model]["best_params"]
+        best_score = meta_data["topX_grid_results"][model]["best_score"]
+        best_params_temp = meta_data["topX_grid_results"][model]["best_params"]
         number_of_runs = len(
-            meta_data["step2"][model]["cv_results"]["mean_fit_time"]
+            meta_data["topX_grid_results"][model]["cv_results"]["mean_fit_time"]
         )
-        time_taken = meta_data["step2"][model]["time_taken"]
+        time_taken = meta_data["topX_grid_results"][model]["time_taken"]
         best_params = []
         for param in best_params_temp:
             my_param = param.replace("model__", "")
@@ -319,14 +319,18 @@ def step3_to_html(
     )
 
     rows = []
-    for model in meta_data["step3"]:
+    for model in meta_data["Top_model_top_grid_output"]:
 
-        best_score = meta_data["step3"][model]["best_score"]
-        best_params_temp = meta_data["step3"][model]["best_params"]
+        best_score = meta_data["Top_model_top_grid_output"][model]["best_score"]
+        best_params_temp = meta_data["Top_model_top_grid_output"][model][
+            "best_params"
+        ]
         number_of_runs = len(
-            meta_data["step3"][model]["cv_results"]["mean_fit_time"]
+            meta_data["Top_model_top_grid_output"][model]["cv_results"][
+                "mean_fit_time"
+            ]
         )
-        time_taken = meta_data["step3"][model]["time_taken"]
+        time_taken = meta_data["Top_model_top_grid_output"][model]["time_taken"]
         best_params = []
         for param in best_params_temp:
             my_param = param.replace("model__", "")
