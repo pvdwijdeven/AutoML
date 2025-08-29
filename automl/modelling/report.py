@@ -31,7 +31,7 @@ def create_report(meta_data: dict[str, Any]) -> str:
     html += general
     html += "<br><h3>Step1: model selection</h3>"
     html += step1
-    html += plot_models_step1(meta_data=meta_data, step="step1")
+    html += plot_models_step1(meta_data=meta_data, step="10_models_output")
     html += f"<br><h3>Step2: hypertuning top {len(meta_data['topX_grid_results'])}</h3>"
     html += step2
     html += plot_models_step2(rows_step2)

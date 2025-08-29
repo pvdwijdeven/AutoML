@@ -12,7 +12,7 @@
             "console": "integratedTerminal"
         },
         {
-        "name": "Run Titanic AutoML",
+        "name": "Titanic",
         "type": "debugpy",
         "request": "launch",
         "module": "automl.automl_main",
@@ -35,7 +35,7 @@
         }
         },
         {
-        "name": "Run House Prices AutoML",
+        "name": "HousePrices",
         "type": "debugpy",
         "request": "launch",
         "module": "automl.automl_main",
@@ -57,7 +57,7 @@
         }
         },
         {
-        "name": "Run Spaceship Titanic AutoML",
+        "name": "SpaceshipTitanic",
         "type": "debugpy",
         "request": "launch",
         "module": "automl.automl_main",
@@ -78,6 +78,12 @@
         "env": {
             "UV_PREFER_BINARY": "1"
         }
+        }
+    ],
+    "compounds": [
+    {
+        "name": "Run All Files",
+        "configurations": ["Titanic", "SpaceshipTitanic", "HousePrices"]
         }
     ]
 }

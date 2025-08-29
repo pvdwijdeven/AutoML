@@ -244,19 +244,23 @@ def stacking_ensembler(
     # Define base models (already hypertuned instances)
     # replace first model with step3 optimized one
     my_models = []
-    for model in meta_data["step2"]:
+    for model in meta_data["topX_grid_results"]:
         model_name = model
-        model_params = meta_data["step2"][model]["best_params"]
-        model_score = meta_data["step2"][model]["best_score"]
+        model_params = meta_data["topX_grid_results"][model]["best_params"]
+        model_score = meta_data["topX_grid_results"][model]["best_score"]
         my_models.append([model_name, model_params, model_score])
     my_models_sorted = sorted(
         my_models,
         key=lambda x: x[2],
         reverse=not sort_ascending(scorer_name=meta_data["scoring"]),
     )
-    best_model = next(iter(meta_data["step3"]))
-    model_params = meta_data["step3"][best_model]["best_params"]
-    model_score = meta_data["step3"][best_model]["best_score"]
+    best_model = next(iter(meta_data["Top_model_top_grid_output"]))
+    model_params = meta_data["Top_model_top_grid_output"][best_model][
+        "best_params"
+    ]
+    model_score = meta_data["Top_model_top_grid_output"][best_model][
+        "best_score"
+    ]
     my_models_sorted[0] = [best_model, model_params, model_score]
 
     base_models = []
