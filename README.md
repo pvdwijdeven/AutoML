@@ -1,8 +1,8 @@
 # AutoML
+
 ![automl icon](automl/data/icons/automl_icon_big.jpg?raw=true "AutoML icon")
 
 Automated Machine Learning module
-
 
 ## 📊 What AutoML Currently Produces
 
@@ -42,14 +42,12 @@ AutoML can automatically generate an interactive **EDA report** (HTML format) fr
   - Detection of mismatches and unseen categories
 
 - **Recommendations to do before pre-processing**
-  - While this tool provides a robust automated EDA, it does not incorporate domain-specific knowledge or an understanding of feature semantics. Prior to applying preprocessing steps, it is strongly advised to review the dataset with human expertise in mind. 
+  - While this tool provides a robust automated EDA, it does not incorporate domain-specific knowledge or an understanding of feature semantics. Prior to applying preprocessing steps, it is strongly advised to review the dataset with human expertise in mind.
   - The report outlines key areas where such insights can be integrated.
 
 The report is fully HTML-based, styled for usability, and supports quick navigation through tabs and feature anchors.
 
-
 ---
-
 
 Use GUI or CLI
 
@@ -79,6 +77,7 @@ automl [OPTIONS]
 ---
 
 ## Column description file
+
 If available, a description file can be added, so that the column description will be part of the report. The descriptions shall be of the following format:
 
 ````text
@@ -99,14 +98,10 @@ Some column_names have no description
 
 The AutoML module is still under active development. The following components are being built:
 
-* 🔧 Automated preprocessing pipeline (guided by EDA insights)
-* 🧠 Model selection and baseline training
-* ⚙️ Hyperparameter optimization
-* 📊 Evaluation metrics and comparison tools
-* 💾 Exportable pipeline (as code and artifacts)
-
-
+- 🔧 Automated preprocessing pipeline (guided by EDA insights)
+- 🧠 Model selection and baseline training
+- ⚙️ Hyperparameter optimization
+- 📊 Evaluation metrics and comparison tools
+- 💾 Exportable pipeline (as code and artifacts)
 
 ---
-
-```
