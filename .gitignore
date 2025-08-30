@@ -1,4 +1,5 @@
 .venv/
+automl_old/
 personal/
 __pycache__/
 *.pyc

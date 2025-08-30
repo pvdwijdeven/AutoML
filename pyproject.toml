@@ -20,6 +20,7 @@ dependencies = [
     "wxpython>=4.2.3",
     "xgboost>=3.0.4",
     "ruff>=0.12.10",
+    "pydantic>=2.11.7",
 ]
 
 [tool.ruff.lint]
