@@ -6,51 +6,67 @@ from typing import Optional, Self
 # Third-party imports
 import pandas as pd
 import yaml
-from library import Logger
 from pandas import DataFrame
 from pydantic import BaseModel, ConfigDict
+
+# Local imports
+from automl.library import Logger
 
 
 class ConfigData(BaseModel):
     """
     Configuration data model defining project-related file paths and settings.
 
-    Attributes:
-        root (Path): The root directory of the project, typically two levels up from this file.
-        project_name (str): Name of the project, used in naming files.
-        training_file (Path): Path to the training data file (e.g., 'path_name/train.csv').
-        target_name (Optional[str]): Name of the target column, if none and no competition
-            data is available, last column will be selected
-        competition_file (Optional[Path]): Optional path to the competition data file (e.g., 'path_name/test.csv').
-        submission_file (Path): Path to the project submission file (e.g., 'path_name/project_submission.csv').
-        report_template (Path): Path to the project report template file (e.g., 'path_name/project_report.html').
-        log_file (Path): Path to the project log file (e.g., 'path_name/project.log').
+    Attributes
+    ----------
+    root : Path
+        Root directory of the project, typically two levels up from this file.
+    project_name : str
+        Project name, also used in file naming conventions.
+    training_file : Path
+        Path to the training dataset (CSV or Excel).
+    target : Optional[str]
+        Target column in the training dataset.
+        If None and no competition file is provided, the last column will be used.
+    competition_file : Optional[Path]
+        Path to competition/test dataset (optional).
+    submission_file : Path
+        Path where submission results will be saved.
+    report_template : Path
+        Path to the project report file.
+    log_file : Path
+        Path for logging file.
 
-    Config:
-        json_encoders (dict): Custom JSON serialization for fields; encodes Path objects as strings.
-
-    Methods:
-        save_to_yaml(filename: str) -> None:
-            Serialize the config data to a YAML file.
-
-        load_from_yaml(filename: str) -> ConfigData:
-            Load the config data from a YAML file and return a ConfigData instance.
+    Methods
+    -------
+    save_to_yaml(filename: str) -> None
+        Save this configuration to a YAML file.
+    load_from_yaml(filename: str) -> ConfigData
+        Load configuration from a YAML file.
     """
 
-    root: Path = Path(__file__).parent.parent
-    project_name: str  # name of the project, also used in filenames
-    training_file: Path  # e.g. path_name/train.csv
-    target: Optional[str]  # target column
-    competition_file: Optional[Path]  # e.g. path_name/test.csv
-    submission_file: Path  # e.g. path_name/project_submission.csv
-    report_template: Path  # e.g. path_name/project_report.html
-    log_file: Path  # e.g. path_name/project.log
+    root: Path = Path(__file__).parent.parent.parent
+    project_name: str
+    training_file: Path
+    target: Optional[str]
+    competition_file: Optional[Path]
+    submission_file: Path
+    report_template: Path
+    log_file: Path
 
     class Config:
-        # force serialization of Path as str
+        # Force serialization of Path objects as strings
         json_encoders = {Path: str}
 
     def save_to_yaml(self, filename: str) -> None:
+        """
+        Save this configuration to a YAML file.
+
+        Parameters
+        ----------
+        filename : str
+            Path where the YAML file should be saved.
+        """
         with open(file=filename, mode="w", encoding="utf-8") as file:
             yaml.safe_dump(
                 data=self.model_dump(mode="json"),
@@ -60,6 +76,19 @@ class ConfigData(BaseModel):
 
     @classmethod
     def load_from_yaml(cls, filename: str) -> Self:
+        """
+        Load a configuration object from a YAML file.
+
+        Parameters
+        ----------
+        filename : str
+            Path to the YAML configuration file.
+
+        Returns
+        -------
+        ConfigData
+            A configuration object loaded from the file.
+        """
         with open(file=filename, mode="r", encoding="utf-8") as file:
             data = yaml.safe_load(stream=file)
         return cls(**data)
@@ -67,77 +96,150 @@ class ConfigData(BaseModel):
 
 class OriginalData(BaseModel):
     """
-    Data model encapsulating the original datasets used for training and competition.
+    Container for original datasets used for training and competition.
 
-    Attributes:
-        X_train (DataFrame): The training features dataset used for model training.
-        y_train (DataFrame): The target dataset corresponding to X_train, containing labels or outcomes.
-        X_comp (Optional[DataFrame]): Optional competition dataset for evaluation or prediction purposes.
+    Attributes
+    ----------
+    X_train : DataFrame
+        Training features (all columns except target).
+    y_train : pd.Series
+        Target variable from the training dataset.
+    X_comp : Optional[DataFrame]
+        Competition dataset (e.g., test features), if provided.
     """
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
-    X_train: DataFrame  # training data
-    y_train: pd.Series  # target data
-    X_comp: Optional[DataFrame]  # competition data
+
+    X_train: DataFrame
+    y_train: pd.Series
+    X_comp: Optional[DataFrame]
 
 
 class ModellingData(BaseModel):
+    """
+    Data model for holding training, validation, and test datasets.
+
+    Attributes
+    ----------
+    X_train : DataFrame
+        Training features.
+    y_train : DataFrame
+        Training target values.
+    X_val : DataFrame
+        Validation features.
+    y_val : DataFrame
+        Validation target values.
+    X_test : DataFrame
+        Test features.
+    y_test : DataFrame
+        Test target values.
+    """
+
     model_config = ConfigDict(arbitrary_types_allowed=True)
-    X_train: DataFrame  # training data
-    y_train: DataFrame  # target data
-    X_val: DataFrame  # training data
-    y_val: DataFrame  # target data
-    X_test: DataFrame  # training data
-    y_test: DataFrame  # target data
+
+    X_train: DataFrame
+    y_train: DataFrame
+    X_val: DataFrame
+    y_val: DataFrame
+    X_test: DataFrame
+    y_test: DataFrame
 
 
-def read_data(file_path: Path, logger) -> Optional[pd.DataFrame]:
-    logger.info(f"[BLUE]- Reading data from {file_path}")
+def read_data(file_path: Path, logger: Logger) -> Optional[pd.DataFrame]:
+    """
+    Read data from CSV or Excel file into a pandas DataFrame.
+
+    Parameters
+    ----------
+    file_path : Path
+        Path to the data file.
+    logger : Logger
+        Logger object for recording process and errors.
+
+    Returns
+    -------
+    Optional[pd.DataFrame]
+        DataFrame if file is loaded successfully, None otherwise.
+    """
     if not file_path:
         return None
+
+    logger.info(f"[BLUE]- Reading data from {file_path}")
+
     try:
         if file_path.suffix == ".xlsx":
             return pd.read_excel(io=file_path)
-        else:
-            return pd.read_csv(filepath_or_buffer=file_path)
+        return pd.read_csv(filepath_or_buffer=file_path)
+
     except FileNotFoundError:
         logger.error(f"File not found: {file_path}")
         return None
     except PermissionError:
-        logger.error(f"File is still open: {file_path}")
-        input("Close the file and press [ENTER]")
-        read_data(file_path=file_path, logger=logger)
+        logger.error(f"File is open and cannot be read: {file_path}")
+        input("Please close the file and press [ENTER] to retry...")
+        return read_data(file_path=file_path, logger=logger)
     except Exception as e:
         logger.error(f"Error reading {file_path}: {e}")
         return None
 
 
 def load_data(config: ConfigData, logger: Logger) -> OriginalData:
+    """
+    Load training and optional competition data from configuration.
+    Automatically extracts features and target column.
 
+    Parameters
+    ----------
+    config : ConfigData
+        Configuration containing paths to datasets and target info.
+    logger : Logger
+        Logger for recording info and errors.
+
+    Returns
+    -------
+    OriginalData
+        Container with training features, target, and competition data.
+
+    Raises
+    ------
+    ValueError
+        If more than one potential target column is found when deducing target.
+    SystemExit
+        If training data cannot be loaded.
+    """
+    # Load training dataset
     X_train_full = read_data(file_path=config.training_file, logger=logger)
     if X_train_full is None:
         logger.error(
-            msg=f"Training data could not be loaded from {config.training_file}"
+            f"Training data could not be loaded from {config.training_file}"
         )
         exit("Exiting due to missing training data")
 
-    # Drop target column to
-    if config.competition_file is not None:
+    # Load competition dataset if specified
+    X_comp = None
+    if config.competition_file:
         X_comp = read_data(file_path=config.competition_file, logger=logger)
-    else:
-        X_comp = None
-    if config.target is None or config.target != "":
+
+    # Resolve target column if missing
+    if not config.target:
         if X_comp is not None:
-            target = list(set(X_train_full.columns) - set(X_comp.columns))
-            # Assuming exactly one target column is missing, get it as a string
-            if len(target) == 1:
-                config.target = target[0]
+            # Target is the column not present in the competition set
+            target_candidates = list(
+                set(X_train_full.columns) - set(X_comp.columns)
+            )
+            if len(target_candidates) == 1:
+                config.target = target_candidates[0]
             else:
                 raise ValueError(
-                    "Expected exactly one target column missing in X_comp"
+                    f"Expected exactly one target column missing in competition "
+                    f"data, found: {target_candidates}"
                 )
         else:
+            # Default to last column in training dataset
             config.target = X_train_full.columns[-1]
-    y_train = X_train_full[config.target]  # Extract target column
+
+    # Split into features and target
+    y_train = X_train_full[config.target]
     X_train = X_train_full.drop(columns=[config.target])
+
     return OriginalData(X_train=X_train, y_train=y_train, X_comp=X_comp)
