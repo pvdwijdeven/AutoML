@@ -1,5 +1,5 @@
 .venv/
-automl_old/
+_automl_old/
 personal/
 __pycache__/
 *.pyc
