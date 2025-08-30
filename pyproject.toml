@@ -21,6 +21,8 @@ dependencies = [
     "xgboost>=3.0.4",
     "ruff>=0.12.10",
     "pydantic>=2.11.7",
+    "pyyaml>=6.0.2",
+    "devtools>=0.12.2",
 ]
 
 [tool.ruff.lint]
