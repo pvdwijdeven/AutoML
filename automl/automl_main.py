@@ -52,8 +52,22 @@ def create_config_paths(config: Config_Data) -> None:
             ensure_folder_exists(root=config.root, filename=value)
 
 
-def main() -> None:
+def get_config_from_title(title) -> Config_Data:
+    config = Config_Data(
+        project_name=title,
+        training_file=Path(f"personal/{title}/data/train.csv"),
+        test_file=Path(f"personal/{title}/data/test.csv"),
+        submission_file=Path(f"personal/{title}/data/submission.csv"),
+        report_template=Path(f"personal/{title}/export/{title}_report.html"),
+        log_file=Path(f"personal/{title}/log/{title}.log"),
+    )
+    filename = f"personal/yaml/{config.project_name}.yaml"
+    ensure_folder_exists(root=config.root, filename=filename)
+    config.save_to_yaml(filename=filename)
+    return config
 
+
+def main() -> None:
     parser = argparse.ArgumentParser(
         description="Automated Machine Learning application"
     )
@@ -68,28 +82,13 @@ def main() -> None:
     args = parser.parse_args()
 
     if args.config:
-        config = Config_Data.load_from_yaml("config.yaml")
+        config = Config_Data.load_from_yaml(filename="config.yaml")
     else:
         if args.title:
-            project_name = args.title
+            title = args.title
         else:
-            project_name = "Titanic"
-        project_name = project_name
-        config = Config_Data(
-            project_name=project_name,
-            training_file=Path(f"personal/{project_name}/data/train.csv"),
-            test_file=Path(f"personal/{project_name}/data/test.csv"),
-            submission_file=Path(
-                f"personal/{project_name}/data/submission.csv"
-            ),
-            report_template=Path(
-                f"personal/{project_name}/export/{project_name}_report.html"
-            ),
-            log_file=Path(f"personal/{project_name}/log/{project_name}.log"),
-        )
-        filename = f"personal/yaml/{config.project_name}.yaml"
-        ensure_folder_exists(root=config.root, filename=filename)
-        config.save_to_yaml(filename=filename)
+            title = "Titanic"
+        config = get_config_from_title(title=title)
     create_config_paths(config=config)
 
 
