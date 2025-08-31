@@ -1,175 +1,242 @@
 # Standard library imports
-import os
-from typing import Optional, Union
+from typing import Optional
 
 # Third-party imports
-from narwhals import col
-import yaml
+import numpy as np
+import pandas as pd
 from pandas import DataFrame, Series
-from pandas.api.types import is_numeric_dtype
 from pydantic import BaseModel
-from scipy.stats import entropy as scipy_entropy
+from seaborn import get_dataset_names
 
 # Local application imports
 from automl.dataloader import ConfigData, OriginalData
 from automl.library import todo  # only during develloping
 
-
-class CategoricalInfo(BaseModel):
-    frequency: dict[str, tuple[int, float]]
-    mode: list[str]
-    entropy: float
-    cardinality: str
+from .column_analysis import ColumnInfo, analyse_columns, insert_descriptions
 
 
-class StringInfo(BaseModel):
-    samples: str  # TODO optional LLM interaction?
-
-
-class NumericInfo(BaseModel):
-    min_value: Union[int, float]
-    max_value: Union[int, float]
-    skewness: float
-    mean: float
-    std_dev: float
-
-
-class ColumnInfo(BaseModel):
-    is_constant: bool
-    column_name: str
-    current_type: str
-    proposed_type: str
-    number_unique: int
-    perc_unique: float
-    is_empty: bool
+class DatasetInfo(BaseModel):
+    number_features: int
+    number_constant_features: int
+    perc_constant_features: float
+    number_duplicate_features: int
+    perc_duplicate_features: float
+    number_empty_features: int
+    perc_empty_features: float
+    feature_types: dict[str, int]
+    number_samples: int
+    number_duplicate_samples: int
+    perc_duplicate_samples: float
+    number_empty_samples: int
+    perc_empty_samples: float
+    table_size: str  # example: "14 x 891"
+    number_cells: int
+    memory: str  # example: 410.39 KB
     number_missing: int
     perc_missing: float
-    description: str
-    suggestions: str
-    default_prepro: str
-    type_specific_info: Union[StringInfo, NumericInfo, CategoricalInfo]
+    target: str
+    target_type: str
+    dataset_type: str
 
 
-def analyse_column(column: Series) -> ColumnInfo:
+def find_duplicate_columns(X_train: DataFrame):
+    """
+    Find columns in the DataFrame that have duplicate values with other columns.
 
-    num_unique = column.nunique()  # counts unique non-missing values
-    perc_unique = num_unique / len(column) * 100
-    num_missing = column.isna().sum()
-    perc_missing = num_missing / len(column) * 100
-    if is_numeric_dtype(arr_or_dtype=column):
-        proposed_type = "numeric"
-    else:
-        proposed_type = "categorical" if perc_unique <= 20 else "string"
+    Args:
+        df (pd.DataFrame): Input DataFrame.
 
-    if proposed_type == "numeric":
-        skewness = column.skew()
-        skewness = (
-            float(skewness)
-            if isinstance(skewness, float) or isinstance(skewness, int)
-            else 0
-        )
-        type_specific_info = NumericInfo(
-            min_value=column.min(),
-            max_value=column.max(),
-            skewness=skewness,
-            mean=column.mean(),
-            std_dev=column.std(),
-        )
-    elif proposed_type == "string":
-        type_specific_info = StringInfo(
-            samples=", ".join(column.value_counts().head(5).index.tolist()),
-        )
-    else:
-        value_counts = column.value_counts(normalize=True, dropna=True)
-        entropy_value = float(
-            scipy_entropy(value_counts, base=2)
-        )  # base-2: bits
-        # Count occurrences
-        counts = column.value_counts(sort=False)
+    Returns:
+        dict: Dictionary where keys are column names, and values are lists of duplicated column names.
+    """
+    duplicates_dict: dict[str, list[str]] = {}
 
-        # Calculate frequency (proportion)
-        freqs = column.value_counts(normalize=True, sort=False)
+    columns = X_train.columns
+    n = len(columns)
 
-        # Combine into dictionary
-        freq_dict = {
-            value: (counts[value], freqs[value]) for value in counts.index
-        }
-        # Cardinality label
-        if num_unique <= 5:
-            cardinality_label = "Low"
-        elif num_unique <= 20:
-            cardinality_label = "Medium"
+    for i in range(n):
+        cur_col = columns[i]
+        duplicates = []
+        for j in range(i + 1, n):
+            other_col = columns[j]
+            # Check if all values in cur_col equal those in other_col
+            if X_train[cur_col].equals(other=X_train[other_col]):
+                duplicates.append(other_col)
+        duplicates_dict[cur_col] = duplicates
+
+    return duplicates_dict
+
+
+def detect_dataset_type(
+    target: Series,
+) -> str:
+    """
+    Detect the type of supervised learning problem based on the characteristics of the target variable.
+
+    The function inspects the target (labels) and categorizes it into one of:
+    - "multi_label_classification": when target is a DataFrame with multiple binary columns.
+    - "regression": when numeric with many unique values (> 20).
+    - "imbalanced_binary_classification": when binary with high imbalance (minority class <= 5%).
+    - "binary_classification": when binary and reasonably balanced.
+    - "multi_class_classification": when categorical or numeric with few discrete levels.
+    - "ordinal_regression": when integer-valued, contiguous classes, between 3 and 20 categories.
+    - "unknown": fallback if none of the above matches.
+
+    Parameters
+    ----------
+    target : Union[pd.DataFrame, pd.Series, np.ndarray]
+        The target variable(s). Can be a DataFrame (multi-output),
+        a Series (single-output), or a NumPy ndarray.
+
+    Returns
+    -------
+    str
+        The detected dataset type. One of:
+        [
+            "multi_label_classification",
+            "regression",
+            "imbalanced_binary_classification",
+            "binary_classification",
+            "multi_class_classification",
+            "ordinal_regression",
+            "unknown",
+        ]
+    """
+    # Convert to pandas object for convenience
+    if isinstance(target, (pd.DataFrame, pd.Series)):
+        target_df = target
+    else:  # Handle NumPy array
+        if target.ndim == 1:
+            target_df = pd.Series(data=target)
+        elif target.ndim == 2:
+            target_df = pd.DataFrame(data=target)
         else:
-            cardinality_label = "High"
-        type_specific_info = CategoricalInfo(
-            frequency=freq_dict,
-            mode=[str(object=x) for x in column.mode()],
-            entropy=entropy_value,
-            cardinality=cardinality_label,
+            raise ValueError("Target must be 1D or 2D array-like")
+
+    # Multi-label case: DataFrame with multiple columns
+    if isinstance(target_df, pd.DataFrame) and target_df.shape[1] > 1:
+        unique_vals = pd.unique(target_df.values.ravel())
+        if set(unique_vals).issubset({0, 1}):
+            return "multi_label_classification"
+        return "multi_label_classification"
+
+    # 1D case: Series
+    target_series = (
+        target_df if isinstance(target_df, pd.Series) else target_df.iloc[:, 0]
+    )
+    is_numeric = pd.api.types.is_numeric_dtype(target_series)
+
+    unique_vals = target_series.dropna().unique()
+    n_unique = len(unique_vals)
+
+    # Numeric continuous => regression
+    if is_numeric and n_unique > 20:
+        return "regression"
+
+    # Binary classification
+    if n_unique == 2:
+        counts = target_series.value_counts(normalize=True)
+        imbalance_threshold = 0.05
+        minority_ratio = counts.min()
+        return (
+            "imbalanced_binary_classification"
+            if minority_ratio <= imbalance_threshold
+            else "binary_classification"
         )
 
-    column_info: ColumnInfo = ColumnInfo(
-        is_constant=num_unique == 1,
-        column_name=str(object=column.name),
-        current_type=str(object=column.dtype),
-        proposed_type=proposed_type,
-        number_unique=num_unique,
-        perc_unique=perc_unique,
-        is_empty=num_missing == len(column),
-        number_missing=num_missing,
-        perc_missing=perc_missing,
-        description="",
-        suggestions="",  # todo
-        default_prepro="",  # todo
-        type_specific_info=type_specific_info,
+    # Multi-class or ordinal case
+    if not is_numeric:
+        return "multi_class_classification"
+
+    unique_vals_sorted = np.sort(unique_vals)
+    diffs = np.diff(unique_vals_sorted)
+
+    if np.all(diffs == 1) and np.all(
+        unique_vals_sorted == unique_vals_sorted.astype(int)
+    ):
+        if 3 <= n_unique <= 20:
+            return "ordinal_regression"
+        return "multi_class_classification"
+
+    if n_unique <= 20:
+        return "multi_class_classification"
+
+    # Fallback
+    return "unknown"
+
+
+def analyse_dataset(
+    X_train: DataFrame,
+    column_info: dict[str, ColumnInfo],
+    dict_duplicates: dict[str, list[str]],
+    y_train: Series,
+) -> DatasetInfo:
+    number_features = len(X_train.columns)
+    constant_features = sum(
+        [column_info[col].is_constant for col in column_info]
     )
-    return column_info
-
-
-def analyse_columns(
-    X_train: DataFrame, y_train: Optional[Series]
-) -> dict[str, ColumnInfo]:
-    column_info: dict[str, ColumnInfo] = {}
-    for column in X_train.columns:
-        column_info[column] = analyse_column(column=X_train[column])
-    if y_train is not None:
-        column_info["target"] = analyse_column(column=y_train)
-    return column_info
-
-
-def insert_descriptions(
-    column_info: dict[str, ColumnInfo], config_data: ConfigData
-) -> dict[str, ColumnInfo]:
-    if config_data.description_file is not None:
-        if os.path.isfile(config_data.description_file):
-            with open(
-                file=str(config_data.description_file),
-                mode="r",
-                encoding="utf-8",
-            ) as file:
-                descriptions: dict[str, str] = yaml.safe_load(stream=file)
-            for column in column_info:
-                column_name = column_info[column].column_name
-                column_info[column].description = descriptions.get(
-                    column_name, ""
-                )
-            return column_info
-    return column_info
+    number_duplicate_features = sum(
+        [len(dict_duplicates[x]) > 0 for x in dict_duplicates]
+    )
+    number_empty_features = sum(
+        [int(X_train[column].isnull().all()) for column in X_train.columns]
+    )
+    duplicate_samples = (
+        pd.util.hash_pandas_object(X_train.round(5), index=False)
+        .duplicated()
+        .sum()
+    )
+    number_samples = X_train.shape[0]
+    number_empty_rows = (X_train.isnull().sum(axis=1) == X_train.shape[1]).sum()
+    number_missing = X_train.isnull().sum().sum()
+    return DatasetInfo(
+        number_features=number_features,
+        number_constant_features=constant_features,
+        perc_constant_features=constant_features / number_features * 100,
+        number_duplicate_features=number_duplicate_features,
+        perc_duplicate_features=number_duplicate_features
+        / number_features
+        * 100,
+        number_empty_features=number_empty_features,
+        perc_empty_features=number_empty_features / number_features * 100,
+        feature_types={},
+        number_samples=number_samples,
+        number_duplicate_samples=duplicate_samples,
+        perc_duplicate_samples=duplicate_samples / number_samples * 100,
+        number_empty_samples=number_empty_rows,
+        perc_empty_samples=number_empty_rows / number_samples * 100,
+        table_size=f"{number_features} x {number_samples}",
+        number_cells=number_features * number_samples,
+        memory=f"{X_train.memory_usage(deep=True).sum() / 1024} kB",
+        number_missing=number_missing,
+        perc_missing=number_missing / (number_features * number_samples) * 100,
+        target=column_info["target"].column_name,
+        target_type=column_info["target"].proposed_type,
+        dataset_type=detect_dataset_type(target=y_train),
+    )
 
 
 def perform_eda(config_data: ConfigData, original_data: OriginalData) -> None:
 
+    dict_duplicates = find_duplicate_columns(X_train=original_data.X_train)
     column_info = analyse_columns(
-        X_train=original_data.X_train, y_train=original_data.y_train
+        X_train=original_data.X_train,
+        dict_duplicates=dict_duplicates,
+        y_train=original_data.y_train,
     )
     column_info = insert_descriptions(
         column_info=column_info, config_data=config_data
     )
-    # analyse_dataset()
+    data_set_info = analyse_dataset(
+        X_train=original_data.X_train,
+        column_info=column_info,
+        dict_duplicates=dict_duplicates,
+        y_train=original_data.y_train,
+    )
     # analyse_relations()
     # analyse_test_data()
     # preprocess_trial()
     # create_report()
     todo()
     return
-    return column_info
+    return data_set_info
