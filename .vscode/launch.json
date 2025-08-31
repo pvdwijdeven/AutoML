@@ -31,7 +31,7 @@
         "module": "automl.automl_main",
         "console": "integratedTerminal",
         "args": [
-            "--title", "HousePrices",
+            "--config", "personal/HousePrices/data/config.yaml",
         ],
         "env": {
             "UV_PREFER_BINARY": "1"

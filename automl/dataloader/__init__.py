@@ -5,6 +5,13 @@ from .dataloader_script import (
     ModellingData,
     load_data,
     ConfigData,
+    get_config,
 )
 
-__all__ = ["OriginalData", "ModellingData", "load_data", "ConfigData"]
+__all__ = [
+    "OriginalData",
+    "ModellingData",
+    "load_data",
+    "ConfigData",
+    "get_config",
+]

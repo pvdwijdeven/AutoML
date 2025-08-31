@@ -6,6 +6,11 @@ from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
 
+def todo() -> None:
+    """TODO: implement this function"""
+    raise NotImplementedError("Function not yet implemented.")
+
+
 class SameLineStreamHandler(logging.StreamHandler):
     def emit(self, record: logging.LogRecord) -> None:
         try:
