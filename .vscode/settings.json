@@ -1,4 +1,5 @@
 {
+    "python.analysis.completeFunctionParens": true,
 
     "[python]": {
     "editor.insertSpaces": true,

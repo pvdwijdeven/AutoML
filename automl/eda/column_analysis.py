@@ -6,7 +6,7 @@ from typing import Optional, Union
 import yaml
 from pandas import DataFrame, Series
 from pandas.api.types import is_numeric_dtype
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from scipy.stats import entropy as scipy_entropy
 
 # Local application imports
@@ -47,6 +47,27 @@ class ColumnInfo(BaseModel):
     suggestions: str
     default_prepro: str
     type_specific_info: Union[StringInfo, NumericInfo, CategoricalInfo]
+
+
+class ColumnInfoMapping(BaseModel):
+    columninfo: dict[str, ColumnInfo] = Field(default_factory=dict)
+
+    # Convenience dict-like behavior
+    def __getitem__(self, item: str) -> ColumnInfo:
+        return self.columninfo[item]
+
+    # Use a custom method to iterate over keys to avoid BaseModel __iter__ override issues
+    def iter_keys(self):
+        return iter(self.columninfo)
+
+    def items(self):
+        return self.columninfo.items()
+
+    def keys(self):
+        return self.columninfo.keys()
+
+    def values(self):
+        return self.columninfo.values()
 
 
 def analyse_column(column: Series, cardinality_max: int = 15) -> ColumnInfo:
@@ -109,7 +130,6 @@ def analyse_column(column: Series, cardinality_max: int = 15) -> ColumnInfo:
             entropy=entropy_value,
             cardinality=cardinality_label,
         )
-
     column_info: ColumnInfo = ColumnInfo(
         is_constant=num_unique == 1,
         column_name=str(object=column.name),
@@ -126,6 +146,7 @@ def analyse_column(column: Series, cardinality_max: int = 15) -> ColumnInfo:
         default_prepro="",  # todo after prepro test
         type_specific_info=type_specific_info,
     )
+
     return column_info
 
 
@@ -133,19 +154,19 @@ def analyse_columns(
     X_train: DataFrame,
     dict_duplicates: dict[str, list[str]],
     y_train: Optional[Series],
-) -> dict[str, ColumnInfo]:
-    column_info: dict[str, ColumnInfo] = {}
+) -> ColumnInfoMapping:
+    column_info = {}
     for column in X_train.columns:
         column_info[column] = analyse_column(column=X_train[column])
         column_info[column].duplicate_columns = dict_duplicates[column]
     if y_train is not None:
         column_info["target"] = analyse_column(column=y_train)
-    return column_info
+    return ColumnInfoMapping(**{"columninfo": column_info})
 
 
 def insert_descriptions(
-    column_info: dict[str, ColumnInfo], config_data: ConfigData
-) -> dict[str, ColumnInfo]:
+    column_info: ColumnInfoMapping, config_data: ConfigData
+) -> ColumnInfoMapping:
     if config_data.description_file is not None:
         if os.path.isfile(config_data.description_file):
             with open(
@@ -154,7 +175,7 @@ def insert_descriptions(
                 encoding="utf-8",
             ) as file:
                 descriptions: dict[str, str] = yaml.safe_load(stream=file)
-            for column in column_info:
+            for column in column_info.keys():
                 column_name = column_info[column].column_name
                 column_info[column].description = descriptions.get(
                     column_name, ""

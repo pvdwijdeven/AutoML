@@ -18,7 +18,7 @@
         "module": "automl.automl_main",
         "console": "integratedTerminal",
         "args": [
-            "--title", "Titanic",
+            "--config", "personal/Titanic/data/config.yaml",
         ],
         "env": {
             "UV_PREFER_BINARY": "1"
@@ -44,7 +44,7 @@
         "module": "automl.automl_main",
         "console": "integratedTerminal",
         "args": [
-            "--title", "SpaceshipTitanic",
+            "--config", "personal/SpaceshipTitanic/data/config.yaml",
         ],
         "env": {
             "UV_PREFER_BINARY": "1"

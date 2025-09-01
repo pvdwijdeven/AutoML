@@ -4,7 +4,7 @@ import pandas as pd
 from pandas import DataFrame, Series
 from pydantic import BaseModel
 
-from .column_analysis import ColumnInfo
+from .column_analysis import ColumnInfoMapping
 
 
 class DatasetInfo(BaseModel):
@@ -159,13 +159,13 @@ def detect_dataset_type(
 
 def analyse_dataset(
     X_train: DataFrame,
-    column_info: dict[str, ColumnInfo],
+    column_info: ColumnInfoMapping,
     dict_duplicates: dict[str, list[str]],
     y_train: Series,
 ) -> DatasetInfo:
     number_features = len(X_train.columns)
     constant_features = sum(
-        [column_info[col].is_constant for col in column_info]
+        [column_info[col].is_constant for col in column_info.keys()]
     )
     number_duplicate_features = sum(
         [len(dict_duplicates[x]) > 0 for x in dict_duplicates]
@@ -174,7 +174,7 @@ def analyse_dataset(
         [int(X_train[column].isnull().all()) for column in X_train.columns]
     )
     duplicate_samples = (
-        pd.util.hash_pandas_object(X_train.round(5), index=False)
+        pd.util.hash_pandas_object(X_train.round(decimals=5), index=False)
         .duplicated()
         .sum()
     )

@@ -4,6 +4,7 @@ from automl.library import todo  # only during develloping
 
 from .column_analysis import analyse_columns, insert_descriptions
 from .dataset_overview import find_duplicate_columns, analyse_dataset
+from .relations import generate_feature_relations
 
 
 def perform_eda(config_data: ConfigData, original_data: OriginalData) -> None:
@@ -17,16 +18,16 @@ def perform_eda(config_data: ConfigData, original_data: OriginalData) -> None:
     column_info = insert_descriptions(
         column_info=column_info, config_data=config_data
     )
-    data_set_info = analyse_dataset(
+    _data_set_info = analyse_dataset(
         X_train=original_data.X_train,
         column_info=column_info,
         dict_duplicates=dict_duplicates,
         y_train=original_data.y_train,
     )
-    # analyse_relations()
+    _relation_info = generate_feature_relations(original_data=original_data)
+
     # analyse_test_data()
     # preprocess_trial()
     # create_report()
     todo()
     return
-    return data_set_info

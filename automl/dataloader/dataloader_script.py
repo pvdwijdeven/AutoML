@@ -1,5 +1,8 @@
 # Standard library imports
+import importlib
+import importlib.util
 import os
+import sys
 from pathlib import Path
 from sys import exit
 from typing import Optional, Self
@@ -67,6 +70,7 @@ class ConfigData(BaseModel):
     competition_file: Optional[Path]
     config_file: Optional[Path]
     description_file: Optional[Path]
+    update_file: Optional[Path]
     log_file: Path
 
     class Config:
@@ -231,6 +235,7 @@ def get_config_from_title(title: str) -> ConfigData:
         submission_file=Path(f"personal/{title}/data/submission.csv"),
         report_template=Path(f"personal/{title}/export/{title}_report.html"),
         config_file=Path(f"personal/yaml/{title}.yaml"),
+        update_file=None,
         description_file=None,
         log_file=Path(f"personal/{title}/log/{title}.log"),
     )
@@ -358,5 +363,72 @@ def load_data(config_data: ConfigData, logger: Logger) -> OriginalData:
     # Split into features and target
     y_train = X_train_full[config_data.target]
     X_train = X_train_full.drop(columns=[config_data.target])
+    original_data = OriginalData(
+        X_train=X_train, y_train=y_train, X_comp=X_comp
+    )
+    if config_data.update_file is not None:
+        original_data = update_with_user_function(
+            config_data=config_data, original_data=original_data, logger=logger
+        )
+    return original_data
 
-    return OriginalData(X_train=X_train, y_train=y_train, X_comp=X_comp)
+
+def update_with_user_function(
+    config_data: ConfigData, original_data: OriginalData, logger: Logger
+) -> OriginalData:
+
+    if config_data.update_file is not None:
+        module_name = config_data.update_file.stem  # e.g. "user_file"
+
+        # Load module from file
+        spec = importlib.util.spec_from_file_location(
+            module_name, str(config_data.update_file)
+        )
+        assert spec is not None
+        assert spec.loader is not None
+        user_module = importlib.util.module_from_spec(spec)
+        sys.modules[module_name] = user_module
+        spec.loader.exec_module(user_module)
+
+        # Get the function
+        update_func = getattr(user_module, "update_df", None)
+        if update_func is None:
+            logger.error(
+                msg=f"No function 'update_df' found in {config_data.update_file}, skipping update"
+            )
+        else:
+            original_data.X_train = update_types(
+                X_train=update_func(original_data.X_train)
+            )
+            if original_data.X_comp is not None:
+                original_data.X_comp = update_types(
+                    X_train=update_func(original_data.X_comp)
+                )
+    # Apply the function to the dataframe
+    return original_data
+
+
+def update_types(X_train: DataFrame):
+    X_work = X_train.copy()
+    for col in X_work.columns:
+        series = X_work[col]
+
+        # Skip non-object/string types
+        if pd.api.types.is_numeric_dtype(arr_or_dtype=series):
+            continue
+
+        # Try integer
+        as_int = pd.to_numeric(arg=series, errors="coerce")
+        if as_int.notna().all():
+            if (as_int % 1 == 0).all():
+                X_work[col] = as_int.astype(dtype="Int64")  # nullable integer
+                continue
+            else:
+                X_work[col] = as_int.astype(dtype=float)
+                continue
+
+        # Try float
+        if as_int.notna().sum() > 0:
+            X_work[col] = as_int.astype(dtype=float)
+            continue
+    return X_work
