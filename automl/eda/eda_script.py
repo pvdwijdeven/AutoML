@@ -5,6 +5,7 @@ from automl.library import todo  # only during develloping
 from .column_analysis import analyse_columns, insert_descriptions
 from .dataset_overview import find_duplicate_columns, analyse_dataset
 from .relations import generate_feature_relations
+from .testdata import analyze_test_data
 
 
 def perform_eda(config_data: ConfigData, original_data: OriginalData) -> None:
@@ -25,9 +26,9 @@ def perform_eda(config_data: ConfigData, original_data: OriginalData) -> None:
         y_train=original_data.y_train,
     )
     _relation_info = generate_feature_relations(original_data=original_data)
+    _test_info = analyze_test_data(original_data=original_data)
 
-    # analyse_test_data()
-    # preprocess_trial()
+    # preprocess_trial() # todo once preprocessing is ready
     # create_report()
     todo()
     return
