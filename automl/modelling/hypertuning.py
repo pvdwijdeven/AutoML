@@ -309,7 +309,6 @@ param_grids_detailed = {
         "lasso_regression": {
             "alpha": np.logspace(-3, 1, 5),  # [0.001, ..., 10]
             "fit_intercept": [True, False],
-            "normalize": [True, False],
             "selection": ["cyclic", "random"],
             "max_iter": [500, 1000, 2500],
         },

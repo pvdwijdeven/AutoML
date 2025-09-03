@@ -63,7 +63,9 @@ def run_kfold_evaluation(
 
         # Pick scoring metric
         start_time = time.perf_counter()
-        scores = cross_val_score(pipeline, X, y, cv=kf, scoring=scoring)
+        scores = cross_val_score(
+            pipeline, X, y, cv=kf, scoring=scoring, verbose=3, n_jobs=-1
+        )
         end_time = time.perf_counter()
         results[model_name] = {
             "mean_score": np.mean(scores),
@@ -142,7 +144,7 @@ def run_kfold_grid_search(
             cv=cv,
             scoring=scoring,
             n_jobs=-1,
-            verbose=1,
+            verbose=3,
             refit=True,
         )
 

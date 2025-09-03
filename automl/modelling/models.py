@@ -26,24 +26,24 @@ from xgboost import XGBRegressor
 # Example for binary classification (balanced or imbalanced)
 models = {
     "binary_classification": {
-        "logistic_regression": LogisticRegression(max_iter=1000),
-        "random_forest": RandomForestClassifier(n_estimators=500),
+        "logistic_regression": LogisticRegression(max_iter=1000, n_jobs=-1),
+        "random_forest": RandomForestClassifier(n_estimators=500, n_jobs=-1),
         "svc": SVC(probability=True),
-        "knn": KNeighborsClassifier(n_neighbors=11),
+        "knn": KNeighborsClassifier(n_neighbors=11, n_jobs=-1),
         "gradient_boosting": GradientBoostingClassifier(),
         "naive_bayes": GaussianNB(),
         "extra_trees": ExtraTreesClassifier(
-            n_estimators=100
+            n_estimators=100, n_jobs=-1
         ),  # Default 100 trees
         "adaboost": AdaBoostClassifier(),
         "mlp": MLPClassifier(max_iter=1000),
         "linear_discriminant_analysis": LinearDiscriminantAnalysis(),
     },
     "imbalanced_binary_classification": {
-        "logistic_regression": LogisticRegression(max_iter=1000),
-        "random_forest": RandomForestClassifier(n_estimators=100),
+        "logistic_regression": LogisticRegression(max_iter=1000, n_jobs=-1),
+        "random_forest": RandomForestClassifier(n_estimators=100, n_jobs=-1),
         "svc": SVC(probability=True),
-        "knn": KNeighborsClassifier(n_neighbors=11),
+        "knn": KNeighborsClassifier(n_neighbors=11, n_jobs=-1),
         "gradient_boosting": GradientBoostingClassifier(),
         # "naive_bayes": None,  # Replace with actual model from sklearn.naive_bayes
         # "extra_trees": None,  # Add ExtraTreesClassifier here
@@ -52,19 +52,19 @@ models = {
         # "linear_discriminant_analysis": None,  # Add LDA here
     },
     "regression": {
-        "linear_regression": LinearRegression(),
+        "linear_regression": LinearRegression(n_jobs=-1),
         "ridge_regression": Ridge(alpha=1.0),
         "lasso_regression": Lasso(alpha=0.1),
         "elasticnet_regression": ElasticNet(alpha=0.1, l1_ratio=0.5),
         "bayesian_ridge_regression": BayesianRidge(),
         "random_forest_regressor": RandomForestRegressor(
-            n_estimators=100, random_state=42
+            n_estimators=100, random_state=42, n_jobs=-1
         ),
         "gradient_boosting_regressor": GradientBoostingRegressor(
             n_estimators=100, random_state=42
         ),
         "svr": SVR(kernel="rbf", C=1.0, epsilon=0.1),
-        "knn_regressor": KNeighborsRegressor(n_neighbors=5),
+        "knn_regressor": KNeighborsRegressor(n_neighbors=5, n_jobs=-1),
         "mlp_regressor": MLPRegressor(
             hidden_layer_sizes=(100,), max_iter=500, random_state=42
         ),

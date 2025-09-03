@@ -71,7 +71,7 @@ class AutomlModeling:
         self.start_modelling()
 
     def start_modelling(self) -> None:
-        self.split_validation_data()
+        self.split_validation_data(test_size=0.99)
 
         (
             self.meta_data["X_val_prepro"],

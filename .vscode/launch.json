@@ -4,6 +4,7 @@
     // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
     "configurations": [
+        
         {
             "name": "Python Debugger: Current File",
             "type": "debugpy",
@@ -78,7 +79,29 @@
         "env": {
             "UV_PREFER_BINARY": "1"
         }
+    },
+{
+        "name": "Bank",
+        "type": "debugpy",
+        "request": "launch",
+        "module": "automl.automl_main",
+        "console": "integratedTerminal",
+        "args": [
+            "--title", "Bank (Kaggle)",
+            "--training_data", "../personal/data/Bank/train.csv",
+            "--test_data", "../personal/data/Bank/test.csv",
+            // "--description", "../personal/data/HousePrices/description.txt",
+            "--EDA",
+            "--scoring", "roc_auc",
+            "--report_file", "../personal/export/Bank/Bank_report.html",
+            "--output_file", "../personal/export/Bank/Bank_results.html",
+            "--logger_file", "./personal/logs/Bank.log",
+            "--nogui"
+        ],
+        "env": {
+            "UV_PREFER_BINARY": "1"
         }
+        },
     ],
     "compounds": [
     {
