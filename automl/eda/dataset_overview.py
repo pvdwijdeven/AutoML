@@ -8,24 +8,24 @@ from .column_analysis import ColumnInfoMapping
 
 
 class DatasetInfo(BaseModel):
-    number_features: int
-    number_constant_features: int
-    perc_constant_features: float
-    number_duplicate_features: int
-    perc_duplicate_features: float
-    number_empty_features: int
-    perc_empty_features: float
+    number_of_features: int
+    number_of_constant_features: int
+    percentage_of_constant_features: float
+    number_of_duplicate_features: int
+    percentage_of_duplicate_features: float
+    number_of_empty_features: int
+    percentage_of_empty_features: float
     feature_types: dict[str, int]
-    number_samples: int
-    number_duplicate_samples: int
-    perc_duplicate_samples: float
-    number_empty_samples: int
-    perc_empty_samples: float
+    number_of_samples: int
+    number_of_duplicate_samples: int
+    percentage_of_duplicate_samples: float
+    number_of_empty_samples: int
+    percentage_of_empty_samples: float
     table_size: str  # example: "14 x 891"
-    number_cells: int
+    number_of_cells: int
     memory: str  # example: 410.39 KB
-    number_missing: int
-    perc_missing: float
+    number_of_missing_items: int
+    percentage_of_missing_items: float
     target: str
     target_type: str
     dataset_type: str
@@ -36,10 +36,10 @@ def find_duplicate_columns(X_train: DataFrame):
     Find columns in the DataFrame that have duplicate values with other columns.
 
     Args:
-        df (pd.DataFrame): Input DataFrame.
+            df (pd.DataFrame): Input DataFrame.
 
     Returns:
-        dict: Dictionary where keys are column names, and values are lists of duplicated column names.
+            dict: Dictionary where keys are column names, and values are lists of duplicated column names.
     """
     duplicates_dict: dict[str, list[str]] = {}
 
@@ -77,22 +77,22 @@ def detect_dataset_type(
     Parameters
     ----------
     target : Union[pd.DataFrame, pd.Series, np.ndarray]
-        The target variable(s). Can be a DataFrame (multi-output),
-        a Series (single-output), or a NumPy ndarray.
+                    The target variable(s). Can be a DataFrame (multi-output),
+                    a Series (single-output), or a NumPy ndarray.
 
     Returns
     -------
     str
-        The detected dataset type. One of:
-        [
-            "multi_label_classification",
-            "regression",
-            "imbalanced_binary_classification",
-            "binary_classification",
-            "multi_class_classification",
-            "ordinal_regression",
-            "unknown",
-        ]
+                    The detected dataset type. One of:
+                    [
+                                    "multi_label_classification",
+                                    "regression",
+                                    "imbalanced_binary_classification",
+                                    "binary_classification",
+                                    "multi_class_classification",
+                                    "ordinal_regression",
+                                    "unknown",
+                    ]
     """
     # Convert to pandas object for convenience
     if isinstance(target, (pd.DataFrame, pd.Series)):
@@ -182,26 +182,26 @@ def analyse_dataset(
     number_empty_rows = (X_train.isnull().sum(axis=1) == X_train.shape[1]).sum()
     number_missing = X_train.isnull().sum().sum()
     return DatasetInfo(
-        number_features=number_features,
-        number_constant_features=constant_features,
-        perc_constant_features=constant_features / number_features * 100,
-        number_duplicate_features=number_duplicate_features,
-        perc_duplicate_features=number_duplicate_features
+        number_of_features=number_features,
+        number_of_constant_features=constant_features,
+        percentage_of_constant_features=constant_features / number_features * 100,
+        number_of_duplicate_features=number_duplicate_features,
+        percentage_of_duplicate_features=number_duplicate_features
         / number_features
         * 100,
-        number_empty_features=number_empty_features,
-        perc_empty_features=number_empty_features / number_features * 100,
-        feature_types={},
-        number_samples=number_samples,
-        number_duplicate_samples=duplicate_samples,
-        perc_duplicate_samples=duplicate_samples / number_samples * 100,
-        number_empty_samples=number_empty_rows,
-        perc_empty_samples=number_empty_rows / number_samples * 100,
+        number_of_empty_features=number_empty_features,
+        percentage_of_empty_features=number_empty_features / number_features * 100,
+        feature_types=X_train.dtypes.astype(dtype=str).value_counts().to_dict(),
+        number_of_samples=number_samples,
+        number_of_duplicate_samples=duplicate_samples,
+        percentage_of_duplicate_samples=duplicate_samples / number_samples * 100,
+        number_of_empty_samples=number_empty_rows,
+        percentage_of_empty_samples=number_empty_rows / number_samples * 100,
         table_size=f"{number_features} x {number_samples}",
-        number_cells=number_features * number_samples,
+        number_of_cells=number_features * number_samples,
         memory=f"{(X_train.memory_usage(deep=True).sum() / 1024):.3f} kB",
-        number_missing=number_missing,
-        perc_missing=number_missing / (number_features * number_samples) * 100,
+        number_of_missing_items=number_missing,
+        percentage_of_missing_items=number_missing / (number_features * number_samples) * 100,
         target=column_info["target"].column_name,
         target_type=column_info["target"].proposed_type,
         dataset_type=detect_dataset_type(target=y_train),

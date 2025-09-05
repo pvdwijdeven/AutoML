@@ -1,0 +1,50 @@
+{% if header %}
+  <h2 id="{{ header_id|default(header|replace(' ', '-')) }}">
+      {{ header }}
+  </h2>
+{% endif %}
+
+
+<div class="table-wrapper">
+  <table>
+    <tbody>
+      {% for key, value in data.items() %}
+        <tr>
+          <th>{{ (key|replace('_',' ')) }}</th>
+          <td>
+            {% if value is mapping %}
+              <table>
+                {% for subkey, subval in value.items() %}
+                  <tr><th>{{ subkey }}</th><td>{{ subval }}</td></tr>
+                {% endfor %}
+              </table>
+            {% else %}
+              {% if value is number %}
+                {% if key.startswith('perc') %}
+                  {% if value != value|int  %}
+                    {{ "%.2f"|format(value) }}%
+                  {% else %}
+                    {{ "%.0f"|format(value) }}%
+                  {% endif %}
+                {% else %}
+                  {% if value != value|int  %}
+                    {{ "%.2f"|format(value) }}
+                  {% else %}
+                    {{ value }}
+                  {% endif %}
+                {% endif %}
+              {% else %}
+                {{ value }}
+              {% endif %}
+            {% endif %}
+          </td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% if note %}
+  <p class="note">{{ note }}</p>
+{% endif %}
+
