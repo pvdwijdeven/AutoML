@@ -125,7 +125,7 @@
           z-index: 1040;
         }
       }
-  //tables
+  /* tables */
     table {
       width: 100%;
       border-collapse: collapse;
@@ -157,6 +157,25 @@
     background-color: var(--bs-table-striped-bg);
   }
 
+  /* inner tab */
+  .tabcontent-inner { display: none; padding: 10px 0; }
+    .tab-inner button { 
+      margin-right: 5px; 
+      min-width: 120px;
+      min-height: 20px;
+      text-align: center;
+      cursor: pointer;
+    }
+  
+  .tabcontent-inner_test { display: none; padding: 10px 0; }
+    .tab-inner_test button { 
+      margin-right: 5px; 
+      min-width: 120px;
+      min-height: 20px;
+      text-align: center;
+      cursor: pointer;
+    }
+
     </style>
   </head>
 
@@ -187,15 +206,13 @@
                 aria-expanded="false"
                 aria-controls="menu1"
               >
-                <i class="bi bi-house"></i>
+                <i class="bi bi-database"></i>
                 <span class="menu-label">General overview</span>
               </button>
               <div class="collapse" id="menu1">
                 <div class="collapse-inner">
-                  <button class="nav-link" data-tab="0">Feature overview</button>
-                  <button class="nav-link" data-tab="1">Target overview</button>
-                  <button class="nav-link" data-tab="2">General</button>
-                  <button class="nav-link" data-tab="3">Sample data</button>
+                  <a class="nav-link" href="#Dataset-overview" onclick="showTab('0')">Dataset overview</a>
+                  <a class="nav-link" href="#Sample-data-train-set" onclick="showTab('0')">Sample data</a>
                 </div>
               </div>
             </li>

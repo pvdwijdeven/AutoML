@@ -1,0 +1,54 @@
+<br>
+{% if header %}
+  <h2 id="{{ header_id|default(header|replace(' ', '-')) }}">
+      {{ header }}
+  </h2>
+{% endif %}
+
+<div class="tab-inner">
+  <div class="btn-group" role="group" aria-label="Inner tab group">
+    <button type="button" class="btn btn-outline-primary" onclick="openInnerTab(event, 'HeadTab')" id="defaultInnerOpen">Head</button>
+    <button type="button" class="btn btn-outline-primary" onclick="openInnerTab(event, 'MiddleTab')">Middle</button>
+    <button type="button" class="btn btn-outline-primary" onclick="openInnerTab(event, 'TailTab')">Tail</button>
+  </div>
+</div>
+
+<div id="HeadTab" class="tabcontent-inner">
+  <div class="table-wrapper">
+    {{ samples_head | safe }}
+  </div>
+</div>
+
+<div id="MiddleTab" class="tabcontent-inner">
+  <div class="table-wrapper">
+    {{ samples_middle | safe }}
+  </div>
+</div>
+
+<div id="TailTab" class="tabcontent-inner">
+  <div class="table-wrapper">
+    {{ samples_tail | safe }}
+  </div>
+</div>
+
+<script>
+function openInnerTab(evt, tabId) {
+  // Hide all tab contents
+  document.querySelectorAll('.tabcontent-inner').forEach(el => el.style.display = 'none');
+
+  // Remove 'active' class from all tab buttons
+  document.querySelectorAll('.btn-group .btn').forEach(btn => btn.classList.remove('active'));
+
+  // Show selected tab content
+  document.getElementById(tabId).style.display = 'block';
+
+  // Mark clicked button as active
+  evt.currentTarget.classList.add('active');
+}
+
+// Run this after DOM is loaded
+document.addEventListener("DOMContentLoaded", () => {
+  document.getElementById("defaultInnerOpen").click();
+});
+</script>
+
