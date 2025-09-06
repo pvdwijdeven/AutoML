@@ -1,54 +1,47 @@
 # Standard library imports
 import warnings
+from dataclasses import dataclass
 from typing import Optional
-from pydantic import BaseModel, Field, model_validator
 
 # Third-party imports
 import numpy as np
 from pandas import DataFrame
-from sklearn.feature_selection import (
-    mutual_info_classif,
-    mutual_info_regression,
-)
+from sklearn.feature_selection import mutual_info_classif, mutual_info_regression
 from sklearn.preprocessing import LabelEncoder
-from automl.dataloader import OriginalData
 
 # Local application imports
+from automl.dataloader import OriginalData
 from automl.library import Logger
 
 
-class RelationInfo(BaseModel):
+@dataclass
+class RelationInfo():
     mutual_information: str
     related_features: str
     suggestions: str
 
 
-class RelationMapping(BaseModel):
-    relations: dict[str, RelationInfo] = Field(default_factory=dict)
+@dataclass
+class RelationMapping():
+    relations: dict[str, RelationInfo] 
     number_of_features: int = 0
 
-    # Auto-update number_of_features after validation
-    @model_validator(mode="after")
-    def set_feature_count(self) -> "RelationMapping":
-        self.number_of_features = len(self.relations)
-        return self
+    # # Convenience dict-like behavior
+    # def __getitem__(self, item: str) -> RelationInfo:
+    #     return self.relations[item]
 
-    # Convenience dict-like behavior
-    def __getitem__(self, item: str) -> RelationInfo:
-        return self.relations[item]
+    # # Use a custom method to iterate over keys to avoid BaseModel __iter__ override issues
+    # def iter_keys(self):
+    #     return iter(self.relations)
 
-    # Use a custom method to iterate over keys to avoid BaseModel __iter__ override issues
-    def iter_keys(self):
-        return iter(self.relations)
+    # def items(self):
+    #     return self.relations.items()
 
-    def items(self):
-        return self.relations.items()
+    # def keys(self):
+    #     return self.relations.keys()
 
-    def keys(self):
-        return self.relations.keys()
-
-    def values(self):
-        return self.relations.values()
+    # def values(self):
+    #     return self.relations.values()
 
 
 def select_features_by_missingness(

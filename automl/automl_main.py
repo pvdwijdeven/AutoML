@@ -2,10 +2,10 @@
 import argparse
 from pathlib import Path
 
-# Third-party imports
-from automl.dataloader import ConfigData, OriginalData, load_data, get_config
-from automl.library import Logger
+# Local application imports
+from automl.dataloader import ConfigData, OriginalData, get_config, load_data
 from automl.eda import perform_eda
+from automl.library import Logger
 
 
 def get_args() -> tuple[str, Path]:

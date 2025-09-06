@@ -1,13 +1,16 @@
+# Standard library imports
+from dataclasses import dataclass
+
 # Third-party imports
 import numpy as np
 import pandas as pd
 from pandas import DataFrame, Series
-from pydantic import BaseModel
 
 from .column_analysis import ColumnInfoMapping
 
 
-class DatasetInfo(BaseModel):
+@dataclass
+class DatasetInfo():
     number_of_features: int
     number_of_constant_features: int
     percentage_of_constant_features: float

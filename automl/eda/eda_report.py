@@ -1,11 +1,19 @@
-from jinja2 import Environment, FileSystemLoader
+# Standard library imports
 import os
-from automl.dataloader import ConfigData
-from .dataset_overview import DatasetInfo
+from dataclasses import asdict
 from datetime import datetime
 
+# Third-party imports
+from jinja2 import Environment, FileSystemLoader
+
+# Local application imports
+from automl.dataloader import ConfigData
+
+from .dataset_overview import DatasetInfo
+
+
 def create_report(config_data: ConfigData, data_set_info: DatasetInfo) -> None:
-    context = {"data": data_set_info.model_dump(), "header":"Dataset overview"}
+    context = {"data": asdict(obj=data_set_info), "header":"Dataset overview"}
     env = Environment(
         loader=FileSystemLoader(
             searchpath=os.path.join(config_data.root, "automl/jinja")

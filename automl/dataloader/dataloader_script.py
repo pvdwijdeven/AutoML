@@ -3,130 +3,107 @@ import importlib
 import importlib.util
 import os
 import sys
+from dataclasses import fields, dataclass, field
 from pathlib import Path
 from sys import exit
-from typing import Optional, Self
+from typing import Optional
 
 # Third-party imports
 import pandas as pd
 import yaml
 from pandas import DataFrame
-from pydantic import BaseModel, ConfigDict
 
 # Local application imports
 from automl.library import Logger
 
 
-class ConfigData(BaseModel):
+@dataclass
+class ConfigData:
     """
     Configuration data model for project paths and settings.
 
     This model defines file paths and project-specific settings
     for training, evaluation, reporting, and logging.
-    All path attributes are automatically serialized as strings.
-
-    Attributes
-    ----------
-    root : pathlib.Path
-        Root directory of the project, typically two levels up from this file.
-    project_name : str
-        Project name, used for directory and file naming conventions.
-    training_file : pathlib.Path
-        Path to the training dataset file (CSV or Excel).
-    target : Optional[str]
-        Target column name in the training dataset. If None and no
-        competition file is given, uses the last column in the training data.
-    competition_file : Optional[pathlib.Path]
-        Optional path to the competition/test dataset.
-    submission_file : pathlib.Path
-        Path for saving generated submission files.
-    report_template : pathlib.Path
-        Path to the report template file for the project.
-    config_file : Optional[pathlib.Path]
-        Path to current configuration YAML file (optional).
-    description_file: Optional[Path]
-        Path to column description YAML file (optiomal)
-    log_file : pathlib.Path
-        Path for the main project logging file.
-
-    Methods
-    -------
-    save_to_yaml() -> None
-        Saves the current configuration to the YAML file specified by config_file.
-    load_from_yaml(filename: pathlib.Path) -> ConfigData
-        Loads and returns a configuration object from the provided YAML file.
-
-    Notes
-    -----
-    All path-type fields are serialized as strings in JSON/YAML output.
     """
 
-    root: Path = Path(__file__).parent.parent.parent
-    project_name: str
-    training_file: Path
-    submission_file: Path
-    report_template: Path
-    target: Optional[str]
-    competition_file: Optional[Path]
-    config_file: Optional[Path]
-    description_file: Optional[Path]
-    update_file: Optional[Path]
-    log_file: Path
+    root: Path = field(
+        default_factory=lambda: Path(__file__).parent.parent.parent
+    )
+    project_name: str = ""
+    training_file: Path = Path()
+    submission_file: Path = Path()
+    report_template: Path = Path()
+    target: Optional[str] = None
+    competition_file: Optional[Path] = None
+    config_file: Optional[Path] = None
+    description_file: Optional[Path] = None
+    update_file: Optional[Path] = None
+    log_file: Path = Path()
 
-    class Config:
-        # Force serialization of Path objects as strings
-        json_encoders = {Path: str}
+
+    def __iter__(self):
+        for field in fields(self):
+            yield field.name, getattr(self, field.name)
 
     def save_to_yaml(self) -> None:
         """
         Saves the configuration object to a YAML file.
 
-        The file path is taken from the 'config_file' attribute.
-        Ensures that the parent folder exists before writing.
-
-        Raises
-        ------
-        FileNotFoundError
-            If the 'config_file' attribute is not set or invalid.
+        Raises FileNotFoundError if 'config_file' is None or invalid.
         """
-        ensure_folder_exists(root=self.root, filename=self.config_file)
-        with open(
-            file=str(object=self.config_file), mode="w", encoding="utf-8"
-        ) as file:
-            yaml.safe_dump(
-                data=self.model_dump(mode="json"),
-                stream=file,
-                sort_keys=False,
-            )
+        if not self.config_file:
+            raise FileNotFoundError("config_file attribute is not set.")
+
+        parent_dir = self.config_file.parent
+        os.makedirs(parent_dir, exist_ok=True)
+
+        # Convert dataclass to dictionary, converting Paths to strings for YAML
+        def serialize(obj):
+            if isinstance(obj, Path):
+                return str(obj)
+            if isinstance(obj, (list, tuple)):
+                return [serialize(o) for o in obj]
+            if isinstance(obj, dict):
+                return {k: serialize(v) for k, v in obj.items()}
+            return obj
+
+        data_dict = {k: serialize(v) for k, v in self.__dict__.items()}
+
+        with open(self.config_file, "w", encoding="utf-8") as file:
+            yaml.safe_dump(data_dict, file, sort_keys=False)
 
     @classmethod
-    def load_from_yaml(cls, filename: Path) -> Self:
+    def load_from_yaml(cls, filename: Path) -> "ConfigData":
         """
         Loads a configuration object from a YAML file.
 
-        Parameters
-        ----------
-        filename : pathlib.Path
-            Path to the YAML configuration file.
-
-        Returns
-        -------
-        ConfigData
-            Instantiated configuration object with settings loaded from file.
-
-        Raises
-        ------
-        FileNotFoundError
-            If the file does not exist at the provided path.
-        yaml.YAMLError
-            If the file is not a valid YAML format.
+        Raises FileNotFoundError, yaml.YAMLError on error.
         """
-        with open(file=filename, mode="r", encoding="utf-8") as file:
-            data = yaml.safe_load(stream=file)
+        with open(filename, "r", encoding="utf-8") as file:
+            data = yaml.safe_load(file)
+
+        # Convert string paths back to Path objects where relevant
+        path_fields = {
+            "root",
+            "training_file",
+            "submission_file",
+            "report_template",
+            "competition_file",
+            "config_file",
+            "description_file",
+            "update_file",
+            "log_file",
+        }
+
+        for field_name in path_fields:
+            if field_name in data and data[field_name] is not None:
+                data[field_name] = Path(data[field_name])
+
         return cls(**data)
 
 
-class OriginalData(BaseModel):
+@dataclass
+class OriginalData():
     """
     Container for original datasets used for training and competition.
 
@@ -140,14 +117,12 @@ class OriginalData(BaseModel):
         Competition dataset (e.g., test features), if provided.
     """
 
-    model_config = ConfigDict(arbitrary_types_allowed=True)
-
     X_train: DataFrame
     y_train: pd.Series
     X_comp: Optional[DataFrame]
 
-
-class ModellingData(BaseModel):
+@dataclass
+class ModellingData():
     """
     Data model for holding training, validation, and test datasets.
 
@@ -166,9 +141,6 @@ class ModellingData(BaseModel):
     y_test : DataFrame
         Test target values.
     """
-
-    model_config = ConfigDict(arbitrary_types_allowed=True)
-
     X_train: DataFrame
     y_train: DataFrame
     X_val: DataFrame

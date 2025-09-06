@@ -1,16 +1,16 @@
+# Standard library imports
+from dataclasses import dataclass
+
 # Third-party imports
 import numpy as np
 from pandas import DataFrame, Series
-from pydantic import BaseModel, ConfigDict
 
 # Local application imports
 from automl.dataloader import OriginalData
 
 
-class TestInfo(BaseModel):
-
-    model_config = ConfigDict(arbitrary_types_allowed=True)
-
+@dataclass
+class TestInfo():
     df_size: DataFrame
     df_colcheck: DataFrame
     df_missing: DataFrame

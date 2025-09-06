@@ -1,30 +1,33 @@
 # Standard library imports
 import os
+from dataclasses import dataclass
 from typing import Optional, Union
 
 # Third-party imports
 import yaml
 from pandas import DataFrame, Series
 from pandas.api.types import is_numeric_dtype
-from pydantic import BaseModel, Field
 from scipy.stats import entropy as scipy_entropy
 
 # Local application imports
 from automl.dataloader import ConfigData
 
 
-class CategoricalInfo(BaseModel):
+@dataclass
+class CategoricalInfo():
     frequency: dict[str, tuple[int, float]]
     mode: list[str]
     entropy: float
     cardinality: str
 
 
-class StringInfo(BaseModel):
+@dataclass
+class StringInfo():
     samples: str
 
 
-class NumericInfo(BaseModel):
+@dataclass
+class NumericInfo():
     min_value: Union[int, float]
     max_value: Union[int, float]
     skewness: float
@@ -32,7 +35,8 @@ class NumericInfo(BaseModel):
     std_dev: float
 
 
-class ColumnInfo(BaseModel):
+@dataclass
+class ColumnInfo():
     is_constant: bool
     column_name: str
     current_type: str
@@ -49,8 +53,9 @@ class ColumnInfo(BaseModel):
     type_specific_info: Union[StringInfo, NumericInfo, CategoricalInfo]
 
 
-class ColumnInfoMapping(BaseModel):
-    columninfo: dict[str, ColumnInfo] = Field(default_factory=dict)
+@dataclass
+class ColumnInfoMapping():
+    columninfo: dict[str, ColumnInfo] 
 
     # Convenience dict-like behavior
     def __getitem__(self, item: str) -> ColumnInfo:
