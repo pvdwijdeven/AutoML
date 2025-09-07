@@ -1,0 +1,66 @@
+{% for colname, colinfo in columninfo_mapping.columninfo.items() %}
+<br>
+<h2 id="feature_{{ colinfo.column_name }}">{{ colinfo.column_name }}</h2>
+
+<table border="1" cellpadding="4" cellspacing="0">
+  <thead>
+    <tr>
+      <th>Parameter</th>
+      <th>Value</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr><td>is_constant</td><td>{{ colinfo.is_constant }}</td></tr>
+    <tr><td>column_name</td><td>{{ colinfo.column_name }}</td></tr>
+    <tr><td>current_type</td><td>{{ colinfo.current_type }}</td></tr>
+    <tr><td>proposed_type</td><td>{{ colinfo.proposed_type }}</td></tr>
+    <tr><td>number_unique</td><td>{{ colinfo.number_unique }}</td></tr>
+    <tr><td>perc_unique</td><td>{{ "%.2f"|format(colinfo.perc_unique) }}</td></tr>
+    <tr><td>is_empty</td><td>{{ colinfo.is_empty }}</td></tr>
+    <tr><td>number_missing</td><td>{{ colinfo.number_missing }}</td></tr>
+    <tr><td>perc_missing</td><td>{{ "%.2f"|format(colinfo.perc_missing) }}</td></tr>
+    <tr><td>duplicate_columns</td><td>{{ colinfo.duplicate_columns or "-" }}</td></tr>
+    <tr><td>description</td><td>{{ colinfo.description or "-" }}</td></tr>
+    <tr><td>suggestions</td><td>{{ colinfo.suggestions or "-" }}</td></tr>
+    <tr><td>default_prepro</td><td>{{ colinfo.default_prepro or "-" }}</td></tr>
+    
+    {% if colinfo.type_specific_info.__class__.__name__ == 'StringInfo' %}
+    <tr><td>samples</td><td>{{ colinfo.type_specific_info.samples }}</td></tr>
+
+    {% elif colinfo.type_specific_info.__class__.__name__ == 'NumericInfo' %}
+    <tr><td>min_value</td><td>{{ colinfo.type_specific_info.min_value }}</td></tr>
+    <tr><td>max_value</td><td>{{ colinfo.type_specific_info.max_value }}</td></tr>
+    <tr><td>skewness</td><td>{{ "%.2f"|format(colinfo.type_specific_info.skewness) }}</td></tr>
+    <tr><td>mean</td><td>{{ "%.2f"|format(colinfo.type_specific_info.mean) }}</td></tr>
+    <tr><td>std_dev</td><td>{{ "%.2f"|format(colinfo.type_specific_info.std_dev) }}</td></tr>
+    
+    {% elif colinfo.type_specific_info.__class__.__name__ == 'CategoricalInfo' %}
+    <tr><td>frequency</td><td> 
+      <tr>
+        <td>frequency</td>
+          <td>
+            <table border="1" cellpadding="3" cellspacing="0">
+              <tr>
+                <th>value</th>
+                <th>amount</th>
+                <th>percent</th>
+              </tr>
+              {% for val, (count, freq) in colinfo.type_specific_info.frequency.items() %}
+              <tr>
+                <td>{{ val }}</td>
+                <td>{{ count }}</td>
+                <td>{{ "%.2f"|format(freq * 100) }}%</td>
+              </tr>
+              {% endfor %}
+            </table>
+          </td>
+        </tr>
+      </td></tr>
+    <tr><td>mode</td><td>{{ colinfo.type_specific_info.mode }}</td></tr>
+    <tr><td>entropy</td><td>{{ "%.2f"|format(colinfo.type_specific_info.entropy) }}</td></tr>
+    <tr><td>cardinality</td><td>{{ colinfo.type_specific_info.cardinality }}</td></tr>
+    {% endif %}
+  </tbody>
+</table>
+
+{% endfor %}

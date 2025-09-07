@@ -16,7 +16,7 @@ from automl.dataloader import ConfigData
 @dataclass
 class CategoricalInfo():
     frequency: dict[str, tuple[int, float]]
-    mode: list[str]
+    mode: str
     entropy: float
     cardinality: str
 
@@ -46,7 +46,7 @@ class ColumnInfo():
     is_empty: bool
     number_missing: int
     perc_missing: float
-    duplicate_columns: list[str]
+    duplicate_columns: str
     description: str
     suggestions: str
     default_prepro: str
@@ -131,7 +131,7 @@ def analyse_column(column: Series, cardinality_max: int = 15) -> ColumnInfo:
             cardinality_label = "High"
         type_specific_info = CategoricalInfo(
             frequency=freq_dict,
-            mode=[str(object=x) for x in column.mode()],
+            mode=", ".join([str(object=x) for x in column.mode()]),
             entropy=entropy_value,
             cardinality=cardinality_label,
         )
@@ -145,7 +145,7 @@ def analyse_column(column: Series, cardinality_max: int = 15) -> ColumnInfo:
         is_empty=num_missing == len(column),
         number_missing=num_missing,
         perc_missing=perc_missing,
-        duplicate_columns=[],
+        duplicate_columns="",
         description="",
         suggestions="",  # todo via LLM?
         default_prepro="",  # todo after prepro test
@@ -163,7 +163,7 @@ def analyse_columns(
     column_info = {}
     for column in X_train.columns:
         column_info[column] = analyse_column(column=X_train[column])
-        column_info[column].duplicate_columns = dict_duplicates[column]
+        column_info[column].duplicate_columns = ", ".join(dict_duplicates[column])
     if y_train is not None:
         column_info["target"] = analyse_column(column=y_train)
     return ColumnInfoMapping(**{"columninfo": column_info})

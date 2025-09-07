@@ -26,22 +26,6 @@ class RelationMapping():
     relations: dict[str, RelationInfo] 
     number_of_features: int = 0
 
-    # # Convenience dict-like behavior
-    # def __getitem__(self, item: str) -> RelationInfo:
-    #     return self.relations[item]
-
-    # # Use a custom method to iterate over keys to avoid BaseModel __iter__ override issues
-    # def iter_keys(self):
-    #     return iter(self.relations)
-
-    # def items(self):
-    #     return self.relations.items()
-
-    # def keys(self):
-    #     return self.relations.keys()
-
-    # def values(self):
-    #     return self.relations.values()
 
 
 def select_features_by_missingness(

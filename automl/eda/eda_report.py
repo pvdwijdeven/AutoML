@@ -11,20 +11,24 @@ from jinja2 import Environment, FileSystemLoader
 # Local application imports
 from automl.dataloader import ConfigData, OriginalData
 
-from .dataset_overview import DatasetInfo
+from .dataset_overview import DatasetInfo, ColumnInfoMapping
 
 
-def add_links_to_headers(html: str, target: str) -> str:
+def add_links_to_headers(html: str) -> str:
     def replace_th(match) -> str:
         col_name = match.group(1)
-        if col_name == target:
-            link = f'<a href="#target_{col_name.replace(" ", "-")}" onclick="showTab(2)" class="feature-link">{col_name}</a>'
-        else:
-            link = f'<a href="#feature_{col_name.replace(" ", "-")}" onclick="showTab(1)" class="feature-link">{col_name}</a>'
+        link = f'<a href="#feature_{col_name.replace(" ", "-")}" onclick="showTab(1)" class="feature-link">{col_name}</a>'
         return f"<th>{link}</th>"
 
     # Replace every <th>...</th> with a linked version
     return re.sub(r"<th>(.*?)</th>", replace_th, html).replace('border="1"', "")
+
+
+def create_feature_report(
+    env: Environment, columninfo: ColumnInfoMapping
+) -> str:
+    template = env.get_template(name="feature_tables.j2")
+    return template.render(**{"columninfo_mapping":columninfo})
 
 
 def create_general_overview(
@@ -49,7 +53,6 @@ def create_general_overview(
         html=X_total.head(n=10).to_html(
             index=False, na_rep="<N/A>", classes="table table-striped"
         ),
-        target=str(object=config_data.target),
     )
     samples_middle = add_links_to_headers(
         html=X_total.iloc[
@@ -57,13 +60,13 @@ def create_general_overview(
             - 5 : data_set_info.number_of_samples // 2
             + 5
         ].to_html(index=False, na_rep="<N/A>", classes="table table-striped"),
-        target=str(object=config_data.target),
+        #target=str(object=config_data.target),
     )
     samples_tail = add_links_to_headers(
         html=X_total.tail(n=10).to_html(
             index=False, na_rep="<N/A>", classes="table table-striped"
         ),
-        target=str(object=config_data.target),
+        #target=str(object=config_data.target),
     )
     sample_data = {
         "samples_head": samples_head,
@@ -81,6 +84,7 @@ def create_report(
     config_data: ConfigData,
     data_set_info: DatasetInfo,
     original_data: OriginalData,
+    column_info: ColumnInfoMapping,
 ) -> None:
     # load jinja2 environment
     env = Environment(
@@ -96,9 +100,15 @@ def create_report(
         original_data=original_data,
     )
 
+    html_features = create_feature_report(env=env, columninfo=column_info)
+
     # complete report
     tabs = [
-        {"title": "General overview", "content": html_general_overview},
+        {
+            "title": "General overview",
+            "content": html_general_overview,
+        },  # html_general_overview,},
+        {"title": "Features", "content": html_features},
     ]
     template = env.get_template(name="report_main.j2")
     output_html = template.render(

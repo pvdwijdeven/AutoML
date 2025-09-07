@@ -32,6 +32,11 @@ def perform_eda(config_data: ConfigData, original_data: OriginalData) -> None:
 
     # preprocess_trial() # todo once preprocessing is ready
 
-    create_report(config_data, data_set_info, original_data=  original_data)
+    create_report(
+        config_data,
+        data_set_info,
+        original_data=original_data,
+        column_info=column_info,
+    )
     todo()
     return

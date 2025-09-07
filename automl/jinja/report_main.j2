@@ -197,6 +197,7 @@
           </button>
 
           <ul class="nav nav-pills flex-column mb-auto" id="menuAccordion">
+
             <!-- General overview -->
             <li class="nav-item">
               <button
@@ -211,17 +212,21 @@
               </button>
               <div class="collapse" id="menu1">
                 <div class="collapse-inner">
-                  <a class="nav-link" href="#Dataset-overview" onclick="showTab('0')">Dataset overview</a>
-                  <a class="nav-link" href="#Sample-data-train-set" onclick="showTab('0')">Sample data</a>
+                  <button class="nav-link"  data-tab="0.#Dataset-overview">
+                    Dataset overview
+                  </button>
+                  <button class="nav-link"  data-tab="0.#Sample-data-train-set">
+                    Sample data
+                  </button>
                 </div>
               </div>
             </li>
 
-            <!-- Details -->
+            <!-- Features -->
             <li class="nav-item">
-              <button class="nav-link" data-tab="4">
+              <button class="nav-link" data-tab="1">
                 <i class="bi bi-ui-checks-grid"></i>
-                <span class="menu-label">Details</span>
+                <span class="menu-label">Features</span>
               </button>
             </li>
           </ul>
@@ -330,8 +335,42 @@
       }
 
       document.querySelectorAll(".nav-link[data-tab]").forEach((el) => {
-        el.addEventListener("click", () => showTab(el.dataset.tab));
+        el.addEventListener("click", () => {
+          const dataTab = el.getAttribute("data-tab"); // e.g. "0.#Dataset-overview"
+          if (dataTab) {
+            // Split at '.' to separate tab index and anchor (format: "tab.anchor")
+            const [tabIndex, anchor] = dataTab.split('.');
+            if (tabIndex) showTab(tabIndex);
+
+            // Remove active from all buttons
+            document.querySelectorAll(".nav-link[data-tab]").forEach((btn) => {
+              btn.classList.remove("active");
+            });
+
+            // Add active only to the clicked button (exact data-tab match)
+            document.querySelectorAll(".nav-link[data-tab]").forEach((btn) => {
+              if (btn.getAttribute("data-tab") === dataTab) {
+                btn.classList.add("active");
+              }
+            });
+
+            if (anchor) {
+              // Smooth scroll to element by id (remove # from anchor)
+              const anchorId = anchor.startsWith('#') ? anchor.slice(1) : anchor;
+              const targetElement = document.getElementById(anchorId);
+              if (targetElement) {
+                targetElement.scrollIntoView({ behavior: "smooth" });
+                history.pushState(null, '', '#' + anchorId);
+              } else {
+                window.location.hash = anchor;
+              }
+            }
+          }
+        });
       });
+
+
+
 
       /* ----------------- Theme ----------------- */
       function applyTheme(theme) {
