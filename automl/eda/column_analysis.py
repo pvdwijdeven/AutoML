@@ -12,22 +12,36 @@ from scipy.stats import entropy as scipy_entropy
 # Local application imports
 from automl.dataloader import ConfigData
 
+from .plots import plot_categorical_distribution, plot_numeric_distribution
+
 
 @dataclass
-class CategoricalInfo():
-    frequency: dict[str, tuple[int, float]]
+class ColumnPlot:
+    feature: str
+    target: str
+    relation: str
+
+
+@dataclass
+class ColumnPlotMapping:
+    columnplot: dict[str, ColumnPlot]
+
+
+@dataclass
+class CategoricalInfo:
+    frequency: Union[dict[str, tuple[int, float]], str]
     mode: str
     entropy: float
     cardinality: str
 
 
 @dataclass
-class StringInfo():
+class StringInfo:
     samples: str
 
 
 @dataclass
-class NumericInfo():
+class NumericInfo:
     min_value: Union[int, float]
     max_value: Union[int, float]
     skewness: float
@@ -36,7 +50,8 @@ class NumericInfo():
 
 
 @dataclass
-class ColumnInfo():
+class ColumnInfo:
+    is_target: bool
     is_constant: bool
     column_name: str
     current_type: str
@@ -54,8 +69,8 @@ class ColumnInfo():
 
 
 @dataclass
-class ColumnInfoMapping():
-    columninfo: dict[str, ColumnInfo] 
+class ColumnInfoMapping:
+    columninfo: dict[str, ColumnInfo]
 
     # Convenience dict-like behavior
     def __getitem__(self, item: str) -> ColumnInfo:
@@ -75,14 +90,17 @@ class ColumnInfoMapping():
         return self.columninfo.values()
 
 
-def analyse_column(column: Series, cardinality_max: int = 15) -> ColumnInfo:
-
+def analyse_column(
+    column: Series, is_target: bool, cardinality_max: int = 15
+) -> tuple[ColumnInfo, ColumnPlot]:
+    column_plot: ColumnPlot =  ColumnPlot(feature="", target="", relation="")
     num_unique = column.nunique()
     perc_unique = num_unique / len(column) * 100
     num_missing = column.isna().sum()
     perc_missing = num_missing / len(column) * 100
     if is_numeric_dtype(arr_or_dtype=column):
         proposed_type = "numeric"
+        column_plot.feature = plot_numeric_distribution(series=column)
     else:
         proposed_type = (
             "categorical" if perc_unique <= cardinality_max else "string"
@@ -107,6 +125,7 @@ def analyse_column(column: Series, cardinality_max: int = 15) -> ColumnInfo:
             samples=", ".join(column.value_counts().head(5).index.tolist()),
         )
     else:
+        column_plot.feature = plot_categorical_distribution(series=column)
         value_counts = column.value_counts(normalize=True, dropna=True)
         entropy_value = float(
             scipy_entropy(value_counts, base=2)
@@ -136,6 +155,7 @@ def analyse_column(column: Series, cardinality_max: int = 15) -> ColumnInfo:
             cardinality=cardinality_label,
         )
     column_info: ColumnInfo = ColumnInfo(
+        is_target=is_target,
         is_constant=num_unique == 1,
         column_name=str(object=column.name),
         current_type=str(object=column.dtype),
@@ -152,21 +172,30 @@ def analyse_column(column: Series, cardinality_max: int = 15) -> ColumnInfo:
         type_specific_info=type_specific_info,
     )
 
-    return column_info
+    return column_info, column_plot
 
 
 def analyse_columns(
     X_train: DataFrame,
     dict_duplicates: dict[str, list[str]],
     y_train: Optional[Series],
-) -> ColumnInfoMapping:
+) -> tuple[ColumnInfoMapping, ColumnPlotMapping]:
     column_info = {}
+    plot_info = {}
     for column in X_train.columns:
-        column_info[column] = analyse_column(column=X_train[column])
-        column_info[column].duplicate_columns = ", ".join(dict_duplicates[column])
+        column_info[column], plot_info[column] = analyse_column(
+            column=X_train[column], is_target=False
+        )
+        column_info[column].duplicate_columns = ", ".join(
+            dict_duplicates[column]
+        )
     if y_train is not None:
-        column_info["target"] = analyse_column(column=y_train)
-    return ColumnInfoMapping(**{"columninfo": column_info})
+        column_info["target"], plot_info["target"] = analyse_column(
+            column=y_train, is_target=True
+        )
+    return ColumnInfoMapping(**{"columninfo": column_info}), ColumnPlotMapping(
+        **{"columnplot": plot_info}
+    )
 
 
 def insert_descriptions(

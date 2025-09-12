@@ -207,7 +207,7 @@ def analyze_test_data(original_data: OriginalData) -> TestInfo:
             )
     df_type_issues = DataFrame(dtype_issues)
     if dtype_issues:
-        suggestions["type_issues"](
+        suggestions["type_issues"]= (
             "Apply consistent dtype conversions. Data type mismatches may break transformation or prediction pipelines."
         )
     return TestInfo(

@@ -1,6 +1,29 @@
-{% for colname, colinfo in columninfo_mapping.columninfo.items() %}
+<div class="fixed-links">
+  <span class="label" style="margin-right: 800px;"></span>
+  <select id="feature-select" class="feature-select" onchange="jumpToFeature(this)">
+    <option value="">Select a feature...</option>
+    {% for column_name, colinfo in columninfo_mapping.columninfo|dictsort %}
+      <option value="#feature_{{ colinfo.column_name }}">{{ colinfo.column_name }}{{ " (target)" if colinfo.is_target else "" }}</option>
+
+    {% endfor %}
+  </select>
+
+</div>
+
+<script>
+  function jumpToFeature(select) {
+    if (select.value) {
+      location.hash = select.value;
+      // Reset to placeholder after short delay to ensure hash works
+      setTimeout(() => {
+        select.value = "";
+      }, 100);
+    }
+  }
+
+</script>{% for column_name, colinfo in columninfo_mapping.columninfo|dictsort %}
 <br>
-<h2 id="feature_{{ colinfo.column_name }}">{{ colinfo.column_name }}</h2>
+<h2 id="feature_{{ colinfo.column_name }}">{{ colinfo.column_name }}{{ " (target)" if colinfo.is_target else "" }}</h2>
 
 <table border="1" cellpadding="4" cellspacing="0">
   <thead>
@@ -62,5 +85,7 @@
     {% endif %}
   </tbody>
 </table>
-
+  {% if column_name in columnplot_mapping.columnplot %}
+      {{ columnplot_mapping.columnplot[column_name].feature }}
+  {% endif %}
 {% endfor %}

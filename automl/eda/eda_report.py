@@ -10,8 +10,8 @@ from jinja2 import Environment, FileSystemLoader
 
 # Local application imports
 from automl.dataloader import ConfigData, OriginalData
-
-from .dataset_overview import DatasetInfo, ColumnInfoMapping
+from .dataset_overview import DatasetInfo
+from .column_analysis import ColumnInfoMapping, ColumnPlotMapping
 
 
 def add_links_to_headers(html: str) -> str:
@@ -25,15 +25,16 @@ def add_links_to_headers(html: str) -> str:
 
 
 def create_feature_report(
-    env: Environment, columninfo: ColumnInfoMapping
+    env: Environment, columninfo: ColumnInfoMapping, plotinfo: ColumnPlotMapping
 ) -> str:
     template = env.get_template(name="feature_tables.j2")
-    return template.render(**{"columninfo_mapping":columninfo})
+    return template.render(
+        **{"columninfo_mapping": columninfo}, **{"columnplot_mapping": plotinfo}
+    )
 
 
 def create_general_overview(
     env: Environment,
-    config_data: ConfigData,
     data_set_info: DatasetInfo,
     original_data: OriginalData,
 ) -> str:
@@ -60,13 +61,13 @@ def create_general_overview(
             - 5 : data_set_info.number_of_samples // 2
             + 5
         ].to_html(index=False, na_rep="<N/A>", classes="table table-striped"),
-        #target=str(object=config_data.target),
+        # target=str(object=config_data.target),
     )
     samples_tail = add_links_to_headers(
         html=X_total.tail(n=10).to_html(
             index=False, na_rep="<N/A>", classes="table table-striped"
         ),
-        #target=str(object=config_data.target),
+        # target=str(object=config_data.target),
     )
     sample_data = {
         "samples_head": samples_head,
@@ -85,6 +86,7 @@ def create_report(
     data_set_info: DatasetInfo,
     original_data: OriginalData,
     column_info: ColumnInfoMapping,
+    column_plot: ColumnPlotMapping,
 ) -> None:
     # load jinja2 environment
     env = Environment(
@@ -95,12 +97,13 @@ def create_report(
 
     html_general_overview = create_general_overview(
         env=env,
-        config_data=config_data,
         data_set_info=data_set_info,
         original_data=original_data,
     )
 
-    html_features = create_feature_report(env=env, columninfo=column_info)
+    html_features = create_feature_report(
+        env=env, columninfo=column_info, plotinfo=column_plot
+    )
 
     # complete report
     tabs = [

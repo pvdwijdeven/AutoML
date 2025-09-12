@@ -1,5 +1,7 @@
 # Standard library imports
+from collections import defaultdict
 from dataclasses import dataclass
+from typing import Union
 
 # Third-party imports
 import numpy as np
@@ -10,7 +12,7 @@ from .column_analysis import ColumnInfoMapping
 
 
 @dataclass
-class DatasetInfo():
+class DatasetInfo:
     number_of_features: int
     number_of_constant_features: int
     percentage_of_constant_features: float
@@ -18,7 +20,7 @@ class DatasetInfo():
     percentage_of_duplicate_features: float
     number_of_empty_features: int
     percentage_of_empty_features: float
-    feature_types: dict[str, int]
+    feature_types: Union[list[str | int | list[str]], str]
     number_of_samples: int
     number_of_duplicate_samples: int
     percentage_of_duplicate_samples: float
@@ -160,12 +162,79 @@ def detect_dataset_type(
     return "unknown"
 
 
+def join_feature_links_with_linebreaks(
+    feature_links: list[str], max_line_length: int = 90
+) -> str:
+    lines = []
+    current_line = ""
+    current_len = 0
+
+    for html_link in feature_links:
+        # Extract visible text from the HTML link
+        # Assumes format: <a ...>VISIBLE TEXT</a>
+        visible_text = html_link.split(">")[-2].split("<")[0]
+        part_len = len(visible_text) + (
+            2 if current_line else 0
+        )  # +2 for ", " if needed
+
+        if current_len + part_len > max_line_length:
+            lines.append(current_line)
+            current_line = html_link
+            current_len = len(visible_text)
+        else:
+            if current_line:
+                current_line += ", " + html_link
+                current_len += part_len
+            else:
+                current_line = html_link
+                current_len = len(visible_text)
+
+    if current_line:
+        lines.append(current_line)
+
+    return "<br>".join(lines)
+
+
 def analyse_dataset(
     X_train: DataFrame,
     column_info: ColumnInfoMapping,
     dict_duplicates: dict[str, list[str]],
     y_train: Series,
 ) -> DatasetInfo:
+
+    def dtypes_summary(df: pd.DataFrame) -> str:
+        feature_cols = sorted(df.columns, key=str.lower)
+        type_to_features = defaultdict(list)
+
+        for col in feature_cols:
+            dtype = df[col].dtype
+            type_to_features[dtype].append(
+                f'<a href="#feature_{col.replace(" ", "-")}" onclick="showTab(1)" class="feature-link">{col}</a>'
+            )
+
+        # Step 2: Build the HTML table
+
+        feature_types = """
+        <div class="feature-table-internal">
+        <table style="border-collapse: collapse;">
+        <thead>
+            <tr>
+            <th>Type</th>
+            <th>Frequency</th>
+            <th>Features</th>
+            </tr>
+        </thead>
+        <tbody>
+        """
+
+        for dtype, features in type_to_features.items():
+            # this is required, because wordwrap is not working with links for some reason.
+            feature_list = join_feature_links_with_linebreaks(features)
+            feature_types += f"<tr><td>{dtype}</td><td>{len(features)}</td><td>{feature_list}</td></tr>\n"
+
+        feature_types += "</tbody>\n</table></div>"
+        return feature_types
+
     number_features = len(X_train.columns)
     constant_features = sum(
         [column_info[col].is_constant for col in column_info.keys()]
@@ -187,25 +256,33 @@ def analyse_dataset(
     return DatasetInfo(
         number_of_features=number_features,
         number_of_constant_features=constant_features,
-        percentage_of_constant_features=constant_features / number_features * 100,
+        percentage_of_constant_features=constant_features
+        / number_features
+        * 100,
         number_of_duplicate_features=number_duplicate_features,
         percentage_of_duplicate_features=number_duplicate_features
         / number_features
         * 100,
         number_of_empty_features=number_empty_features,
-        percentage_of_empty_features=number_empty_features / number_features * 100,
-        feature_types=X_train.dtypes.astype(dtype=str).value_counts().to_dict(),
+        percentage_of_empty_features=number_empty_features
+        / number_features
+        * 100,
+        feature_types=dtypes_summary(df=X_train),
         number_of_samples=number_samples,
         number_of_duplicate_samples=duplicate_samples,
-        percentage_of_duplicate_samples=duplicate_samples / number_samples * 100,
+        percentage_of_duplicate_samples=duplicate_samples
+        / number_samples
+        * 100,
         number_of_empty_samples=number_empty_rows,
         percentage_of_empty_samples=number_empty_rows / number_samples * 100,
         table_size=f"{number_features} x {number_samples}",
         number_of_cells=number_features * number_samples,
         memory=f"{(X_train.memory_usage(deep=True).sum() / 1024):.3f} kB",
         number_of_missing_items=number_missing,
-        percentage_of_missing_items=number_missing / (number_features * number_samples) * 100,
-        target=column_info["target"].column_name,
+        percentage_of_missing_items=number_missing
+        / (number_features * number_samples)
+        * 100,
+        target=f'<a href="#feature_{column_info["target"].column_name.replace(" ", "-")}" onclick="showTab(1)" class="feature-link">{column_info["target"].column_name}</a>',
         target_type=column_info["target"].proposed_type,
         dataset_type=detect_dataset_type(target=y_train),
     )

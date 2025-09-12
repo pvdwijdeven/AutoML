@@ -13,30 +13,22 @@
         <tr>
           <th>{{ (key|replace('_',' ')) }}</th>
           <td>
-            {% if value is mapping %}
-              <table>
-                {% for subkey, subval in value.items() %}
-                  <tr><th>{{ subkey }}</th><td>{{ subval }}</td></tr>
-                {% endfor %}
-              </table>
-            {% else %}
-              {% if value is number %}
-                {% if key.startswith('perc') %}
-                  {% if value != value|int  %}
-                    {{ "%.2f"|format(value) }}%
-                  {% else %}
-                    {{ "%.0f"|format(value) }}%
-                  {% endif %}
+            {% if value is number %}
+              {% if key.startswith('perc') %}
+                {% if value != value|int  %}
+                  {{ "%.2f"|format(value) }}%
                 {% else %}
-                  {% if value != value|int  %}
-                    {{ "%.2f"|format(value) }}
-                  {% else %}
-                    {{ value }}
-                  {% endif %}
+                  {{ "%.0f"|format(value) }}%
                 {% endif %}
               {% else %}
-                {{ value }}
+                {% if value != value|int  %}
+                  {{ "%.2f"|format(value) }}
+                {% else %}
+                  {{ value }}
+                {% endif %}
               {% endif %}
+            {% else %}
+              {{ value }}
             {% endif %}
           </td>
         </tr>

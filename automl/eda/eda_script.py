@@ -12,7 +12,7 @@ from .testdata import analyze_test_data
 def perform_eda(config_data: ConfigData, original_data: OriginalData) -> None:
 
     dict_duplicates = find_duplicate_columns(X_train=original_data.X_train)
-    column_info = analyse_columns(
+    column_info, column_plot = analyse_columns(
         X_train=original_data.X_train,
         dict_duplicates=dict_duplicates,
         y_train=original_data.y_train,
@@ -37,6 +37,7 @@ def perform_eda(config_data: ConfigData, original_data: OriginalData) -> None:
         data_set_info,
         original_data=original_data,
         column_info=column_info,
+        column_plot=column_plot,
     )
     todo()
     return
