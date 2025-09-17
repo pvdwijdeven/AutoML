@@ -1,13 +1,16 @@
 # Standard library imports
 import os
 from dataclasses import dataclass
-from typing import Optional, Union
+from typing import Any, Optional, Union
 
 # Third-party imports
+import numpy as np
+import pandas as pd
 import yaml
 from pandas import DataFrame, Series
 from pandas.api.types import is_numeric_dtype
 from scipy.stats import entropy as scipy_entropy
+from scipy.stats import kurtosis, shapiro
 
 # Local application imports
 from automl.dataloader import ConfigData
@@ -47,6 +50,15 @@ class NumericInfo:
     skewness: float
     mean: float
     std_dev: float
+    outliers_count: int
+    extreme_outliers_count: int
+    lower_bound: Union[int, float]
+    upper_bound: Union[int, float]
+    extreme_lower: Union[int, float]
+    extreme_upper: Union[int, float]
+    threshold_method: str
+    kurtosis: Union[float, str]
+    prop_zero: float
 
 
 @dataclass
@@ -90,10 +102,92 @@ class ColumnInfoMapping:
         return self.columninfo.values()
 
 
+def get_threshold_method(column: pd.Series, max_sample_size: int = 5000) -> str:
+    data = column.dropna()
+    # if low cardinality or many zeros, use empirical
+    n_unique = data.nunique(dropna=True)
+    prop_zero = (data == 0).sum() / max(1, len(data))
+    if len(data) < 3 or len(data) > max_sample_size:
+        return "iqr"
+    if n_unique <= 10 or prop_zero > 0.3:
+        # low-cardinality or zero-inflated: use empirical rules
+        return "empirical"
+    _, p_value = shapiro(data)  # still ok for moderate sizes
+    return "zscore" if p_value > 0.05 else "iqr"
+
+
+def get_outliers(
+    column: pd.Series,
+    extreme_outlier_factor: float = 2.0,
+    empirical_quantile: float = 0.99,
+) -> dict[str, Any]:
+    column = column.copy()
+    threshold_method = get_threshold_method(column)
+
+    if threshold_method == "iqr":
+        Q1, Q3 = column.quantile(0.25), column.quantile(0.75)
+        IQR = Q3 - Q1
+        lower_bound = Q1 - 1.5 * IQR
+        upper_bound = Q3 + 1.5 * IQR
+        extreme_lower = Q1 - extreme_outlier_factor * 1.5 * IQR
+        extreme_upper = Q3 + extreme_outlier_factor * 1.5 * IQR
+
+    elif threshold_method == "empirical":
+        # Focus on non-zero behaviour but keep domain limits
+        nonzero = column[column > 0]
+        if len(nonzero) == 0:
+            # all zeros -> no outliers
+            lower_bound = upper_bound = extreme_lower = extreme_upper = 0
+        else:
+            # use an upper quantile of the empirical distribution of values (>0)
+            upper_q = int(np.ceil(nonzero.quantile(empirical_quantile)))
+            # make sure we don't exceed possible domain
+            domain_max = (
+                column.max()
+                if pd.api.types.is_numeric_dtype(column)
+                else upper_q
+            )
+            upper_bound = min(upper_q, domain_max)
+            lower_bound = 0  # zeros are common, so lower bound stays 0
+            # extreme bounds could be just the max possible observed value
+            extreme_upper = column.max()
+            extreme_lower = 0
+
+        # If you prefer cumulative-frequency-based threshold:
+        # compute cumulative frequency and pick smallest v with cumfreq >= 0.99
+
+    else:  # zscore
+        mean, std = column.mean(), column.std(ddof=0)
+        lower_bound = mean - 3 * std
+        upper_bound = mean + 3 * std
+        extreme_lower = mean - extreme_outlier_factor * 3 * std
+        extreme_upper = mean + extreme_outlier_factor * 3 * std
+
+    outliers_mask = (column < lower_bound) | (column > upper_bound)
+    extreme_mask = (column < extreme_lower) | (column > extreme_upper)
+
+    result = {
+        "outliers_count": int(outliers_mask.sum()),
+        "extreme_outliers_count": int(extreme_mask.sum()),
+        "lower_bound": lower_bound,
+        "upper_bound": upper_bound,
+        "extreme_lower": extreme_lower,
+        "extreme_upper": extreme_upper,
+        "threshold_method": threshold_method,
+        "kurtosis": (
+            float(kurtosis(column.dropna(), fisher=False))
+            if len(column.dropna()) > 0
+            else ""
+        ),
+        "prop_zero": float((column == 0).sum() / max(1, len(column))),
+    }
+    return result
+
+
 def analyse_column(
     column: Series, is_target: bool, cardinality_max: int = 15
 ) -> tuple[ColumnInfo, ColumnPlot]:
-    column_plot: ColumnPlot =  ColumnPlot(feature="", target="", relation="")
+    column_plot: ColumnPlot = ColumnPlot(feature="", target="", relation="")
     num_unique = column.nunique()
     perc_unique = num_unique / len(column) * 100
     num_missing = column.isna().sum()
@@ -113,12 +207,22 @@ def analyse_column(
             if isinstance(skewness, float) or isinstance(skewness, int)
             else 0
         )
+        dict_outlier = get_outliers(column=column)
         type_specific_info = NumericInfo(
             min_value=column.min(),
             max_value=column.max(),
             skewness=skewness,
             mean=column.mean(),
             std_dev=column.std(),
+            outliers_count=dict_outlier["outliers_count"],
+            extreme_outliers_count=dict_outlier["extreme_outliers_count"],
+            lower_bound=dict_outlier["lower_bound"],
+            upper_bound=dict_outlier["upper_bound"],
+            extreme_lower=dict_outlier["extreme_lower"],
+            extreme_upper=dict_outlier["extreme_upper"],
+            threshold_method=dict_outlier["threshold_method"],
+            kurtosis=dict_outlier["kurtosis"],
+            prop_zero=dict_outlier["prop_zero"],
         )
     elif proposed_type == "string":
         type_specific_info = StringInfo(

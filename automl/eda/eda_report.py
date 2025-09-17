@@ -12,6 +12,7 @@ from jinja2 import Environment, FileSystemLoader
 from automl.dataloader import ConfigData, OriginalData
 from .dataset_overview import DatasetInfo
 from .column_analysis import ColumnInfoMapping, ColumnPlotMapping
+from .target_relations import TargetRelationMapping
 
 
 def add_links_to_headers(html: str) -> str:
@@ -21,7 +22,7 @@ def add_links_to_headers(html: str) -> str:
         return f"<th>{link}</th>"
 
     # Replace every <th>...</th> with a linked version
-    return re.sub(r"<th>(.*?)</th>", replace_th, html).replace('border="1"', "")
+    return re.sub(pattern=r"<th>(.*?)</th>", repl=replace_th, string=html).replace('border="1"', "")
 
 
 def create_feature_report(
@@ -31,6 +32,13 @@ def create_feature_report(
     return template.render(
         **{"columninfo_mapping": columninfo}, **{"columnplot_mapping": plotinfo}
     )
+
+
+def create_target_relations_report(
+    env: Environment, target_relations: TargetRelationMapping
+) -> str:
+    template = env.get_template(name="target_relations.j2")
+    return template.render(**{"columninfo_mapping": target_relations})
 
 
 def create_general_overview(
@@ -61,13 +69,11 @@ def create_general_overview(
             - 5 : data_set_info.number_of_samples // 2
             + 5
         ].to_html(index=False, na_rep="<N/A>", classes="table table-striped"),
-        # target=str(object=config_data.target),
     )
     samples_tail = add_links_to_headers(
         html=X_total.tail(n=10).to_html(
             index=False, na_rep="<N/A>", classes="table table-striped"
         ),
-        # target=str(object=config_data.target),
     )
     sample_data = {
         "samples_head": samples_head,
@@ -87,6 +93,7 @@ def create_report(
     original_data: OriginalData,
     column_info: ColumnInfoMapping,
     column_plot: ColumnPlotMapping,
+    target_relations: TargetRelationMapping,
 ) -> None:
     # load jinja2 environment
     env = Environment(
@@ -105,13 +112,18 @@ def create_report(
         env=env, columninfo=column_info, plotinfo=column_plot
     )
 
+    html_target_relations = create_target_relations_report(
+        env=env, target_relations=target_relations
+    )
+
     # complete report
     tabs = [
         {
             "title": "General overview",
             "content": html_general_overview,
-        },  # html_general_overview,},
+        }, 
         {"title": "Features", "content": html_features},
+        {"title": "Target relations", "content": html_target_relations},
     ]
     template = env.get_template(name="report_main.j2")
     output_html = template.render(

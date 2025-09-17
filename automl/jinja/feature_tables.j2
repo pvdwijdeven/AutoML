@@ -56,7 +56,16 @@
     <tr><td>skewness</td><td>{{ "%.2f"|format(colinfo.type_specific_info.skewness) }}</td></tr>
     <tr><td>mean</td><td>{{ "%.2f"|format(colinfo.type_specific_info.mean) }}</td></tr>
     <tr><td>std_dev</td><td>{{ "%.2f"|format(colinfo.type_specific_info.std_dev) }}</td></tr>
-    
+    <tr><td>outlier_treshold_method</td><td>{{ colinfo.type_specific_info.threshold_method }}</td></tr>
+    <tr><td>extreme_lower</td><td>{{ "%.2f"|format(colinfo.type_specific_info.extreme_lower) }}</td></tr>
+    <tr><td>lower_bound</td><td>{{ "%.2f"|format(colinfo.type_specific_info.lower_bound) }}</td></tr>
+    <tr><td>upper_bound</td><td>{{ "%.2f"|format(colinfo.type_specific_info.upper_bound) }}</td></tr>
+    <tr><td>extreme_upper</td><td>{{ "%.2f"|format(colinfo.type_specific_info.extreme_upper) }}</td></tr>
+    <tr><td>outliers_count</td><td>{{ colinfo.type_specific_info.outliers_count }}</td></tr>
+    <tr><td>extreme_outliers_count</td><td>{{ colinfo.type_specific_info.extreme_outliers_count }}</td></tr>
+    <tr><td>kurtosis</td><td>{{ colinfo.type_specific_info.kurtosis }}</td></tr>
+    <tr><td>prop_zero</td><td>{{ colinfo.type_specific_info.prop_zero }}</td></tr>
+
     {% elif colinfo.type_specific_info.__class__.__name__ == 'CategoricalInfo' %}
     <tr><td>frequency</td><td> 
       <tr>

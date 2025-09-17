@@ -1,0 +1,58 @@
+<div class="fixed-links">
+  <span class="label" style="margin-right: 800px;"></span>
+  <select id="feature-select" class="feature-select" onchange="jumpTotrelation(this)">
+    <option value="">Select a feature...</option>
+    {% for column_name, colinfo in columninfo_mapping.target_relation|dictsort %}
+      <option value="#trelation_{{ column_name }}">{{ column_name }}</option>
+
+    {% endfor %}
+  </select>
+
+</div>
+
+<script>
+  function jumpTotrelation(select) {
+    if (select.value) {
+      location.hash = select.value;
+      // Reset to placeholder after short delay to ensure hash works
+      setTimeout(() => {
+        select.value = "";
+      }, 100);
+    }
+  }
+
+</script>{% for column_name, colinfo in columninfo_mapping.target_relation|dictsort %}
+<br>
+<h2 id="trelation_{{ column_name }}">{{ column_name }}</h2>
+
+<div class="table-wrapper">
+  <table>
+    <tbody>
+      {% for key, value in colinfo.items() %}
+        <tr>
+          <th>{{ (key|replace('_',' ')) }}</th>
+          <td>
+            {% if value is number %}
+              {% if key.startswith('perc') %}
+                {% if value != value|int  %}
+                  {{ "%.2f"|format(value) }}%
+                {% else %}
+                  {{ "%.0f"|format(value) }}%
+                {% endif %}
+              {% else %}
+                {% if value != value|int  %}
+                  {{ "%.2f"|format(value) }}
+                {% else %}
+                  {{ value }}
+                {% endif %}
+              {% endif %}
+            {% else %}
+              {{ value }}
+            {% endif %}
+          </td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endfor %}

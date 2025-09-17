@@ -7,6 +7,7 @@ from .dataset_overview import analyse_dataset, find_duplicate_columns
 from .eda_report import create_report
 from .relations import generate_feature_relations
 from .testdata import analyze_test_data
+from .target_relations import get_target_relations
 
 
 def perform_eda(config_data: ConfigData, original_data: OriginalData) -> None:
@@ -26,6 +27,11 @@ def perform_eda(config_data: ConfigData, original_data: OriginalData) -> None:
         dict_duplicates=dict_duplicates,
         y_train=original_data.y_train,
     )
+    target_relations = get_target_relations(
+        X_train=original_data.X_train,
+        y_train=original_data.y_train,
+        column_info=column_info,
+    )
 
     _relation_info = generate_feature_relations(original_data=original_data)
     _test_info = analyze_test_data(original_data=original_data)
@@ -33,11 +39,12 @@ def perform_eda(config_data: ConfigData, original_data: OriginalData) -> None:
     # preprocess_trial() # todo once preprocessing is ready
 
     create_report(
-        config_data,
-        data_set_info,
+        config_data=config_data,
+        data_set_info=data_set_info,
         original_data=original_data,
         column_info=column_info,
         column_plot=column_plot,
+        target_relations=target_relations,
     )
     todo()
     return
