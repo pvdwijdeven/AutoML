@@ -163,7 +163,7 @@ def detect_dataset_type(
 
 
 def join_feature_links_with_linebreaks(
-    feature_links: list[str], max_line_length: int = 90
+    feature_links: list[str], max_line_length: int = 10000
 ) -> str:
     lines = []
     current_line = ""
@@ -220,7 +220,7 @@ def analyse_dataset(
         <thead>
             <tr>
             <th>Type</th>
-            <th>Frequency</th>
+            <th>Amount</th>
             <th>Features</th>
             </tr>
         </thead>
@@ -228,8 +228,7 @@ def analyse_dataset(
         """
 
         for dtype, features in type_to_features.items():
-            # this is required, because wordwrap is not working with links for some reason.
-            feature_list = join_feature_links_with_linebreaks(features)
+            feature_list = ", ".join(features)
             feature_types += f"<tr><td>{dtype}</td><td>{len(features)}</td><td>{feature_list}</td></tr>\n"
 
         feature_types += "</tbody>\n</table></div>"

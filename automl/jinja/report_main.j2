@@ -146,22 +146,25 @@
   }
 
   /* tables */
+
   table {
     width: 100%;
     border-collapse: collapse;
     margin-bottom: 1em;
-    table-layout: fixed;   /* Ensures columns have fixed width, helps wrapping */
+    
+    /* --- Add this line --- */
+    table-layout: fixed;   /* This is crucial for controlling column widths */
   }
+
   th, td {
     border: 1px solid #ccc;
     padding: 8px;
     text-align: left;
+    overflow-wrap: anywhere; /* modern browsers */
+    word-wrap: break-word;   /* legacy support */
+    word-break: break-word;  /* another fallback */
+    white-space: normal;     /* ensures text wrapping is allowed */
 
-    /* Wrapping rules */
-    overflow-wrap: anywhere; /* modern */
-    word-wrap: break-word;   /* legacy */
-    word-break: break-word;  /* fallback */
-    white-space: normal;     /* allow wrapping */
   }
 
   /* Keep first column a fixed width but still wrap */
@@ -170,6 +173,11 @@
     width: 200px;
     white-space: normal; /* changed from nowrap */
   }
+
+.table-wrapper2 table {
+    min-width: 90%;
+    width: 100%; /* You can also add this to be explicit */
+}
 
   .table-wrapper {
     overflow-x: auto;
@@ -203,6 +211,26 @@
     text-align: center;
     cursor: pointer;
   }
+
+.feature-table-internal table {
+  border-collapse: collapse;
+  width: 100%;
+  table-layout: auto;   /* let the browser size based on content */
+}
+
+.feature-table-internal th:nth-child(1),
+.feature-table-internal td:nth-child(1),
+.feature-table-internal th:nth-child(2),
+.feature-table-internal td:nth-child(2) {
+  white-space: nowrap;  /* keep text in one line */
+  width: 1%;            /* hint: shrink as much as possible */
+}
+
+.feature-table-internal th:nth-child(3),
+.feature-table-internal td:nth-child(3) {
+  width: 100%;          /* take up remaining space */
+}
+
 </style>
 
   </head>
