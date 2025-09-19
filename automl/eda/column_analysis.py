@@ -317,6 +317,6 @@ def insert_descriptions(
                 column_name = column_info[column].column_name
                 column_info[column].description = descriptions.get(
                     column_name, ""
-                )
+                ).replace("\n","<br>")
             return column_info
     return column_info
