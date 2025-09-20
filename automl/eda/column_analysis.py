@@ -8,7 +8,6 @@ import numpy as np
 import pandas as pd
 import yaml
 from pandas import DataFrame, Series
-from pandas.api.types import is_numeric_dtype
 from scipy.stats import entropy as scipy_entropy
 from scipy.stats import kurtosis, shapiro
 
@@ -192,7 +191,7 @@ def analyse_column(
     perc_unique = num_unique / len(column) * 100
     num_missing = column.isna().sum()
     perc_missing = num_missing / len(column) * 100
-    if is_numeric_dtype(arr_or_dtype=column):
+    if pd.api.types.is_numeric_dtype(arr_or_dtype=column) and column.nunique()>2:
         proposed_type = "numeric"
         column_plot.feature = plot_numeric_distribution(series=column)
     else:

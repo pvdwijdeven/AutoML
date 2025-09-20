@@ -46,5 +46,4 @@ def perform_eda(config_data: ConfigData, original_data: OriginalData) -> None:
         column_plot=column_plot,
         target_relations=target_relations,
     )
-    todo()
     return

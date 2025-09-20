@@ -1,11 +1,12 @@
 # Standard library imports
-from dataclasses import dataclass, asdict
-from typing import Union
+from dataclasses import asdict, dataclass
+from typing import Union, Any
 
 # Third-party imports
 import numpy as np
 import pandas as pd
 from pandas import DataFrame, Series
+from scipy import stats
 from scipy.stats import pearsonr, shapiro, spearmanr
 
 from .column_analysis import ColumnInfoMapping
@@ -39,14 +40,22 @@ class CatNumCorr:
 
 @dataclass
 class NumCatCorr:
-
+    target_type: str
+    n_categories: int
+    statistical_test: str
+    effect_size: str
+    comment: str
+    
     def items(self):
         return asdict(self).items()
 
 
 @dataclass
 class CatCatCorr:
-
+    statistical_test:str
+    effect_size: str
+    comment: str
+    
     def items(self):
         return asdict(self).items()
 
@@ -56,6 +65,96 @@ class TargetRelationMapping:
     target_relation: dict[
         str, Union[NumNumCorr, CatNumCorr, NumCatCorr, CatCatCorr]
     ]
+
+
+def generate_interpretation(
+    analysis_dict: dict[str, Any], feature_name: str, target_name: str
+) -> str:
+    """
+    Generates a human-readable interpretation from an analysis dictionary.
+
+    Args:
+        analysis_dict (Dict[str, Any]): The output dictionary from one of the
+                                        analysis functions.
+        feature_name (str): The name of the feature variable.
+        target_name (str): The name of the target variable.
+
+    Returns:
+        str: A text summary of the statistical findings.
+    """
+    if "error" in analysis_dict:
+        return f"Analysis could not be performed for '{feature_name}' and '{target_name}': {analysis_dict['error']}"
+
+    # --- Step 1: Check for Statistical Significance ---
+    p_value = analysis_dict["statistical_test"]["p_value"]
+    test_name = analysis_dict["statistical_test"]["name"]
+    alpha = 0.05
+
+    # Format p-value for reporting
+    p_text = f"p = {p_value:.4f}" if p_value >= 0.001 else "p < 0.001"
+
+    if p_value >= alpha:
+        return (
+            f"The {test_name} found no statistically significant relationship between "
+            f"'{feature_name}' and '{target_name}' ({p_text}). Any observed "
+            f"differences or associations are likely due to random chance."
+        )
+
+    # --- Step 2: If significant, interpret the effect size ---
+    effect_size_name = analysis_dict["effect_size"]["name"]
+    effect_size_value = analysis_dict["effect_size"]["value"]
+    strength = "unknown"
+
+    if effect_size_name == "Cramér's V":
+        if effect_size_value >= 0.5:
+            strength = "strong"
+        elif effect_size_value >= 0.3:
+            strength = "moderate"
+        elif effect_size_value >= 0.1:
+            strength = "weak"
+        else:
+            strength = "very weak"
+
+        return (
+            f"A statistically significant and <strong>{strength} association</strong> was found "
+            f"between '{feature_name}' and '{target_name}' ({p_text}, "
+            f"Cramér's V = {effect_size_value:.2f})."
+        )
+
+    elif effect_size_name == "Eta-squared (η²)":
+        if effect_size_value >= 0.14:
+            strength = "large"
+        elif effect_size_value >= 0.06:
+            strength = "moderate"
+        elif effect_size_value >= 0.01:
+            strength = "small"
+        else:
+            strength = "very small"
+
+        return (
+            f"A statistically significant relationship was found. The groups in "
+            f"'{target_name}' account for a <strong>{strength}</strong> amount of the variance in "
+            f"'{feature_name}' ({p_text}, η² = {effect_size_value:.2f})."
+        )
+
+    elif effect_size_name == "Cohen's d":
+        abs_d = abs(effect_size_value)
+        if abs_d >= 0.8:
+            strength = "large"
+        elif abs_d >= 0.5:
+            strength = "moderate"
+        elif abs_d >= 0.2:
+            strength = "small"
+        else:
+            strength = "very small"
+
+        return (
+            f"A statistically significant and <strong>{strength} difference</strong> was found in the "
+            f"mean of '{feature_name}' between the categories of '{target_name}' "
+            f"({p_text}, Cohen's d = {effect_size_value:.2f})."
+        )
+
+    return "Interpretation could not be generated."
 
 
 # This is the helper function you provided, used for generating the final interpretation.
@@ -147,6 +246,218 @@ def _get_eta_squared(x: pd.Series, y: pd.Series) -> float:
     )
 
     return ss_between / ss_total
+
+
+def get_cat_cat_correlation(
+    feature: pd.Series, target: pd.Series
+) -> CatCatCorr:
+    """
+    Analyzes the relationship between two categorical variables.
+
+    This function creates a contingency table, performs a Chi-Squared test for
+    independence, and calculates Cramér's V as a measure of the strength of
+    the association.
+
+    Args:
+        categorical_feature (pd.Series): A pandas Series containing the feature's
+                                            categorical data.
+        categorical_target (pd.Series): A pandas Series containing the target's
+                                        categorical data. Must be of the same
+                                        length as categorical_feature.
+
+    Returns:
+        Dict[str, Any]: A dictionary containing the contingency table, Chi-Squared
+                        test results, and the Cramér's V effect size. Returns an
+                        error message if analysis is not possible.
+    """
+    if len(feature) != len(target):
+        raise ValueError("Input Series must have the same length.")
+
+    # Combine into a single DataFrame and drop missing values
+    df = pd.DataFrame(
+        {"feature": feature, "target": target}
+    ).dropna()
+    skip = False
+    comment = ""
+    if df.empty:
+        comment = "No valid data after dropping missing values."
+        skip = True
+
+    # --- 1. Contingency Table ---
+    # This table shows the frequency of each combination of categories.
+    contingency_table = pd.crosstab(df["feature"], df["target"])
+
+    # Check if the table is valid for a chi-squared test
+    if contingency_table.shape[0] < 2 or contingency_table.shape[1] < 2:
+        comment = "At least one variable has fewer than 2 unique categories after dropping NaNs."
+        skip = True
+
+    if not skip:
+        # --- 2. Statistical Test: Chi-Squared ---
+        chi2, p_value, dof, expected = stats.chi2_contingency(contingency_table)
+
+        # --- 3. Effect Size: Cramér's V ---
+        # Cramér's V is a measure of association between two nominal variables,
+        # giving a value between 0 (no association) and 1 (perfect association).
+        n = contingency_table.sum().sum()
+        phi2 = chi2 / n
+        r, k = contingency_table.shape
+
+        # Handle the case where a dimension has only 1 level
+        if min(k - 1, r - 1) == 0:
+            cramers_v = np.nan
+        else:
+            cramers_v = np.sqrt(phi2 / min(k - 1, r - 1))
+
+        # --- 4. Assemble Results ---
+        results = {
+            "statistical_test": {
+                "name": "Chi-Squared Test of Independence",
+                "chi2_statistic": chi2,
+                "p_value": p_value,
+                "degrees_of_freedom": dof,
+            },
+            "effect_size": {"name": "Cramér's V", "value": cramers_v},
+        }
+        feature_name = str(feature.name) if feature.name else "feature"
+        target_name = str(target.name) if target.name else "target"
+
+        comment = generate_interpretation(
+            analysis_dict=results,
+            feature_name=feature_name,
+            target_name=target_name,
+        )
+        result = CatCatCorr(
+            statistical_test=(
+                f"name: Chi-Squared Test of Independence<br>chi2_statistic: {chi2}<br>p_value: {p_value}<br>degrees_of_freedom: {dof}"
+            ),
+            effect_size=f"name: Cramér's V<br>value: {cramers_v}",
+            comment=comment,
+        )
+    else:
+        result = CatCatCorr(statistical_test="", effect_size="",comment=comment)
+    return result
+
+
+def get_num_cat_correlation(
+    feature: pd.Series, target: pd.Series
+) -> NumCatCorr:
+    """
+    Analyzes the relationship between a numeric feature and a categorical target.
+
+    This function provides descriptive statistics for the numeric feature grouped by each
+    category of the target. It automatically performs the appropriate statistical test
+    (t-test for binary target, ANOVA for multi-class target) and calculates a
+    corresponding effect size (Cohen's d or Eta-squared).
+
+    Args:
+        numeric_feature (pd.Series): A pandas Series containing numerical data.
+        categorical_target (pd.Series): A pandas Series containing categorical data.
+                                        Must be of the same length as numeric_feature.
+
+    Returns:
+        Dict[str, Any]: A dictionary containing a comprehensive analysis of the
+                        relationship, including summary stats, test results, and
+                        effect size. Returns an error message if analysis
+                        is not possible.
+    """
+    if len(feature) != len(target):
+        raise ValueError("Input Series must have the same length.")
+
+    # Combine into a single DataFrame and drop missing values
+    df = pd.DataFrame(
+        {"feature": feature, "target": target}
+    ).dropna()
+
+    skip = False
+    comment = ""
+
+    if df.empty:
+        comment = "No valid data after dropping missing values."
+        skip = True
+
+    # Identify categories and their count
+    categories = df["target"].unique()
+    n_categories = len(categories)
+
+    if n_categories < 2:
+        comment = f"Target must have at least 2 unique categories, but found {n_categories}."
+        skip = True
+
+    # --- 1. Summary Statistics by Category ---
+
+    results = NumCatCorr(        target_type= "binary" if n_categories == 2 else "multiclass",
+        n_categories= n_categories,
+        statistical_test= "",
+        effect_size= "",
+        comment=comment,
+    )
+    my_dict = {
+        "name": "",
+        "statistical_test": {},
+        "effect_size": {}
+    }
+    if not skip:
+        # --- 2. Statistical Test and Effect Size ---
+        if n_categories == 2:
+            # For Binary Targets
+            group1 = df[df["target"] == categories[0]]["feature"]
+            group2 = df[df["target"] == categories[1]]["feature"]
+
+            # Welch's T-test (does not assume equal variance)
+            t_stat, p_value = stats.ttest_ind(group1, group2, equal_var=False)
+            results.statistical_test = f"name: Welch's Independent T-test<br>t_statistic: {t_stat}<br>p_value: {p_value}"
+            my_dict["statistical_test"] = {
+                "name": "Welch's Independent T-test",
+                "t_statistic": t_stat,
+                "p_value": p_value,
+            }
+            # Cohen's d for effect size
+            n1, n2 = len(group1), len(group2)
+            mean1, mean2 = group1.mean(), group2.mean()
+            std1, std2 = group1.std(), group2.std()
+            pooled_std = np.sqrt(
+                ((n1 - 1) * std1**2 + (n2 - 1) * std2**2) / (n1 + n2 - 2)
+            )
+            cohen_d = (mean1 - mean2) / pooled_std
+            results.effect_size = f"name: Cohen's d<br>value: {cohen_d}"
+            my_dict["effect_size"] = {
+            "name": "Cohen's d",
+            "value": cohen_d
+        }
+        else:  # n_categories > 2
+            # For Multi-class Targets
+            groups = [df[df["target"] == cat]["feature"] for cat in categories]
+
+            # ANOVA Test
+            f_stat, p_value = stats.f_oneway(*groups)
+            results.statistical_test = f"name: One-Way ANOVA<br>F_statistic: {f_stat}<br>p_value: {p_value}"
+            my_dict["statistical_test"] = {
+                "name": "One-Way ANOVA",
+                "F_statistic": f_stat,
+                "p_value": p_value,
+            }
+            # Eta-squared for effect size
+            ss_between = sum(
+                len(g) * (g.mean() - df["feature"].mean()) ** 2 for g in groups
+            )
+            ss_total = sum((x - df["feature"].mean()) ** 2 for x in df["feature"])
+            eta_squared = ss_between / ss_total
+            results.effect_size = f"name: Eta-squared (η²)<br>value: {eta_squared}"
+            my_dict["effect_size"] = {
+                "name": "Eta-squared (η²)",
+                "value": eta_squared,
+            }
+        feature_name = str(feature.name) if feature.name else "feature"
+        target_name = str(target.name) if target.name else "target"
+
+        results.comment = generate_interpretation(
+            analysis_dict=my_dict,
+            feature_name=feature_name,
+            target_name=target_name,
+        )
+
+    return results
 
 
 def get_cat_num_correlation(
@@ -247,22 +558,6 @@ def get_cat_num_correlation(
         category_counts="<br>".join(f"{k}: {v}" for k, v in category_counts.items()),
         insights_and_recommendations="<br>".join(insights),
     )
-
-
-def get_num_cat_correlation(
-    feature: pd.Series,
-    target: pd.Series,
-) -> NumCatCorr:
-    result = NumCatCorr()
-    return result
-
-
-def get_cat_cat_correlation(
-    feature: pd.Series,
-    target: pd.Series,
-) -> CatCatCorr:
-    result = CatCatCorr()
-    return result
 
 
 def get_num_num_correlation(
