@@ -3,12 +3,16 @@ import base64
 import io
 
 # Third-party imports
-import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import scipy.stats as stats
 import seaborn as sns
+from pandas import DataFrame
+from scipy.cluster.hierarchy import dendrogram, linkage
+from scipy.spatial.distance import pdist
+from scipy.stats import chi2_contingency
 
 
 def fig_to_base64(fig, alt_text: str) -> str:
@@ -54,7 +58,7 @@ def plot_cat_cat_relation(feature_series, target_series):
     else:
         title_suffix = ""
 
-    fig, axes = plt.subplots(1, 2, figsize=(14, 8))
+    fig, axes = plt.subplots(1, 2, figsize=(14, 6))
 
     # --- Grouped Bar Plot ---
     # Create a DataFrame for plotting
@@ -397,7 +401,7 @@ def plot_numeric_distribution(series, bins=20):
         series = pd.Series(series)
     series = series.dropna()
     f_color = "dodgerblue"
-    fig, axes = plt.subplots(2, 2, figsize=(12,12))
+    fig, axes = plt.subplots(2, 2, figsize=(12, 12))
     axes = axes.flatten()
 
     # 1. Histogram + KDE
@@ -410,7 +414,11 @@ def plot_numeric_distribution(series, bins=20):
     else:
         bw_adjust = 1
     sns.histplot(
-        x=series, bins=bins, kde=True, ax=axes[0], kde_kws={"bw_adjust": bw_adjust}
+        x=series,
+        bins=bins,
+        kde=True,
+        ax=axes[0],
+        kde_kws={"bw_adjust": bw_adjust},
     )
     # Force x-axis to show only integer ticks
     # if pd.api.types.is_integer_dtype(series):
@@ -492,3 +500,174 @@ def plot_categorical_distribution(series, bins=20):
     plt.tight_layout()
     # plt.show()
     return fig_to_base64(fig, alt_text="Categorical distribution plot")
+
+
+# Local application imports
+# Your existing imports here...
+# ...
+# def fig_to_base64(...)
+# def plot_cat_cat_relation(...)
+# ... and so on
+
+
+def calculate_cramers_v(x: pd.Series, y: pd.Series) -> float:
+    """Calculates Cramer's V for two categorical series."""
+    confusion_matrix = pd.crosstab(x, y)
+
+    # Handle the case where the contingency table is too small for a meaningful result
+    if confusion_matrix.shape[0] <= 1 or confusion_matrix.shape[1] <= 1:
+        return 0.0
+
+    chi2 = chi2_contingency(confusion_matrix)[0]
+    n = confusion_matrix.sum().sum()
+    phi2 = chi2 / n
+    r, k = confusion_matrix.shape
+
+    # Correction for small sample sizes
+    phi2_corrected = max(0, phi2 - ((k - 1) * (r - 1)) / (n - 1))
+    r_corrected = r - ((r - 1) ** 2) / (n - 1)
+    k_corrected = k - ((k - 1) ** 2) / (n - 1)
+
+    # Handle division by zero
+    denominator = min(k_corrected - 1, r_corrected - 1)
+    if denominator == 0:
+        return 0.0
+
+    return np.sqrt(phi2_corrected / denominator)
+
+
+def plot_heatmap(df: DataFrame, title: str, cmap: str, metric: str) -> str:
+    """
+    Generates a heatmap from a correlation/association matrix.
+
+    Args:
+        df (DataFrame): The DataFrame with the calculated matrix.
+        title (str): The title of the heatmap.
+        cmap (str): The colormap for the heatmap.
+        metric (str): The name of the metric (e.g., 'Pearson r', 'Cramer's V').
+
+    Returns:
+        str: A base64-encoded HTML image string of the plot.
+    """
+    f_color = "dodgerblue"
+
+    # Check if we need to apply clustering for readability
+    if df.shape[0] > 20:
+        # Create a distance matrix
+        if metric == "Pearson Correlation":
+            # For correlation, use 1 - |r| as the distance
+            dist_matrix = 1 - np.abs(df)
+        else:  # For Cramer's V, use 1 - V as the distance
+            dist_matrix = 1 - df
+
+        # Perform hierarchical clustering
+        linked = linkage(pdist(dist_matrix), method="ward")
+
+        # Get the new order of columns
+        new_order = dendrogram(linked, no_plot=True)["leaves"]
+        df_reordered:DataFrame = df.iloc[new_order, new_order]
+
+        # Adjust figure size for larger plots
+        fig_size = min(max(10, df_reordered.shape[0] * 0.5),14)
+
+        fig, ax = plt.subplots(figsize=(fig_size, fig_size))
+        sns.heatmap(
+            df_reordered,
+            cmap=cmap,
+            linewidths=0.5,
+            ax=ax,
+            cbar_kws={"label": f"{metric} Value"},
+        )
+        # Only show labels if the plot is not too crowded
+        if df_reordered.shape[0] < 50:
+            ax.set_yticklabels(df_reordered.columns)
+            ax.set_xticklabels(df_reordered.columns)
+        else:
+            ax.set_yticklabels([])
+            ax.set_xticklabels([])
+    else:
+        fig, ax = plt.subplots(figsize=(10, 8))
+        sns.heatmap(
+            df,
+            annot=True,
+            cmap=cmap,
+            fmt=".2f",
+            linewidths=0.5,
+            ax=ax,
+            cbar_kws={"label": f"{metric} Value"},
+        )
+
+    ax.set_title(title, color=f_color, fontsize=16)
+    ax.tick_params(axis="x", colors=f_color, labelrotation=45)
+    ax.tick_params(axis="y", colors=f_color, labelrotation=0)
+
+    # Color the labels and title
+    ax.xaxis.label.set_color(f_color)
+    ax.yaxis.label.set_color(f_color)
+
+    # Style the color bar label
+    cbar = ax.collections[0].colorbar
+    assert cbar is not None
+    cbar.ax.yaxis.label.set_color(f_color)
+    cbar.ax.tick_params(colors=f_color)
+    cbar.set_label("Proportion", color=f_color)
+
+    # Color the axes and spines
+    ax.spines["bottom"].set_color(f_color)
+    ax.spines["top"].set_color(f_color)
+    ax.spines["left"].set_color(f_color)
+    ax.spines["right"].set_color(f_color)
+
+    plt.tight_layout()
+    return fig_to_base64(fig, alt_text=f"{title} heatmap")
+
+
+def plot_numeric_heatmap(df: DataFrame) -> str:
+    """
+    Generates a heatmap for the Pearson correlation matrix of numeric features.
+
+    Args:
+        df (DataFrame): A DataFrame containing only numeric columns.
+
+    Returns:
+        str: A base64-encoded HTML image string of the heatmap.
+    """
+    corr_matrix = df.corr(method="pearson", numeric_only=True)
+    return plot_heatmap(
+        corr_matrix,
+        "Numeric Feature Correlation Heatmap (Pearson)",
+        "coolwarm",
+        "Pearson Correlation",
+    )
+
+
+def plot_categorical_heatmap(df: DataFrame) -> str:
+    """
+    Generates a heatmap for the Cramer's V association matrix of categorical features.
+
+    Args:
+        df (DataFrame): A DataFrame containing only categorical columns.
+
+    Returns:
+        str: A base64-encoded HTML image string of the heatmap.
+    """
+    categorical_cols = df.columns
+    n_cols = len(categorical_cols)
+    cramer_v_matrix = pd.DataFrame(
+        index=categorical_cols, columns=categorical_cols, dtype=float
+    )
+
+    for i in range(n_cols):
+        for j in range(i, n_cols):
+            col1 = categorical_cols[i]
+            col2 = categorical_cols[j]
+            v = calculate_cramers_v(df[col1], df[col2])
+            cramer_v_matrix.loc[col1, col2] = v
+            cramer_v_matrix.loc[col2, col1] = v
+
+    return plot_heatmap(
+        cramer_v_matrix,
+        "Categorical Feature Association Heatmap (Cramer's V)",
+        "Blues",
+        "Cramer's V",
+    )

@@ -5,7 +5,7 @@ from automl.library import todo  # only during develloping
 from .column_analysis import analyse_columns, insert_descriptions
 from .dataset_overview import analyse_dataset, find_duplicate_columns
 from .eda_report import create_report
-from .relations import generate_feature_relations
+from .relations import generate_feature_relations_initial_scan
 from .testdata import analyze_test_data
 from .target_relations import get_target_relations
 
@@ -33,7 +33,9 @@ def perform_eda(config_data: ConfigData, original_data: OriginalData) -> None:
         column_info=column_info,
     )
 
-    _relation_info = generate_feature_relations(original_data=original_data)
+    relation_info = generate_feature_relations_initial_scan(
+        original_data=original_data
+    )
     _test_info = analyze_test_data(original_data=original_data)
 
     # preprocess_trial() # todo once preprocessing is ready
@@ -45,5 +47,6 @@ def perform_eda(config_data: ConfigData, original_data: OriginalData) -> None:
         column_info=column_info,
         column_plot=column_plot,
         target_relations=target_relations,
+        relation_info = relation_info
     )
     return

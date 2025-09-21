@@ -13,6 +13,7 @@ from automl.dataloader import ConfigData, OriginalData
 from .dataset_overview import DatasetInfo
 from .column_analysis import ColumnInfoMapping, ColumnPlotMapping
 from .target_relations import TargetRelationMapping
+from .relations import RelationInfoMapping
 
 
 def add_links_to_headers(html: str) -> str:
@@ -39,6 +40,13 @@ def create_target_relations_report(
 ) -> str:
     template = env.get_template(name="target_relations.j2")
     return template.render(**{"columninfo_mapping": target_relations})
+
+
+def create_relations_report(
+    env: Environment, relation_info: RelationInfoMapping
+) -> str:
+    template = env.get_template(name="relations.j2")
+    return template.render(**{"relation_info": relation_info})
 
 
 def create_general_overview(
@@ -94,6 +102,7 @@ def create_report(
     column_info: ColumnInfoMapping,
     column_plot: ColumnPlotMapping,
     target_relations: TargetRelationMapping,
+    relation_info: RelationInfoMapping,
 ) -> None:
     # load jinja2 environment
     env = Environment(
@@ -116,6 +125,9 @@ def create_report(
         env=env, target_relations=target_relations
     )
 
+    html_relations = create_relations_report(
+        env=env, relation_info=relation_info
+    )
     # complete report
     tabs = [
         {
@@ -124,6 +136,7 @@ def create_report(
         }, 
         {"title": "Features", "content": html_features},
         {"title": "Target relations", "content": html_target_relations},
+        {"title": "Relations", "content": html_relations},
     ]
     template = env.get_template(name="report_main.j2")
     output_html = template.render(
