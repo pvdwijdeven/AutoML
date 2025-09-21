@@ -10,7 +10,13 @@ from scipy import stats
 from scipy.stats import pearsonr, shapiro, spearmanr
 from sklearn.feature_selection import mutual_info_classif, mutual_info_regression
 from sklearn.preprocessing import LabelEncoder
-from .plots import plot_feature_importance
+from .plots import (
+    plot_feature_importance,
+    plot_num_num_relation,
+    plot_num_cat_relation,
+    plot_cat_num_relation,
+    plot_cat_cat_relation,
+)
 from .column_analysis import ColumnInfoMapping
 
 
@@ -67,6 +73,7 @@ class TargetRelationMapping:
     target_relation: dict[
         str, Union[NumNumCorr, CatNumCorr, NumCatCorr, CatCatCorr]
     ]
+    rel_plots: dict[str,str]
     feature_importance: dict[str,float]
     im_plot: str
 
@@ -787,6 +794,7 @@ def get_target_relations(
 ) -> TargetRelationMapping:
     feature_importance = get_feature_importance(X_train=X_train, y_train=y_train, column_info=column_info)
     target_relation = {}
+    rel_plots = {}
     target_type = column_info["target"].proposed_type
     for column in X_train.columns:
         feature_type = column_info[column].proposed_type
@@ -795,24 +803,33 @@ def get_target_relations(
                 target_relation[column] = get_num_num_correlation(
                     feature=X_train[column], target=y_train
                 )
+                rel_plots[column] = plot_num_num_relation(feature_series=X_train[column], target_series=y_train)
             if feature_type == "categorical":
                 target_relation[column] = get_cat_num_correlation(
                     feature=X_train[column], target=y_train
+                )
+                rel_plots[column] = plot_cat_num_relation(
+                    feature_series=X_train[column], target_series=y_train
                 )
         if target_type == "categorical":
             if feature_type == "numeric":
                 target_relation[column] = get_num_cat_correlation(
                     feature=X_train[column], target=y_train
                 )
+                rel_plots[column] = plot_num_cat_relation(
+                    feature_series=X_train[column], target_series=y_train
+                )
             if feature_type == "categorical":
                 target_relation[column] = get_cat_cat_correlation(
                     feature=X_train[column], target=y_train
                 )
+                rel_plots[column] = plot_cat_cat_relation(
+                    feature_series=X_train[column], target_series=y_train
+                )
     im_plot = plot_feature_importance(sorted_importance=feature_importance)
     return TargetRelationMapping(
-        **{
-            "target_relation": target_relation,
-            "feature_importance": feature_importance,
-            "im_plot": im_plot
-        }
+            target_relation= target_relation,
+            feature_importance= feature_importance,
+            rel_plots=rel_plots,
+            im_plot= im_plot,
     )
