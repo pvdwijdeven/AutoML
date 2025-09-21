@@ -21,7 +21,34 @@
     }
   }
 
-</script>{% for column_name, colinfo in columninfo_mapping.target_relation|dictsort %}
+</script>
+
+<h2 id="feature_importance">Feature Importance (based on Mutual Importance)</h2>
+
+{{ columninfo_mapping.im_plot }}
+
+<div class="table-wrapper2">
+  <table>
+    <tbody>
+      {% for key, value in columninfo_mapping.feature_importance.items() %}
+        <tr>
+          <th>{{ key }}</th>
+          <td>
+            {% if value is number %}
+              {{ "%.2f"|format(value) }}%
+            {% else %}
+              {{ value }}
+            {% endif %}
+          </td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+<br>
+<h2 id="feature_target">Feature target relations</h2>
+
+{% for column_name, colinfo in columninfo_mapping.target_relation|dictsort %}
 <br>
 <h2 id="trelation_{{ column_name }}">{{ column_name }}</h2>
 

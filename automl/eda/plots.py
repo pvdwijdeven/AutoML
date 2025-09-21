@@ -4,10 +4,10 @@ import io
 
 # Third-party imports
 import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 import scipy.stats as stats
 import seaborn as sns
-import numpy as np
 
 
 def fig_to_base64(fig, alt_text: str) -> str:
@@ -18,6 +18,72 @@ def fig_to_base64(fig, alt_text: str) -> str:
     img_base64 = base64.b64encode(buf.read()).decode("utf-8")
     plt.close(fig)
     return f'<img src="data:image/png;base64,{img_base64}" alt="alt_text" class="responsive-img"/>'
+
+
+def plot_feature_importance(sorted_importance: dict[str, float]) -> str:
+    """
+    Creates a horizontal bar plot of feature importance scores.
+
+    Args:
+        sorted_importance (dict[str, float]): A dictionary mapping feature names
+                                            to their importance score, sorted
+                                            in descending order.
+
+    Returns:
+        str: A base64-encoded HTML image string of the plot.
+    """
+    # Create a DataFrame from the sorted importance dictionary
+    df_importance = pd.DataFrame(
+        list(sorted_importance.items()), columns=["feature", "importance"]
+    )
+
+    # Convert importance scores to a percentage scale for better readability
+    total_importance = df_importance["importance"].sum()
+    if total_importance > 0:
+        df_importance["importance_percentage"] = (
+            df_importance["importance"] / total_importance
+        ) * 100
+    else:
+        df_importance["importance_percentage"] = 0
+
+    # Create the plot
+    fig, ax = plt.subplots(figsize=(10, len(df_importance) * 0.4 + 2))
+    f_color = "dodgerblue"
+
+    # Use Seaborn to create the bar plot
+    sns.barplot(
+        x="importance_percentage",
+        y="feature",
+        data=df_importance,
+        ax=ax,
+    )
+
+    # Style the plot to match the rest of the EDA report
+    ax.set_title(
+        "Feature Importance (Mutual Information)", color=f_color, fontsize=16
+    )
+    ax.set_xlabel("Relative Importance (%)", color=f_color, fontsize=12)
+    ax.set_ylabel("Feature", color=f_color, fontsize=12)
+    ax.tick_params(axis="x", colors=f_color)
+    ax.tick_params(axis="y", colors=f_color)
+
+    # Set spines to blue
+    for spine in ax.spines.values():
+        spine.set_color(f_color)
+
+    # Add a grid for better readability
+    ax.grid(axis="x", color=f_color, linestyle="--", linewidth=0.5, alpha=0.3)
+
+    plt.tight_layout()
+
+    # Convert the plot to a base64 string
+    buf = io.BytesIO()
+    fig.savefig(buf, format="png", bbox_inches="tight", transparent=True)
+    buf.seek(0)
+    img_base64 = base64.b64encode(buf.read()).decode("utf-8")
+    plt.close(fig)
+
+    return f'<img src="data:image/png;base64,{img_base64}" alt="Feature Importance Plot" class="responsive-img"/>'
 
 
 def plot_numeric_distribution(series, bins=20):

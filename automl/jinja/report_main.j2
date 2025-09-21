@@ -287,9 +287,23 @@
             </li>
             <!-- Target Relations -->
             <li class="nav-item">
-              <button class="nav-link" data-tab="2">
-                <i class="bi bi-ui-checks-grid"></i>
-                <span class="menu-label">Target Relations</span>
+              <button
+                class="nav-link d-flex align-items-center"
+                data-bs-toggle="collapse"
+                data-bs-target="#menu3"
+                aria-expanded="false"
+                aria-controls="menu3"
+              >
+            <i class="bi bi-ui-checks-grid"></i>
+            <span class="menu-label">Target Relations</span>
+          </button>
+          <div class="collapse" id="menu3">
+            <div class="collapse-inner">
+              <button class="nav-link"  data-tab="2.#feature_importance">
+                Feature importance
+              </button>
+              <button class="nav-link"  data-tab="2.#feature_target">
+                Feature/Target relation
               </button>
             </li>
           </ul>

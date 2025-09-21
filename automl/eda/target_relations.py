@@ -1,6 +1,6 @@
 # Standard library imports
 from dataclasses import asdict, dataclass
-from typing import Union, Any
+from typing import Any, Union
 
 # Third-party imports
 import numpy as np
@@ -8,7 +8,9 @@ import pandas as pd
 from pandas import DataFrame, Series
 from scipy import stats
 from scipy.stats import pearsonr, shapiro, spearmanr
-
+from sklearn.feature_selection import mutual_info_classif, mutual_info_regression
+from sklearn.preprocessing import LabelEncoder
+from .plots import plot_feature_importance
 from .column_analysis import ColumnInfoMapping
 
 
@@ -65,6 +67,112 @@ class TargetRelationMapping:
     target_relation: dict[
         str, Union[NumNumCorr, CatNumCorr, NumCatCorr, CatCatCorr]
     ]
+    feature_importance: dict[str,float]
+    im_plot: str
+
+
+def get_feature_importance(
+    X_train: pd.DataFrame, y_train: pd.Series, column_info: ColumnInfoMapping
+) -> dict[str, float]:
+    """
+    Estimates feature importance using Mutual Information on a copy of the data
+    after imputing missing values and encoding categorical features.
+
+    Args:
+        X_train (pd.DataFrame): The feature matrix (training data).
+        y_train (pd.Series): The target vector (training data).
+        column_info (ColumnInfoMapping): Dataclass containing information about
+                                        each column's type.
+
+    Returns:
+        dict[str, float]: A dictionary mapping feature names to their Mutual
+                            Information score, sorted in descending order of score.
+    """
+    # Create a copy to avoid modifying the original dataframes
+    X = X_train.copy()
+    y = y_train.copy()
+
+    # Filter to include only numeric and categorical columns
+    valid_features = [
+        col
+        for col in X.columns
+        if column_info[col].proposed_type in ["numeric", "categorical"]
+    ]
+    X_filtered = X[valid_features]
+
+    # Impute missing values before calculating mutual information
+    for col in X_filtered.columns:
+        if X_filtered[col].isnull().any():
+            if column_info[col].proposed_type == "numeric":
+                median_val = X_filtered[col].median()
+                if not np.isnan(median_val):
+                    X_filtered.loc[:,col] = X_filtered[col].fillna(median_val)
+                else:
+                    X_filtered.loc[:, col] = X_filtered[col].fillna(0)
+            elif column_info[col].proposed_type == "categorical":
+                mode_val = X_filtered[col].mode()
+                if not mode_val.empty:
+                    if pd.notna(mode_val.iloc[0]):
+                        X_filtered.loc[:, col] = X_filtered[col].fillna(
+                            mode_val.iloc[0]
+                        )
+                    else:
+                        X_filtered.loc[:, col] = X_filtered[col].fillna(
+                            "missing"
+                        )
+                else:
+                    X_filtered.loc[:, col] = X_filtered[col].fillna("missing")
+
+    # Label encode categorical features for mutual information calculation
+    for col in X_filtered.columns:
+        if column_info[col].proposed_type == "categorical":
+            try:
+                le = LabelEncoder()
+                X_filtered.loc[:, col] = pd.Series(
+                    le.fit_transform(X_filtered[col]), index=X_filtered.index
+                )
+            except (TypeError, ValueError) as e:
+                # Log or handle the error for debugging
+                print(f"Error encoding categorical column '{col}': {e}")
+                X_filtered.drop(col, axis=1, inplace=True)
+                continue
+
+    # Get target type from column_info
+    target_type = column_info["target"].proposed_type
+
+    # Identify numeric and categorical columns from the filtered set
+    feature_columns = X_filtered.columns.tolist()
+    is_discrete = [
+        column_info[col].proposed_type == "categorical"
+        for col in feature_columns
+    ]
+
+    # Map target types to the correct mutual information function
+    if target_type == "categorical" or (
+        target_type == "numeric" and y.nunique() <= 10
+    ):
+        mi_scores = mutual_info_classif(
+            X_filtered, y, discrete_features=is_discrete, random_state=42
+        )
+    else:
+        mi_scores = mutual_info_regression(
+            X_filtered, y, discrete_features=is_discrete, random_state=42
+        )
+
+    # Create a dictionary of feature names and their MI scores
+    feature_importance_dict = dict(zip(feature_columns, mi_scores))
+
+    # Sort the dictionary by importance score in descending order
+    sorted_importance = {
+        k: v
+        for k, v in sorted(
+            feature_importance_dict.items(),
+            key=lambda item: item[1],
+            reverse=True,
+        )
+    }
+
+    return sorted_importance
 
 
 def generate_interpretation(
@@ -677,12 +785,11 @@ def get_num_num_correlation(
 def get_target_relations(
     X_train: DataFrame, y_train: Series, column_info: ColumnInfoMapping
 ) -> TargetRelationMapping:
-
+    feature_importance = get_feature_importance(X_train=X_train, y_train=y_train, column_info=column_info)
     target_relation = {}
     target_type = column_info["target"].proposed_type
     for column in X_train.columns:
         feature_type = column_info[column].proposed_type
-        # todo extend with other types
         if target_type == "numeric":
             if feature_type == "numeric":
                 target_relation[column] = get_num_num_correlation(
@@ -701,4 +808,11 @@ def get_target_relations(
                 target_relation[column] = get_cat_cat_correlation(
                     feature=X_train[column], target=y_train
                 )
-    return TargetRelationMapping(**{"target_relation": target_relation})
+    im_plot = plot_feature_importance(sorted_importance=feature_importance)
+    return TargetRelationMapping(
+        **{
+            "target_relation": target_relation,
+            "feature_importance": feature_importance,
+            "im_plot": im_plot
+        }
+    )
