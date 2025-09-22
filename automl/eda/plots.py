@@ -565,7 +565,7 @@ def plot_heatmap(df: DataFrame, title: str, cmap: str, metric: str) -> str:
 
         # Get the new order of columns
         new_order = dendrogram(linked, no_plot=True)["leaves"]
-        df_reordered:DataFrame = df.iloc[new_order, new_order]
+        df_reordered:DataFrame = df.iloc[new_order, new_order] # type: ignore
 
         # Adjust figure size for larger plots
         fig_size = min(max(10, df_reordered.shape[0] * 0.5),14)

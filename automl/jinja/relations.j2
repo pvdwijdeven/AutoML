@@ -6,3 +6,71 @@
 <br>
 {{ relation_info.initial_scan_plots.categorical_heatmap }}
 <br>
+<h2 id="pairwise_summary">High-Correlation Pairwise Summary (Threshold > 0.7)</h2>
+
+<h3>Numeric Feature Pairs</h3>
+{% if relation_info.pairwise_summary.numeric_pairs %}
+<table>
+    <thead>
+        <tr>
+            <th>Feature 1</th>
+            <th>Feature 2</th>
+            <th>Metric</th>
+            <th>Value</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for pair in relation_info.pairwise_summary.numeric_pairs %}
+        <tr>
+            <td>{{ pair.feature_1 }}</td>
+            <td>{{ pair.feature_2 }}</td>
+            <td>{{ pair.metric }}</td>
+            <td>{{ "%.2f"|format(pair.value) }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<p>No highly correlated numeric feature pairs found above the threshold.</p>
+{% endif %}
+
+<h3>Categorical Feature Pairs</h3>
+{% if relation_info.pairwise_summary.categorical_pairs %}
+<table>
+    <thead>
+        <tr>
+            <th>Feature 1</th>
+            <th>Feature 2</th>
+            <th>Metric</th>
+            <th>Value</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for pair in relation_info.pairwise_summary.categorical_pairs %}
+        <tr>
+            <td>{{ pair.feature_1 }}</td>
+            <td>{{ pair.feature_2 }}</td>
+            <td>{{ pair.metric }}</td>
+            <td>{{ "%.2f"|format(pair.value) }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<p>No highly associated categorical feature pairs found above the threshold.</p>
+{% endif %}
+
+<h2 id="pairwise_plots">Detailed Pairwise Plots</h2>
+
+{% if relation_info.pairwise_plots.plots %}
+  {% for pair_key, plot_info in relation_info.pairwise_plots.plots.items() %}
+    {% set features = pair_key.split('_') %}
+    <h3>Relationship between {{ features[0] }} and {{ features[1] }}</h3>
+    <div class="plot-container">
+      {{ plot_info.plot | safe }}
+    </div>
+    <br>
+  {% endfor %}
+{% else %}
+  <p>No pairs with strong relationships were found to plot.</p>
+{% endif %}
