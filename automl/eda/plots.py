@@ -13,7 +13,7 @@ from pandas import DataFrame
 from scipy.cluster.hierarchy import dendrogram, linkage
 from scipy.spatial.distance import pdist
 from scipy.stats import chi2_contingency
-
+from matplotlib.colors import ListedColormap
 
 def fig_to_base64(fig, alt_text: str) -> str:
     """Convert a matplotlib figure to a base64-encoded HTML image."""
@@ -23,6 +23,45 @@ def fig_to_base64(fig, alt_text: str) -> str:
     img_base64 = base64.b64encode(buf.read()).decode("utf-8")
     plt.close(fig)
     return f'<img src="data:image/png;base64,{img_base64}" alt="alt_text" class="responsive-img"/>'
+
+
+def plot_missingness_matrix(df: pd.DataFrame) -> str:
+    """
+    Generates a missingness matrix plot (blue for missing, transparent for valid).
+    All text labels are set to 'dodgerblue'.
+    """
+    # Define the color for all text elements
+    text_color = "dodgerblue"
+
+    fig, ax = plt.subplots(figsize=(15, 8))
+
+    # Create a custom colormap for the heatmap
+    custom_cmap = ListedColormap([(0, 0, 0, 0), "steelblue"])
+    sns.heatmap(df.isnull(), cbar=False, cmap=custom_cmap, ax=ax)
+
+    # Set title and labels with the specified color
+    ax.set_title("Missing Values Matrix", fontsize=16, color=text_color)
+    ax.set_xlabel("Features", fontsize=12, color=text_color)
+    ax.set_ylabel("Samples", fontsize=12, color=text_color)
+
+    # Set the color of the tick labels for both axes
+    ax.tick_params(axis="x", colors=text_color)
+    ax.tick_params(axis="y", colors=text_color)
+
+    # Optional: Rotate x-axis labels if too many features
+    if len(df.columns) > 20:
+        plt.xticks(rotation=90)
+
+    # Save the plot to a BytesIO object
+    buf = io.BytesIO()
+    plt.savefig(buf, format="png", bbox_inches="tight", transparent=True)
+    buf.seek(0)
+    plt.close(fig)
+
+    # Encode to base64 string
+    img_base64 = base64.b64encode(buf.read()).decode("utf-8")
+
+    return f'<img src="data:image/png;base64,{img_base64}" alt="Missing Values Matrix"/>'
 
 
 def plot_cat_cat_relation(feature_series, target_series):

@@ -1,0 +1,98 @@
+<div class="fixed-links">
+  <span class="label" style="margin-right: 800px;"></span>
+  <select id="feature-select" class="feature-select" onchange="jumpTomissing(this)">
+    <option value="">Select a feature...</option>
+    {% for column_name, colinfo in missinginfo.missinginfomapping|dictsort %}
+      <option value="#missingf_{{ column_name }}">{{ column_name }}</option>
+
+    {% endfor %}
+  </select>
+
+</div>
+
+<script>
+  function jumpTomissing(select) {
+    if (select.value) {
+      location.hash = select.value;
+      // Reset to placeholder after short delay to ensure hash works
+      setTimeout(() => {
+        select.value = "";
+      }, 100);
+    }
+  }
+
+</script>
+
+
+<h2 id="missing_overview">Missing Data Overview</h2>
+
+{{ missinginfo.missingplot }}
+<br>
+<div class="table-wrapper2">
+  <table>
+    <tbody>
+      {% for key, value in missinginfo.missing_general.items() %}
+        <tr>
+          <th>{{ key }}</th>
+          <td>
+            {% if value is number %}
+              {% if key.startswith('perc') %}
+                {% if value != value|int  %}
+                  {{ "%.2f"|format(value) }}%
+                {% else %}
+                  {{ "%.0f"|format(value) }}%
+                {% endif %}
+              {% else %}
+                {% if value != value|int  %}
+                  {{ "%.2f"|format(value) }}
+                {% else %}
+                  {{ value }}
+                {% endif %}
+              {% endif %}
+            {% else %}
+              {{ value }}
+            {% endif %}
+          </td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+<br>
+<h2 id="missing_feature">Missing data per feature</h2>
+
+{% for column_name, colinfo in missinginfo.missinginfomapping|dictsort %}
+<br>
+<h2 id="missingf_{{ column_name }}">{{ column_name }}</h2>
+
+<div class="table-wrapper2">
+  <table>
+    <tbody>
+      {% for key, value in colinfo.items() %}
+        <tr>
+          <th>{{ (key|replace('_',' ')) }}</th>
+          <td>
+            {% if value is number %}
+              {% if key.startswith('perc') %}
+                {% if value != value|int  %}
+                  {{ "%.2f"|format(value) }}%
+                {% else %}
+                  {{ "%.0f"|format(value) }}%
+                {% endif %}
+              {% else %}
+                {% if value != value|int  %}
+                  {{ "%.2f"|format(value) }}
+                {% else %}
+                  {{ value }}
+                {% endif %}
+              {% endif %}
+            {% else %}
+              {{ value }}
+            {% endif %}
+          </td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endfor %}

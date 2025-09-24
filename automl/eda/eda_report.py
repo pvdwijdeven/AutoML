@@ -14,6 +14,7 @@ from .dataset_overview import DatasetInfo
 from .column_analysis import ColumnInfoMapping, ColumnPlotMapping
 from .target_relations import TargetRelationMapping
 from .relations import RelationInfoMapping
+from .missing import MissingOverview
 
 
 def add_links_to_headers(html: str) -> str:
@@ -33,6 +34,13 @@ def create_feature_report(
     return template.render(
         **{"columninfo_mapping": columninfo}, **{"columnplot_mapping": plotinfo}
     )
+
+
+def create_missing_report(
+    env: Environment, missing_info: MissingOverview
+) -> str:
+    template = env.get_template(name="missing_info.j2")
+    return template.render(**{"missinginfo": missing_info})
 
 
 def create_target_relations_report(
@@ -103,6 +111,7 @@ def create_report(
     column_plot: ColumnPlotMapping,
     target_relations: TargetRelationMapping,
     relation_info: RelationInfoMapping,
+    missing_info: MissingOverview,
 ) -> None:
     # load jinja2 environment
     env = Environment(
@@ -128,6 +137,9 @@ def create_report(
     html_relations = create_relations_report(
         env=env, relation_info=relation_info
     )
+
+    html_missing = create_missing_report(env=env, missing_info=missing_info)
+
     # complete report
     tabs = [
         {
@@ -137,6 +149,7 @@ def create_report(
         {"title": "Features", "content": html_features},
         {"title": "Target relations", "content": html_target_relations},
         {"title": "Relations", "content": html_relations},
+        {"title": "Missing", "content": html_missing}
     ]
     template = env.get_template(name="report_main.j2")
     output_html = template.render(
