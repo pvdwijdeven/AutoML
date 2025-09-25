@@ -6,11 +6,11 @@ Automated Machine Learning module
 
 ## 📊 What AutoML Currently Produces
 
-When EDA is started from the GUI or via CLI with the `--EDA` option, AutoML generates an interactive **Exploratory Data Analysis (EDA) report** as an HTML file.
+AutoML generates an interactive **Exploratory Data Analysis (EDA) report** as an HTML file.
 
 ## 🧠 Exploratory Data Analysis (EDA) Report
 
-AutoML can automatically generate an interactive **EDA report** (HTML format) from any structured dataset via GUI or CLI. This report provides a comprehensive overview of your data before modeling, supporting informed decisions in feature engineering and preprocessing.
+AutoML can automatically generate an interactive **EDA report** (HTML format) from any structured dataset via CLI or via Python. This report provides a comprehensive overview of your data before modeling, supporting informed decisions in feature engineering and preprocessing.
 
 ### 🧩 Key Capabilities
 
@@ -49,7 +49,7 @@ The report is fully HTML-based, styled for usability, and supports quick navigat
 
 ---
 
-Use GUI or CLI
+Use CLI
 
 ## Command Line Interface (CLI) Options
 
@@ -63,16 +63,7 @@ automl [OPTIONS]
 | ---------------------- | ------------------------------------------------------------- |
 | `-h`, `--help`         | Show this help message and exit                               |
 | `--title`              | Title for the project                                         |
-| `--training_data FILE` | Filename for training data                                    |
-| `--description FILE`   | Filename for column description - see readme for further description    |
-| `--taget`              | target column, if no test data available and not last column of training data  |
-| `--test_data FILE`     | Filename for test data                                        |
-| `--EDA`                | Start EDA (default: `False`)                                  |
-| `--nogui`              | Execute without GUI (default: `False`)                        |
-| `--silent`             | If executed without GUI, no console output (default: `False`) |
-| `--report_file FILE`   | Filename for report file (`.html`)                            |
-| `--output_file FILE`   | Filename for output file (`.csv`)                             |
-| `--logger_file FILE`   | Filename for logger file (`.log`)                             |
+| `--config FILE`        | Filename for configuration data                               |
 
 ---
 
