@@ -67,6 +67,24 @@ automl [OPTIONS]
 
 ---
 
+## yaml configuration file
+
+Here is an example of a yaml configuration file for loading the data:
+
+```yaml
+root: C:\Users\pvdwi\OneDrive\Python\ML\automl2
+project_name: Titanic
+training_file: personal\Titanic\data\train.csv
+submission_file: personal\Titanic\data\submission.csv
+report_template: personal\Titanic\export\Titanic_report.html
+target: Survived
+competition_file: personal\Titanic\data\test.csv
+config_file: personal\yaml\Titanic.yaml
+description_file: null
+update_file: null
+log_file: personal\Titanic\log\Titanic.log
+```
+
 ## Column description file
 
 If available, a description file can be added, so that the column description will be part of the report. The descriptions shall be of the following format:
