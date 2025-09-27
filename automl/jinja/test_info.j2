@@ -1,0 +1,90 @@
+
+<br>
+<h2 id="test-data-overview">Test Data</h2>
+{{ test_info.html_size | safe }}
+<br>
+{{ test_info.styling | safe }}
+<h2 id="test-column-differences">Column differences</h2>
+{{ test_info.html_colcheck | safe }}
+{% if test_info.suggestions.colcheck != "" %}
+  <div>
+    {{ test_info.suggestions.colcheck | safe }}
+  </div>
+{% endif %}
+<br>
+<h2 id="test-missing-data">Missing data</h2>
+{{ test_info.html_missing | safe }}
+
+<br>
+<h2 id="test-unseen-categories">Unseen categories</h2>
+{{ test_info.html_unseen_cats | safe }}
+{% if test_info.suggestions.unseen_cats != "" %}
+  <div>
+    {{ test_info.suggestions.unseen_cats | safe }}
+  </div>
+{% endif %}
+<br>
+<h2 id="test-numeric-differences">Numeric Differences</h2>
+{{ test_info.html_num_stats | safe }}
+{% if test_info.suggestions.num_stats != "" %}
+  <div>
+    {{ test_info.suggestions.num_stats | safe }}
+  </div>
+{% endif %}
+<br>
+<h2 id="test-type-issues">Type issues</h2>
+{{ test_info.html_type_issues | safe }}
+
+
+{% if test_info.suggestions.type_issues != "" %}
+  <div>
+    {{ test_info.suggestions.type_issues | safe }}
+  </div>
+{% endif %}
+<span id="test-samples"><br></span>
+<h2 id="test-sample-data">Test Sample Data</h2>
+<div class="tab-inner_test">
+<div class="btn-group_test" role="group" aria-label="Inner tab group">
+  <button class="btn btn-outline-primary" onclick="openInnerTab_test(event, 'HeadTab_test')" id="defaultInnerOpen_test">Head</button>
+  <button class="btn btn-outline-primary" onclick="openInnerTab_test(event, 'MiddleTab_test')">Middle</button>
+  <button class="btn btn-outline-primary" onclick="openInnerTab_test(event, 'TailTab_test')">Tail</button>
+</div>
+</div>
+<span><br></span>
+<div id="HeadTab_test" class="tabcontent-inner_test">
+  <div class="table-wrapper">
+    {{ test_info.samples_head | safe }}
+  </div>
+</div>
+
+<div id="MiddleTab_test" class="tabcontent-inner_test">
+  <div class="table-wrapper">
+    {{ test_info.samples_middle | safe }}
+  </div>
+</div>
+
+<div id="TailTab_test" class="tabcontent-inner_test">
+  <div class="table-wrapper">
+    {{ test_info.samples_tail | safe }}
+  </div>
+</div>
+<script>
+function openInnerTab_test(evt, tabId) {
+  // Hide all tab contents
+  document.querySelectorAll('.tabcontent-inner_test').forEach(el => el.style.display = 'none');
+
+  // Remove 'active' class from all tab buttons
+  document.querySelectorAll('.btn-group_test .btn').forEach(btn => btn.classList.remove('active'));
+
+  // Show selected tab content
+  document.getElementById(tabId).style.display = 'block';
+
+  // Mark clicked button as active
+  evt.currentTarget.classList.add('active');
+}
+
+// Run this after DOM is loaded
+document.addEventListener("DOMContentLoaded", () => {
+  document.getElementById("defaultInnerOpen_test").click();
+});
+</script>

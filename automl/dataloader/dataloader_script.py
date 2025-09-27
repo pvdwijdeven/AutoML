@@ -3,7 +3,7 @@ import importlib
 import importlib.util
 import os
 import sys
-from dataclasses import fields, dataclass, field
+from dataclasses import dataclass, field, fields
 from pathlib import Path
 from sys import exit
 from typing import Optional
@@ -42,8 +42,8 @@ class ConfigData:
 
 
     def __iter__(self):
-        for field in fields(self):
-            yield field.name, getattr(self, field.name)
+        for fld in fields(self):
+            yield fld.name, getattr(self, fld.name)
 
     def save_to_yaml(self) -> None:
         """
@@ -336,7 +336,9 @@ def load_data(config_data: ConfigData, logger: Logger) -> OriginalData:
     y_train = X_train_full[config_data.target]
     X_train = X_train_full.drop(columns=[config_data.target])
     original_data = OriginalData(
-        X_train=X_train, y_train=y_train, X_comp=X_comp
+        X_train=update_types(X_train=X_train),
+        y_train=y_train,
+        X_comp=update_types(X_train=X_comp) if X_comp is not None else X_comp,
     )
     if config_data.update_file is not None:
         original_data = update_with_user_function(
@@ -376,7 +378,6 @@ def update_with_user_function(
                 original_data.X_comp = update_types(
                     X_train=update_func(original_data.X_comp)
                 )
-    # Apply the function to the dataframe
     return original_data
 
 
@@ -386,7 +387,7 @@ def update_types(X_train: DataFrame):
         series = X_work[col]
 
         # Skip non-object/string types
-        if pd.api.types.is_numeric_dtype(arr_or_dtype=series):
+        if not pd.api.types.is_numeric_dtype(arr_or_dtype=series):
             continue
 
         # Try integer

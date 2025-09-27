@@ -354,6 +354,44 @@
                 Missing Data per Feature
               </button>
             </li>
+            {% if test != "" %}
+              <!-- Test data-->
+              <li class="nav-item">
+                <button
+                  class="nav-link d-flex align-items-center"
+                  data-bs-toggle="collapse"
+                  data-bs-target="#menu6"
+                  aria-expanded="false"
+                  aria-controls="menu6"
+                >
+              <i class="bi bi-database-fill-lock"></i>
+              <span class="menu-label">Test Data</span>
+            </button>
+            <div class="collapse" id="menu6">
+              <div class="collapse-inner">
+                <button class="nav-link"  data-tab="5.#test-data-overview">
+                  Test Data Overview
+                </button>
+                <button class="nav-link"  data-tab="5.#test-column-differences">
+                  Column Differences
+                </button>
+                <button class="nav-link"  data-tab="5.#test-missing-data">
+                  Missing Test Data
+                </button>
+                <button class="nav-link"  data-tab="5.#test-unseen-categories">
+                  Unseen Categories
+                </button>
+                <button class="nav-link"  data-tab="5.#test-numeric-differences">
+                  Numeric Differences
+                </button>
+                <button class="nav-link"  data-tab="5.#test-type-issues">
+                  Type Issues
+                </button>
+                <button class="nav-link"  data-tab="5.#test-sample-data">
+                  Test Samples
+                </button>
+              </li>
+            {% endif %}
           </ul>
 
           <hr />

@@ -37,7 +37,7 @@ AutoML can automatically generate an interactive **EDA report** (HTML format) fr
   - Estimates data retention if rows/columns are dropped
   - Suggests basic imputation strategies per column
 
-- **(Optional) Test Data Check**
+- **(Optional) Competition/Isolated test Data Check**
   - Structural and statistical comparison with training data
   - Detection of mismatches and unseen categories
 

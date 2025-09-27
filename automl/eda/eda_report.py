@@ -3,6 +3,7 @@ import os
 import re
 from dataclasses import asdict
 from datetime import datetime
+from typing import Union
 
 # Third-party imports
 import pandas as pd
@@ -15,6 +16,7 @@ from .column_analysis import ColumnInfoMapping, ColumnPlotMapping
 from .target_relations import TargetRelationMapping
 from .relations import RelationInfoMapping
 from .missing import MissingOverview
+from .testdata import TestInfo
 
 
 def add_links_to_headers(html: str) -> str:
@@ -34,6 +36,13 @@ def create_feature_report(
     return template.render(
         **{"columninfo_mapping": columninfo}, **{"columnplot_mapping": plotinfo}
     )
+
+
+def create_test_report(
+    env: Environment, test_info: TestInfo
+) -> str:
+    template = env.get_template(name="test_info.j2")
+    return template.render(**{"test_info": test_info})
 
 
 def create_missing_report(
@@ -112,6 +121,7 @@ def create_report(
     target_relations: TargetRelationMapping,
     relation_info: RelationInfoMapping,
     missing_info: MissingOverview,
+    test_info: Union[TestInfo,None],
 ) -> None:
     # load jinja2 environment
     env = Environment(
@@ -139,7 +149,10 @@ def create_report(
     )
 
     html_missing = create_missing_report(env=env, missing_info=missing_info)
-
+    if test_info is not None:
+        html_test = create_test_report(env=env, test_info=test_info)
+    else:
+        html_test = ""
     # complete report
     tabs = [
         {
@@ -149,11 +162,13 @@ def create_report(
         {"title": "Features", "content": html_features},
         {"title": "Target relations", "content": html_target_relations},
         {"title": "Relations", "content": html_relations},
-        {"title": "Missing", "content": html_missing}
+        {"title": "Missing", "content": html_missing},
+        {"title": "Test Data", "content": html_test},
     ]
     template = env.get_template(name="report_main.j2")
     output_html = template.render(
         tabs=tabs,
+        test = "available" if html_test != "" else "",
         title=f"EDA Report {config_data.project_name}",
         current_time=datetime.now(),
     )
