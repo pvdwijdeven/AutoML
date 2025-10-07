@@ -8,7 +8,8 @@ from automl.dataloader import OriginalData
 from .column_analysis import ColumnInfoMapping, NumericInfo
 from .plots import plot_missingness_matrix
 
-@dataclass
+
+@dataclass(slots=True)
 class MissingInfo:
     number_missing: int
     percentage_missing: float
@@ -18,33 +19,19 @@ class MissingInfo:
         return asdict(self).items()
 
 
-@dataclass
+@dataclass(slots=True)
 class MissingInfoMapping:
     missinginfo: dict[str, MissingInfo]
-
-    # Convenience dict-like behavior
-    def __getitem__(self, item: str) -> MissingInfo:
-        return self.missinginfo[item]
-
-    # Use a custom method to iterate over keys to avoid BaseModel __iter__ override issues
-    def iter_keys(self):
-        return iter(self.missinginfo)
 
     def items(self):
         return self.missinginfo.items()
 
-    def keys(self):
-        return self.missinginfo.keys()
 
-    def values(self):
-        return self.missinginfo.values()
-
-
-@dataclass 
+@dataclass(slots=True)
 class MissingOverview:
-  missinginfomapping: MissingInfoMapping
-  missingplot: str
-  missing_general: dict[str,int|float]
+    missinginfomapping: MissingInfoMapping
+    missingplot: str
+    missing_general: dict[str,int|float]
 
 
 def suggest_imputation_methods(
@@ -71,7 +58,7 @@ def suggest_imputation_methods(
     for column in X_train.columns:
         feature = X_train[column]
         missing_percentage = (feature.isnull().sum() / len(feature)) * 100
-        feature_type = columninfomapping[column].proposed_type
+        feature_type = columninfomapping.columninfo[column].proposed_type
 
         if missing_percentage == 0:
             suggestions[column] = ["no imputation needed"]
@@ -91,7 +78,9 @@ def suggest_imputation_methods(
                 ).sum() > 1
 
             if missing_percentage <= 10:
-                type_info = columninfomapping[column].type_specific_info
+                type_info = columninfomapping.columninfo[
+                    column
+                ].type_specific_info
                 if isinstance(type_info, NumericInfo) and hasattr(type_info, "skewness") and type_info.skewness > 1:
                     suggestions[column] = ["median"]
                 else:

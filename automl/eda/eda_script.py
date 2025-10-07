@@ -19,18 +19,18 @@ def perform_eda(config_data: ConfigData, original_data: OriginalData) -> None:
         y_train=original_data.y_train,
     )
     column_info = insert_descriptions(
-        column_info=column_info, config_data=config_data
+        dict_column_info=column_info, config_data=config_data
     )
     data_set_info = analyse_dataset(
         X_train=original_data.X_train,
-        column_info=column_info,
+        dict_column_info=column_info,
         dict_duplicates=dict_duplicates,
         y_train=original_data.y_train,
     )
     target_relations = get_target_relations(
         X_train=original_data.X_train,
         y_train=original_data.y_train,
-        column_info=column_info,
+        dict_column_info=column_info,
     )
 
     relation_info = generate_feature_relations_initial_scan(
@@ -41,7 +41,7 @@ def perform_eda(config_data: ConfigData, original_data: OriginalData) -> None:
         original_data=original_data, columninfomapping=column_info
     )
     if original_data.X_comp is not None:
-        test_info = analyze_test_data(original_data=original_data, column_info=column_info)
+        test_info = analyze_test_data(original_data=original_data, dict_column_info=column_info)
     else:
         test_info = None
     # preprocess_trial() # todo once preprocessing is ready

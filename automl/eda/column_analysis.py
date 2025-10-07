@@ -17,19 +17,19 @@ from automl.dataloader import ConfigData
 from .plots import plot_categorical_distribution, plot_numeric_distribution
 
 
-@dataclass
+@dataclass(slots=True)
 class ColumnPlot:
     feature: str
     target: str
     relation: str
 
 
-@dataclass
+@dataclass(slots=True)
 class ColumnPlotMapping:
     columnplot: dict[str, ColumnPlot]
 
 
-@dataclass
+@dataclass(slots=True)
 class CategoricalInfo:
     frequency: Union[dict[str, tuple[int, float]], str]
     mode: str
@@ -37,12 +37,12 @@ class CategoricalInfo:
     cardinality: str
 
 
-@dataclass
+@dataclass(slots=True)
 class StringInfo:
     samples: str
 
 
-@dataclass
+@dataclass(slots=True)
 class NumericInfo:
     min_value: Union[int, float]
     max_value: Union[int, float]
@@ -60,7 +60,7 @@ class NumericInfo:
     prop_zero: float
 
 
-@dataclass
+@dataclass(slots=True)
 class ColumnInfo:
     is_target: bool
     is_constant: bool
@@ -79,26 +79,26 @@ class ColumnInfo:
     type_specific_info: Union[StringInfo, NumericInfo, CategoricalInfo]
 
 
-@dataclass
+@dataclass(slots=True)
 class ColumnInfoMapping:
     columninfo: dict[str, ColumnInfo]
 
-    # Convenience dict-like behavior
-    def __getitem__(self, item: str) -> ColumnInfo:
-        return self.columninfo[item]
+    # # Convenience dict-like behavior
+    # def __getitem__(self, item: str) -> ColumnInfo:
+    #     return self.columninfo[item]
 
-    # Use a custom method to iterate over keys to avoid BaseModel __iter__ override issues
-    def iter_keys(self):
-        return iter(self.columninfo)
+    # # Use a custom method to iterate over keys to avoid BaseModel __iter__ override issues
+    # def iter_keys(self):
+    #     return iter(self.columninfo)
 
-    def items(self):
-        return self.columninfo.items()
+    # def items(self):
+    #     return self.columninfo.items()
 
-    def keys(self):
-        return self.columninfo.keys()
+    # def keys(self):
+    #     return self.columninfo.keys()
 
-    def values(self):
-        return self.columninfo.values()
+    # def values(self):
+    #     return self.columninfo.values()
 
 
 def get_threshold_method(column: pd.Series, max_sample_size: int = 5000) -> str:
@@ -302,7 +302,7 @@ def analyse_columns(
 
 
 def insert_descriptions(
-    column_info: ColumnInfoMapping, config_data: ConfigData
+    dict_column_info: ColumnInfoMapping, config_data: ConfigData
 ) -> ColumnInfoMapping:
     if config_data.description_file is not None:
         if os.path.isfile(config_data.description_file):
@@ -312,10 +312,10 @@ def insert_descriptions(
                 encoding="utf-8",
             ) as file:
                 descriptions: dict[str, str] = yaml.safe_load(stream=file)
-            for column in column_info.keys():
-                column_name = column_info[column].column_name
-                column_info[column].description = descriptions.get(
-                    column_name, ""
-                ).replace("\n","<br>")
-            return column_info
-    return column_info
+            for column in dict_column_info.columninfo.keys():
+                column_name = dict_column_info.columninfo[column].column_name
+                dict_column_info.columninfo[column].description = (
+                    descriptions.get(column_name, "").replace("\n", "<br>")
+                )
+            return dict_column_info
+    return dict_column_info

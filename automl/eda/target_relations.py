@@ -20,7 +20,7 @@ from .plots import (
 from .column_analysis import ColumnInfoMapping
 
 
-@dataclass
+@dataclass(slots=True)
 class NumNumCorr:
     pearson_correlation: float
     pearson_pvalue: float
@@ -34,7 +34,7 @@ class NumNumCorr:
         return asdict(self).items()
 
 
-@dataclass
+@dataclass(slots=True)
 class CatNumCorr:
     correlation_metric_name: str
     correlation_metric_value: float
@@ -46,29 +46,29 @@ class CatNumCorr:
         return asdict(self).items()
 
 
-@dataclass
+@dataclass(slots=True)
 class NumCatCorr:
     target_type: str
     n_categories: int
     statistical_test: str
     effect_size: str
     comment: str
-    
+
     def items(self):
         return asdict(self).items()
 
 
-@dataclass
+@dataclass(slots=True)
 class CatCatCorr:
     statistical_test:str
     effect_size: str
     comment: str
-    
+
     def items(self):
         return asdict(self).items()
 
 
-@dataclass
+@dataclass(slots=True)
 class TargetRelationMapping:
     target_relation: dict[
         str, Union[NumNumCorr, CatNumCorr, NumCatCorr, CatCatCorr]
@@ -79,7 +79,7 @@ class TargetRelationMapping:
 
 
 def get_feature_importance(
-    X_train: pd.DataFrame, y_train: pd.Series, column_info: ColumnInfoMapping
+    X_train: pd.DataFrame, y_train: pd.Series, dict_column_info: ColumnInfoMapping
 ) -> dict[str, float]:
     """
     Estimates feature importance using Mutual Information on a copy of the data
@@ -103,20 +103,22 @@ def get_feature_importance(
     valid_features = [
         col
         for col in X.columns
-        if column_info[col].proposed_type in ["numeric", "categorical"]
+        if dict_column_info.columninfo[col].proposed_type in ["numeric", "categorical"]
     ]
     X_filtered = X[valid_features]
 
     # Impute missing values before calculating mutual information
     for col in X_filtered.columns:
         if X_filtered[col].isnull().any():
-            if column_info[col].proposed_type == "numeric":
+            if dict_column_info.columninfo[col].proposed_type == "numeric":
                 median_val = X_filtered[col].median()
                 if not np.isnan(median_val):
                     X_filtered.loc[:,col] = X_filtered[col].fillna(median_val)
                 else:
                     X_filtered.loc[:, col] = X_filtered[col].fillna(0)
-            elif column_info[col].proposed_type == "categorical":
+            elif (
+                dict_column_info.columninfo[col].proposed_type == "categorical"
+            ):
                 mode_val = X_filtered[col].mode()
                 if not mode_val.empty:
                     if pd.notna(mode_val.iloc[0]):
@@ -132,7 +134,7 @@ def get_feature_importance(
 
     # Label encode categorical features for mutual information calculation
     for col in X_filtered.columns:
-        if column_info[col].proposed_type == "categorical":
+        if dict_column_info.columninfo[col].proposed_type == "categorical":
             try:
                 le = LabelEncoder()
                 X_filtered.loc[:, col] = pd.Series(
@@ -145,12 +147,12 @@ def get_feature_importance(
                 continue
 
     # Get target type from column_info
-    target_type = column_info["target"].proposed_type
+    target_type = dict_column_info.columninfo["target"].proposed_type
 
     # Identify numeric and categorical columns from the filtered set
     feature_columns = X_filtered.columns.tolist()
     is_discrete = [
-        column_info[col].proposed_type == "categorical"
+        dict_column_info.columninfo[col].proposed_type == "categorical"
         for col in feature_columns
     ]
 
@@ -790,14 +792,14 @@ def get_num_num_correlation(
 
 
 def get_target_relations(
-    X_train: DataFrame, y_train: Series, column_info: ColumnInfoMapping
+    X_train: DataFrame, y_train: Series, dict_column_info: ColumnInfoMapping
 ) -> TargetRelationMapping:
-    feature_importance = get_feature_importance(X_train=X_train, y_train=y_train, column_info=column_info)
+    feature_importance = get_feature_importance(X_train=X_train, y_train=y_train, dict_column_info=dict_column_info)
     target_relation = {}
     rel_plots = {}
-    target_type = column_info["target"].proposed_type
+    target_type = dict_column_info.columninfo["target"].proposed_type
     for column in X_train.columns:
-        feature_type = column_info[column].proposed_type
+        feature_type = dict_column_info.columninfo[column].proposed_type
         if target_type == "numeric":
             if feature_type == "numeric":
                 target_relation[column] = get_num_num_correlation(

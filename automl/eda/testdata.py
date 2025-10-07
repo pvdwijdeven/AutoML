@@ -11,7 +11,7 @@ from automl.dataloader import OriginalData
 from .column_analysis import ColumnInfoMapping
 
 
-@dataclass
+@dataclass(slots=True)
 class TestInfo:
     df_size: DataFrame
     html_size: str
@@ -81,7 +81,7 @@ def build_shift_table(stats: list[dict]) -> str:
     return "\n".join(html)
 
 
-def analyze_test_data(original_data: OriginalData, column_info: ColumnInfoMapping) -> TestInfo:
+def analyze_test_data(original_data: OriginalData, dict_column_info: ColumnInfoMapping) -> TestInfo:
 
     def suggestion(row):
         test_missing = (
@@ -180,7 +180,7 @@ def analyze_test_data(original_data: OriginalData, column_info: ColumnInfoMappin
     unseen_data = []
     for col in cat_cols:
         if col in X_comp.columns:
-            if column_info[col].proposed_type == "categorical":
+            if dict_column_info.columninfo[col].proposed_type == "categorical":
                 train_cats = set(X_train[col].dropna().astype(str).unique())
                 test_cats = set(X_comp[col].dropna().astype(str).unique())
                 unseen = test_cats - train_cats
@@ -256,7 +256,7 @@ def analyze_test_data(original_data: OriginalData, column_info: ColumnInfoMappin
     df_num_stats = pd.DataFrame(stats)
 
     table_html = build_shift_table(stats=stats)
-    
+
     suggestions["num_stats"] = (
         """Cells highlighted in light red indicate significant distribution shifts between training and test data.
         Cells highlighted in light red indicate significant distribution shifts between training and test data.

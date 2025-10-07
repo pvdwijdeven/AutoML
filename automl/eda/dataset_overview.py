@@ -11,7 +11,7 @@ from pandas import DataFrame, Series
 from .column_analysis import ColumnInfoMapping
 
 
-@dataclass
+@dataclass(slots=True)
 class DatasetInfo:
     number_of_features: int
     number_of_constant_features: int
@@ -197,7 +197,7 @@ def join_feature_links_with_linebreaks(
 
 def analyse_dataset(
     X_train: DataFrame,
-    column_info: ColumnInfoMapping,
+    dict_column_info: ColumnInfoMapping,
     dict_duplicates: dict[str, list[str]],
     y_train: Series,
 ) -> DatasetInfo:
@@ -236,7 +236,10 @@ def analyse_dataset(
 
     number_features = len(X_train.columns)
     constant_features = sum(
-        [column_info[col].is_constant for col in column_info.keys()]
+        [
+            dict_column_info.columninfo[col].is_constant
+            for col in dict_column_info.columninfo.keys()
+        ]
     )
     number_duplicate_features = sum(
         [len(dict_duplicates[x]) > 0 for x in dict_duplicates]
@@ -281,7 +284,7 @@ def analyse_dataset(
         percentage_of_missing_items=number_missing
         / (number_features * number_samples)
         * 100,
-        target=f'<a href="#feature_{column_info["target"].column_name.replace(" ", "-")}" onclick="showTab(1)" class="feature-link">{column_info["target"].column_name}</a>',
-        target_type=column_info["target"].proposed_type,
+        target=f'<a href="#feature_{dict_column_info.columninfo["target"].column_name.replace(" ", "-")}" onclick="showTab(1)" class="feature-link">{dict_column_info.columninfo["target"].column_name}</a>',
+        target_type=dict_column_info.columninfo["target"].proposed_type,
         dataset_type=detect_dataset_type(target=y_train),
     )

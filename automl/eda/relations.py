@@ -17,13 +17,13 @@ from .plots import (
 )
 
 
-@dataclass
+@dataclass(slots=True)
 class InitialScanPlots:
     numeric_heatmap: str
     categorical_heatmap: str
 
 
-@dataclass
+@dataclass(slots=True)
 class FeaturePair:
     feature_1: str
     feature_2: str
@@ -32,23 +32,23 @@ class FeaturePair:
     type: str
 
 
-@dataclass
+@dataclass(slots=True)
 class PairwiseSummary:
     numeric_pairs: List[FeaturePair] = field(default_factory=list)
     categorical_pairs: List[FeaturePair] = field(default_factory=list)
 
 
-@dataclass
+@dataclass(slots=True)
 class PairwisePlot:
     plot: str
 
 
-@dataclass
+@dataclass(slots=True)
 class PairwisePlots:
     plots: dict[str, PairwisePlot] = field(default_factory=dict)
 
 
-@dataclass
+@dataclass(slots=True)
 class RelationInfoMapping:
     initial_scan_plots: InitialScanPlots
     pairwise_summary: PairwiseSummary

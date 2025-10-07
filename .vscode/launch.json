@@ -4,6 +4,7 @@
     // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
     "configurations": [
+
         {
             "name": "Python Debugger: Current File",
             "type": "debugpy",
@@ -19,6 +20,19 @@
         "console": "integratedTerminal",
         "args": [
             "--config", "personal/Titanic/data/config.yaml",
+        ],
+        "env": {
+            "UV_PREFER_BINARY": "1"
+        }
+        },
+        {
+        "name": "Accidents",
+        "type": "debugpy",
+        "request": "launch",
+        "module": "automl.automl_main",
+        "console": "integratedTerminal",
+        "args": [
+            "--config", "personal/RoadAccidents/data/config.yaml",
         ],
         "env": {
             "UV_PREFER_BINARY": "1"
