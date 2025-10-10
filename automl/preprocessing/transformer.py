@@ -13,12 +13,7 @@ from .column_handling import (
     drop_constant_columns,
     general_info,
 )
-
-# from .encoding import auto_encode_features
-# from .general import drop_constant_columns, drop_duplicate_columns, drop_strings
-# from .missing import handle_missing_values
-# from .outliers import handle_outliers, outlier_imputation_order
-# from .standardizing import normalize_columns
+from .outliers import handle_outliers
 
 
 class AutomlTransformer:
@@ -86,11 +81,11 @@ class AutomlTransformer:
                 "name": "general_info",
                 "function": general_info,
             },
-            # {
-            #     "name": "handle_outliers_before",
-            #     "function": handle_outliers,
-            #     "config": {"before": True},
-            # },
+            {
+                "name": "handle_outliers_before",
+                "function": handle_outliers,
+                "config": {"before": True},
+            },
             # {
             #     "name": "handle_missing_values_cat",
             #     "function": handle_missing_values,
@@ -103,11 +98,11 @@ class AutomlTransformer:
             #     "function": handle_missing_values,
             #     "config": {"categorical_only": False},
             # },
-            # {
-            #     "name": "handle_outliers_after",
-            #     "function": handle_outliers,
-            #     "config": {"before": False},
-            # },
+            {
+                "name": "handle_outliers_after",
+                "function": handle_outliers,
+                "config": {"before": False},
+            },
             # {"name": "normalize_columns", "function": normalize_columns},
         ]
 
