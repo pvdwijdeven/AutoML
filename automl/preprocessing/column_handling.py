@@ -18,7 +18,6 @@ def general_info(
     fit: bool,
     step_params: dict[str, Any],
     logger: Logger,
-    meta_data: dict[str, dict[str, Any]],
     **config: Any,
 ) -> tuple[DataFrame, Optional[Series], dict[str, Any]]:
     if fit:
@@ -34,7 +33,58 @@ def general_info(
     return X, y, step_params
 
 
+def drop_strings(
+    X: DataFrame,
+    y: Optional[Series],
+    fit: bool,
+    step_params: dict[str, Any],
+    logger: Logger,
+    **config: Any,
+) -> tuple[DataFrame, Optional[Series], dict[str, Any]]:
+    """
+    Drops string-like columns (string, category, object) with too many unique values.
 
+    During the *fit* stage, the function identifies string-like columns whose number
+    of unique values exceeds a threshold (`max_unique`) and records them in `step_params`.
+    During the *transform* stage, the previously recorded columns are dropped.
+
+    Parameters
+    ----------
+    X : pd.DataFrame
+        Feature matrix.
+    y : Optional[pd.Series]
+        Target values, used to determine threshold for unique values.
+    fit : bool
+        Whether to operate in 'fit' mode (identify columns) or 'transform' mode (apply drops).
+    step_params : dict[str, Any]
+        dictionary for saving or retrieving parameters across fit/transform stages.
+    logger : Logger
+        Logger instance for debug messages.
+    meta_data : dict[str, Any]
+        Additional metadata dictionary (currently unused).
+
+    Returns
+    -------
+    tuple[pd.DataFrame, Optional[pd.Series], Optional[dict[str, Any]]]
+        Transformed (or unmodified) X, unchanged y, and updated step_params.
+    """
+    if fit:
+        string_columns = []
+        max_unique = min(
+            20, max(10, int(0.01 * len(y)) if y is not None else 10)
+        )
+        for col in X.columns:
+            if X[col].dtype in ["string", "category", "object"]:
+                if X[col].nunique(dropna=True) > max_unique:
+                    string_columns.append(col)
+        step_params["drop_cols"] = string_columns
+
+    string_columns = step_params.get("drop_cols", [])
+    if string_columns:
+        logger.debug(f"[GREEN]- Dropping string-like columns: {string_columns}")
+        X = X.drop(columns=string_columns)
+
+    return X, y, step_params
 
 
 def drop_constant_columns(
@@ -43,7 +93,6 @@ def drop_constant_columns(
     fit: bool,
     step_params: dict[str, Any],
     logger: Logger,
-    meta_data: dict[str, dict[str, Any]],
     **config: Any,
 ) -> tuple[DataFrame, Optional[Series], dict[str, Any]]:
     """
@@ -131,7 +180,6 @@ def drop_duplicate_columns(
     fit: bool,
     step_params: dict[str, Any],
     logger: Logger,
-    meta_data: dict[str, dict[str, Any]],
     **config: Any,
 ) -> tuple[DataFrame, Optional[Series], dict[str, Any]]:
     """

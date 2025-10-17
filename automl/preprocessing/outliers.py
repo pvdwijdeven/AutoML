@@ -15,7 +15,6 @@ def handle_outliers(
     step_params: dict[str, Any],
     before: bool,
     logger: Logger,
-    meta_data: dict[str, dict[str, Any]],
     **config: Any,
 ) -> tuple[DataFrame, Optional[Series], dict[str, Any]]:
     """

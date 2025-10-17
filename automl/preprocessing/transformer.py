@@ -12,9 +12,12 @@ from .column_handling import (
     drop_duplicate_columns,
     drop_constant_columns,
     general_info,
+    drop_strings,
 )
 from .outliers import handle_outliers
-
+from .missing_values import handle_missing_values
+from .encoding import auto_encode_features
+from .standardizing import normalize_columns
 
 class AutomlTransformer:
     """
@@ -86,24 +89,28 @@ class AutomlTransformer:
                 "function": handle_outliers,
                 "config": {"before": True},
             },
-            # {
-            #     "name": "handle_missing_values_cat",
-            #     "function": handle_missing_values,
-            #     "config": {"categorical_only": True},
-            # },
-            # {"name": "drop_strings", "function": drop_strings},
-            # {"name": "auto_encode_features", "function": auto_encode_features},
-            # {
-            #     "name": "handle_missing_values_num",
-            #     "function": handle_missing_values,
-            #     "config": {"categorical_only": False},
-            # },
+            {
+                "name": "handle_missing_values_cat",
+                "function": handle_missing_values,
+                "config": {"categorical_only": True},
+            },
+            {"name": "drop_strings", "function": drop_strings},
+            {
+                "name": "encode_categorical_features",
+                "function": auto_encode_features,
+                "config": {"OHE_CARDINALITY_THRESHOLD": 10},
+            },
+            {
+                "name": "handle_missing_values_num",
+                "function": handle_missing_values,
+                "config": {"categorical_only": False},
+            },
             {
                 "name": "handle_outliers_after",
                 "function": handle_outliers,
                 "config": {"before": False},
             },
-            # {"name": "normalize_columns", "function": normalize_columns},
+            {"name": "normalize_columns", "function": normalize_columns},
         ]
 
         # Initialize meta_data to be populated during fit
@@ -167,7 +174,6 @@ class AutomlTransformer:
                 fit=True,
                 step_params={},  # Step params are calculated here
                 logger=self.logger,
-                meta_data=self.meta_data.copy(),
                 **step.get("config", {}),
             )
 
@@ -210,7 +216,6 @@ class AutomlTransformer:
                 fit=False,
                 step_params=step.get("params", {}),  # Use stored parameters
                 logger=self.logger,
-                meta_data=self.meta_data.copy(),
                 **step.get("config", {}),
             )
 
